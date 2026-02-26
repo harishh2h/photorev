@@ -1,10 +1,10 @@
-import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import { RegisterSchema } from "../utils/types";
+import { FastifyInstance, FastifyPluginOptions } from 'fastify'
+import { RegisterSchema } from '../utils/types'
+import buildAuthHandler from '../handler/auth.handler'
 
 async function authRoutes(fastify: FastifyInstance, opts: FastifyPluginOptions): Promise<void> {
-    fastify.post('/register', {schema : RegisterSchema} ,async (request, reply) => {
-        return reply.status(200).send({ message: 'Hello World' });
-    });
+    const authHandler = buildAuthHandler(fastify, opts)
+    fastify.post('/register', { schema: RegisterSchema }, authHandler.registerUser)
 }
 
-export default authRoutes;
+export default authRoutes
