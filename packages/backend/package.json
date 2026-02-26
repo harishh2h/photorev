@@ -3,10 +3,15 @@
   "version": "1.0.0",
   "description": "",
   "main": "server.ts",
-  "scripts": {
+"scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "migrate:latest": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex migrate:latest --knexfile src/db/knexfile.ts",
+    "migrate:make": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex migrate:make --knexfile src/db/knexfile.ts -x ts",
+    "migrate:rollback": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex migrate:rollback --knexfile src/db/knexfile.ts",
+    "migrate:list": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex migrate:list --knexfile src/db/knexfile.ts",
+    "seed:run": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex seed:run --knexfile src/db/knexfile.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
-  },
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -23,6 +28,7 @@
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^25.3.0",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
   }
