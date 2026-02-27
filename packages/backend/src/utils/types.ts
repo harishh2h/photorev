@@ -15,4 +15,16 @@ export const RegisterSchema ={
       }
 }
 
+export const LoginSchema = {
+    body: {
+        type: 'object',
+        required: ['email', 'password'],
+        properties: {
+            email: { type: 'string', format: 'email', minLength: 3, maxLength: 255 },
+            password: { type: 'string', minLength: 6, maxLength: 255 },
+        },
+        additionalProperties: false,
+    },
+}
+
 export type { BuildOptions }

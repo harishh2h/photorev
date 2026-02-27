@@ -3,15 +3,15 @@
   "version": "1.0.0",
   "description": "",
   "main": "server.ts",
-"scripts": {
+  "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "migrate:latest": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex migrate:latest --knexfile src/db/knexfile.ts",
     "migrate:make": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex migrate:make --knexfile src/db/knexfile.ts -x ts",
     "migrate:rollback": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex migrate:rollback --knexfile src/db/knexfile.ts",
     "migrate:list": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex migrate:list --knexfile src/db/knexfile.ts",
     "seed:run": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex seed:run --knexfile src/db/knexfile.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
-},
+    "test": "jest"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -19,15 +19,22 @@
   "dependencies": {
     "@fastify/cors": "^11.2.0",
     "@fastify/jwt": "^10.0.0",
+    "@fastify/swagger": "^9.7.0",
+    "@fastify/swagger-ui": "^5.2.5",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.3.1",
     "fastify": "^5.7.4",
+    "jsonwebtoken": "^9.0.3",
     "knex": "^3.1.0",
     "pg": "^8.18.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.3.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
