@@ -1,0 +1,9 @@
+.page {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.main {
+  padding: var(--space-8) var(--space-6) var(--space-12);
+  padding-top: calc(3.5rem + var(--space-8));
+}

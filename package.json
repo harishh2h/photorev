@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "pnpm --filter @photorev/frontend dev",
     "backend:dev": "pnpm --filter @photorev/backend dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
