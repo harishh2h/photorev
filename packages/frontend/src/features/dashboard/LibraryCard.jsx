@@ -18,7 +18,7 @@ export default function LibraryCard({
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className={styles.imageWrap}>
-        {!hasPhotos && <div className={styles.placeholder} aria-hidden />}
+        {!hasPhotos && <div className="illustration-placeholder" aria-hidden />}
         {hasPhotos && isSingle && (
           <div className={styles.imageGridSingle}>
             <img src={displayUrls[0]} alt="" />

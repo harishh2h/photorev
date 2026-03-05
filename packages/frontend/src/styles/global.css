@@ -10,7 +10,7 @@
 
 body {
   margin: 0;
-  font-family: var(--font-body);
+  font-family: var(--font-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -18,10 +18,37 @@ body {
 @keyframes fadeUp {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/**
+ * Default when no image: geometric illustration using accent palette.
+ * Design system: accent-subtle base + accent-mid dots/lines — never solid grey.
+ */
+.illustration-placeholder {
+  position: absolute;
+  inset: 0;
+  background-color: var(--color-accent-subtle);
+  background-image: radial-gradient(
+      circle at 50% 50%,
+      var(--color-accent-mid) 1.5px,
+      transparent 1.5px
+    ),
+    radial-gradient(
+      circle at 20% 30%,
+      var(--color-accent-mid) 1px,
+      transparent 1px
+    ),
+    radial-gradient(
+      circle at 80% 70%,
+      var(--color-accent-mid) 1px,
+      transparent 1px
+    );
+  background-size: 24px 24px, 40px 40px, 36px 36px;
+  background-position: 0 0, 0 0, 12px 12px;
 }

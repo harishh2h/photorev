@@ -1,31 +1,35 @@
 .hero {
-  margin-bottom: var(--space-10);
+  margin-bottom: var(--space-12);
 }
 
 .greeting {
-  font-family: var(--font-display);
-  font-size: var(--text-3xl);
+  font-family: var(--font-base);
+  font-size: var(--text-4xl);
   font-weight: 700;
   color: var(--color-text);
   margin: 0 0 var(--space-2);
+  animation: fadeUp var(--stagger-duration) var(--ease-out) both;
 }
 
 .subtitle {
+  font-family: var(--font-base);
   font-size: var(--text-base);
   color: var(--color-text-muted);
   margin: 0 0 var(--space-8);
+  animation: fadeUp var(--stagger-duration) var(--ease-out) both;
 }
 
 .stats {
   display: grid;
-  grid-template-columns: 2fr 1fr 2fr;
+  grid-template-columns: 2fr 1.5fr 1fr;
   gap: var(--space-6);
 }
 
 .statCard {
   background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
   padding: var(--space-6);
   transition: transform var(--duration-slow) var(--ease-out),
     box-shadow var(--duration-slow) var(--ease-out);
@@ -34,16 +38,16 @@
 
 .statCard:hover {
   transform: translateY(var(--card-hover-y));
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .statCard:nth-child(1) { animation-delay: 0ms; }
-.statCard:nth-child(2) { animation-delay: 80ms; }
-.statCard:nth-child(3) { animation-delay: 160ms; }
+.statCard:nth-child(2) { animation-delay: 70ms; }
+.statCard:nth-child(3) { animation-delay: 140ms; }
 
 .statValue {
-  font-family: var(--font-display);
-  font-size: var(--text-2xl);
+  font-family: var(--font-base);
+  font-size: var(--text-4xl);
   font-weight: 700;
   color: var(--color-accent);
   line-height: var(--line-height-tight);
@@ -51,7 +55,8 @@
 }
 
 .statLabel {
+  font-family: var(--font-base);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
-  margin: 0;
+  margin: var(--space-2) 0 0;
 }

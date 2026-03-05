@@ -10,7 +10,11 @@ import jwtPlugin from "./plugins/jwt";
 function buildApp(opts: BuildOptions = {}): FastifyInstance {
 
   const app = Fastify(opts);
-  app.register(cors);
+  app.register(cors, {
+    origin: process.env.CORS_ORIGIN ?? true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  });
   app.register(jwtPlugin);
 
   app.register(swagger, {

@@ -6,7 +6,7 @@ const DROPDOWN_ITEMS = {
   projects: ['All Projects', 'Recent', 'Archived'],
   reviews: ['Active Sessions', 'Completed', 'Shared Links'],
   library: ['All Photos', 'Albums', 'Favorites'],
-  user: ['Profile', 'Settings', 'Logout'],
+  user: ['Profile', 'Settings'],
 }
 
 function NavDropdown({ label, items, isOpen, onToggle, onClose, triggerRef, panelRef }) {
@@ -51,7 +51,7 @@ NavDropdown.propTypes = {
   panelRef: PropTypes.object.isRequired,
 }
 
-export default function Header({ userDisplayName = 'User' }) {
+export default function Header({ userDisplayName = 'User', onLogout }) {
   const projects = useDropdown()
   const reviews = useDropdown()
   const library = useDropdown()
@@ -115,7 +115,7 @@ export default function Header({ userDisplayName = 'User' }) {
           </button>
           {user.isOpen && (
             <div ref={user.panelRef} className={styles.panel} role="menu">
-              {DROPDOWN_ITEMS.user.map((item) => (
+              {DROPDOWN_ITEMS.user.filter((item) => item !== 'Logout').map((item) => (
                 <button
                   key={item}
                   type="button"
@@ -126,6 +126,18 @@ export default function Header({ userDisplayName = 'User' }) {
                   {item}
                 </button>
               ))}
+              <div className={styles.panelSeparator} aria-hidden />
+              <button
+                type="button"
+                className={`${styles.panelItem} ${styles.panelItemLogout}`}
+                role="menuitem"
+                onClick={() => {
+                  if (onLogout) onLogout()
+                  user.close()
+                }}
+              >
+                Sign out
+              </button>
             </div>
           )}
         </div>
@@ -136,4 +148,5 @@ export default function Header({ userDisplayName = 'User' }) {
 
 Header.propTypes = {
   userDisplayName: PropTypes.string,
+  onLogout: PropTypes.func,
 }

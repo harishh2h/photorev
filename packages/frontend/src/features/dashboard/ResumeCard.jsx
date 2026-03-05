@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
 import styles from './ResumeCard.module.css'
 
@@ -11,6 +12,18 @@ export default function ResumeCard({
   animationDelay = 0,
 }) {
   const progressPercent = totalCount > 0 ? (selectedCount / totalCount) * 100 : 0
+  const [fillPercent, setFillPercent] = useState(0)
+
+  useEffect(() => {
+    if (progressPercent <= 0) {
+      setFillPercent(0)
+      return
+    }
+    const timeoutId = window.setTimeout(() => {
+      setFillPercent(progressPercent)
+    }, 50)
+    return () => window.clearTimeout(timeoutId)
+  }, [progressPercent])
   return (
     <article
       className={styles.card}
@@ -20,7 +33,7 @@ export default function ResumeCard({
         {coverImageUrl ? (
           <img src={coverImageUrl} alt="" />
         ) : (
-          <div className={styles.placeholder} aria-hidden />
+          <div className="illustration-placeholder" aria-hidden />
         )}
       </div>
       <div className={styles.content}>
@@ -29,12 +42,12 @@ export default function ResumeCard({
         <div className={styles.progressTrack}>
           <div
             className={styles.progressFill}
-            style={{ width: `${progressPercent}%` }}
+            style={{ width: `${fillPercent}%` }}
           />
         </div>
         <p className={styles.lastActive}>{lastActiveAt}</p>
         <button type="button" className={styles.resumeBtn}>
-          Resume →
+          Resume <span className={styles.resumeArrow}>→</span>
         </button>
       </div>
     </article>

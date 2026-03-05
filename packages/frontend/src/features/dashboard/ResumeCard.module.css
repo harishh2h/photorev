@@ -1,9 +1,9 @@
 .card {
   flex: 0 0 280px;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
   transition: transform var(--duration-slow) var(--ease-out),
     box-shadow var(--duration-slow) var(--ease-out);
@@ -12,7 +12,7 @@
 
 .card:hover {
   transform: translateY(var(--card-hover-y));
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .card:hover .imageWrap {
@@ -24,7 +24,7 @@
   width: 100%;
   padding-bottom: 65%;
   overflow: hidden;
-  transition: transform var(--image-hover-duration) var(--ease-out);
+  transition: transform var(--duration-slow) var(--ease-out);
 }
 
 .imageWrap img {
@@ -35,19 +35,12 @@
   object-fit: cover;
 }
 
-.placeholder {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, var(--color-accent-subtle) 0%, var(--color-accent) 100%);
-  opacity: 0.9;
-}
-
 .content {
   padding: var(--space-6);
 }
 
 .projectName {
-  font-family: var(--font-display);
+  font-family: var(--font-base);
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--color-text);
@@ -61,9 +54,9 @@
 }
 
 .progressTrack {
-  height: 4px;
+  height: 6px;
   background: var(--color-border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-pill);
   overflow: hidden;
   margin-bottom: var(--space-3);
 }
@@ -71,8 +64,8 @@
 .progressFill {
   height: 100%;
   background: var(--color-accent);
-  border-radius: var(--radius-full);
-  transition: width 600ms var(--ease-out);
+  border-radius: var(--radius-pill);
+  transition: width var(--progress-duration) var(--ease-out);
 }
 
 .lastActive {
@@ -85,6 +78,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  font-family: var(--font-base);
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--color-accent);
@@ -92,14 +86,19 @@
   border: none;
   cursor: pointer;
   padding: 0;
-  transition: transform var(--duration-fast) var(--ease-default);
-}
-
-.card:hover .resumeBtn {
-  transform: translateX(4px);
+  transition: color var(--duration-fast) var(--ease-out);
 }
 
 .resumeBtn:focus-visible {
   outline: none;
   box-shadow: var(--shadow-focus);
+}
+
+.resumeArrow {
+  display: inline-block;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.card:hover .resumeArrow {
+  transform: translateX(4px);
 }
