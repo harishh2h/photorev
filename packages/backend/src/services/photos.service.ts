@@ -11,24 +11,36 @@ export interface PhotoRecord {
   readonly id: string;
   readonly project_id: string;
   readonly library_id: string;
-  readonly filename: string;
-  readonly absolute_path: string;
+  readonly original_path: string;
   thumbnail_path: string | null;
   readonly hash: string | null;
   metadata: unknown | null;
   readonly created_at: Date;
+  readonly original_name: string | null;
+  readonly mime_type: string | null;
+  readonly file_size: number | null;
+  readonly status: string;
+  readonly width: number | null;
+  readonly height: number | null;
+  readonly preview_path: string | null;
 }
 
 export interface PhotoDto {
   readonly id: string;
   readonly projectId: string;
   readonly libraryId: string;
-  readonly filename: string;
-  readonly absolutePath: string;
+  readonly originalPath: string;
   readonly thumbnailPath: string | null;
   readonly hash: string | null;
   readonly metadata: unknown | null;
   readonly createdAt: string;
+  readonly originalName: string | null;
+  readonly mimeType: string | null;
+  readonly fileSize: number | null;
+  readonly status: string;
+  readonly width: number | null;
+  readonly height: number | null;
+  readonly previewPath: string | null;
 }
 
 export interface ListPhotosFilters extends PaginationParams {
@@ -72,12 +84,18 @@ function mapPhotoRecordToDto(record: PhotoRecord): PhotoDto {
     id: record.id,
     projectId: record.project_id,
     libraryId: record.library_id,
-    filename: record.filename,
-    absolutePath: record.absolute_path,
+    originalPath: record.original_path,
     thumbnailPath: record.thumbnail_path,
     hash: record.hash,
     metadata: record.metadata,
     createdAt: record.created_at.toISOString(),
+    originalName: record.original_name,
+    mimeType: record.mime_type,
+    fileSize: record.file_size,
+    status: record.status,
+    width: record.width,
+    height: record.height,
+    previewPath: record.preview_path,
   };
 }
 
@@ -106,7 +124,7 @@ function buildPhotosService(
       baseQuery.where("photos.library_id", filters.libraryId);
     }
     if (filters.search) {
-      baseQuery.whereILike("photos.filename", `%${filters.search}%`);
+      baseQuery.whereILike("photos.original_name", `%${filters.search}%`);
     }
     if (typeof filters.decision !== "undefined") {
       baseQuery

@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import buildApp from './app';
 import { config } from './config/config';
+import path from 'path';
+import fs from 'fs';
 
 const server = buildApp({
     logger : {
@@ -19,6 +21,28 @@ const start = async (): Promise<void> => {
     try {
         await server.listen({ port : config.server.port, host : config.server.host });
         server.log.info(`Server is running on http://${config.server.host}:${config.server.port}`);
+    } catch (error) {
+        server.log.error(error);
+        process.exit(1);
+    }
+
+    try {
+        const StorageRoot = process.env.STORAGE_ROOT ?? path.join(process.cwd(), 'storage');
+        if(!fs.existsSync(StorageRoot)) {
+            fs.mkdirSync(StorageRoot, { recursive: true });
+            server.log.info(`Created storage directory at ${StorageRoot}`);
+        }else{
+            server.log.info(`Storage directory already exists at ${StorageRoot}`);
+        }
+
+        const photoDir = path.join(StorageRoot, 'photos');
+        if(!fs.existsSync(photoDir)) {
+            fs.mkdirSync(photoDir, { recursive: true });
+            server.log.info(`Created photo directory at ${photoDir}`);
+        }else{
+            server.log.info(`Photo directory already exists at ${photoDir}`);
+        }
+
     } catch (error) {
         server.log.error(error);
         process.exit(1);
