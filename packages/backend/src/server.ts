@@ -11,6 +11,7 @@ const server = buildApp({
 })
 
 const start = async (): Promise<void> => {
+    // Check database connection
     try {
         await server.db.raw('SELECT NOW()');
         server.log.info('Database connection OK');
@@ -18,15 +19,10 @@ const start = async (): Promise<void> => {
         server.log.error(error, 'Database connection failed');
         process.exit(1);
     }
-    try {
-        await server.listen({ port : config.server.port, host : config.server.host });
-        server.log.info(`Server is running on http://${config.server.host}:${config.server.port}`);
-    } catch (error) {
-        server.log.error(error);
-        process.exit(1);
-    }
+
 
     try {
+        // Create storage directory if it doesn't exist
         const StorageRoot = process.env.STORAGE_ROOT ?? path.join(process.cwd(), 'storage');
         if(!fs.existsSync(StorageRoot)) {
             fs.mkdirSync(StorageRoot, { recursive: true });
@@ -43,6 +39,15 @@ const start = async (): Promise<void> => {
             server.log.info(`Photo directory already exists at ${photoDir}`);
         }
 
+    } catch (error) {
+        server.log.error(error);
+        process.exit(1);
+    }
+
+    // Start server
+    try {
+        await server.listen({ port : config.server.port, host : config.server.host });
+        server.log.info(`Server is running on http://${config.server.host}:${config.server.port}`);
     } catch (error) {
         server.log.error(error);
         process.exit(1);

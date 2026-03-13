@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.ts",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "tsx src/server.ts",
     "migrate:latest": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex migrate:latest --knexfile src/db/knexfile.ts",
     "migrate:make": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex migrate:make --knexfile src/db/knexfile.ts -x ts",
     "migrate:rollback": "NODE_OPTIONS='-r ts-node/register' pnpm exec knex migrate:rollback --knexfile src/db/knexfile.ts",
@@ -19,11 +19,13 @@
   "dependencies": {
     "@fastify/cors": "^11.2.0",
     "@fastify/jwt": "^10.0.0",
+    "@fastify/multipart": "^9.4.0",
     "@fastify/swagger": "^9.7.0",
     "@fastify/swagger-ui": "^5.2.5",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.3.1",
     "fastify": "^5.7.4",
+    "fs-extra": "^11.3.4",
     "jsonwebtoken": "^9.0.3",
     "knex": "^3.1.0",
     "pg": "^8.18.0"
@@ -37,6 +39,7 @@
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }

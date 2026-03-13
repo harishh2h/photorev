@@ -7,6 +7,19 @@ import {
   PaginationParams,
 } from "../utils/pagination";
 
+export interface PhotoInsert {
+  id?: string;
+  project_id: string;
+  library_id: string;
+  original_path: string;
+  original_name: string;
+  mime_type?: string;
+  file_size?: number;
+  status?: "pending" | "ready" | "failed";
+  width?: number;
+  height?: number;
+  preview_path?: string;
+}
 export interface PhotoRecord {
   readonly id: string;
   readonly project_id: string;
@@ -67,6 +80,12 @@ export interface UpdatePhotoMetadataParams {
   readonly thumbnailPath?: string;
 }
 
+export interface CanUploadToProjectParams {
+  readonly userId: string;
+  readonly projectId: string;
+  readonly libraryId: string;
+}
+
 export interface PhotosServiceMethods {
   listPhotos: (
     filters: ListPhotosFilters,
@@ -77,6 +96,10 @@ export interface PhotosServiceMethods {
   ) => Promise<PaginatedResult<PhotoDto>>;
   getPhoto: (params: GetPhotoParams) => Promise<PhotoDto | null>;
   updatePhotoMetadata: (params: UpdatePhotoMetadataParams) => Promise<PhotoDto | null>;
+  insertPhoto: (photo: PhotoInsert) => Promise<PhotoDto | null>;
+  canUploadToProject: (
+    params: CanUploadToProjectParams,
+  ) => Promise<boolean>;
 }
 
 function mapPhotoRecordToDto(record: PhotoRecord): PhotoDto {
@@ -220,11 +243,46 @@ function buildPhotosService(
     return mapPhotoRecordToDto(updated);
   }
 
+  async function canUploadToProject(
+    params: CanUploadToProjectParams,
+  ): Promise<boolean> {
+    const row = await db("project_members")
+      .join("library", "library.project_id", "project_members.project_id")
+      .where("project_members.user_id", params.userId)
+      .where("project_members.project_id", params.projectId)
+      .where("library.id", params.libraryId)
+      .first();
+    return Boolean(row);
+  }
+
+  async function insertPhoto(photo: PhotoInsert): Promise<PhotoDto | null> {
+    const row: Record<string, unknown> = {
+      project_id: photo.project_id,
+      library_id: photo.library_id,
+      original_path: photo.original_path,
+      original_name: photo.original_name,
+      mime_type: photo.mime_type,
+      file_size: photo.file_size,
+      status: photo.status ?? "pending",
+      width: photo.width ?? null,
+      height: photo.height ?? null,
+    };
+    if (photo.id) row.id = photo.id;
+    const inserted = await db<PhotoRecord>("photos")
+      .insert(row, "*")
+      .then((rows: PhotoRecord[]) => rows);
+    const insertedPhoto = inserted[0];
+    if (!insertedPhoto) return null;
+    return mapPhotoRecordToDto(insertedPhoto);
+  }
+
   return {
     listPhotos,
     listLibraryPhotos,
     getPhoto,
     updatePhotoMetadata,
+    insertPhoto,
+    canUploadToProject,
   };
 }
 

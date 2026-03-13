@@ -21,6 +21,7 @@ export interface Photo {
 }
 
 export interface PhotoInsert {
+  id?: string
   project_id: string
   library_id: string
   original_path: string

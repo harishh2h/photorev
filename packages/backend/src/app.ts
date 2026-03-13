@@ -6,6 +6,7 @@ import { BuildOptions } from "./utils/types";
 import routes from "./routes";
 import { db } from "./db";
 import jwtPlugin from "./plugins/jwt";
+import multipart from "@fastify/multipart";
 
 function buildApp(opts: BuildOptions = {}): FastifyInstance {
 
@@ -16,6 +17,11 @@ function buildApp(opts: BuildOptions = {}): FastifyInstance {
     allowedHeaders: ["Content-Type", "Authorization"],
   });
   app.register(jwtPlugin);
+  app.register(multipart, {
+    limits: {
+      fileSize: 1024 * 1024 * 30, // 30MB
+    },
+  });
 
   app.register(swagger, {
     openapi: {

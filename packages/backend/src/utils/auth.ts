@@ -18,6 +18,7 @@ export async function ensureAuthenticated(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
+  // Test mode bypass for development - remove this in production
   const bypassHeader = request.headers["x-test-bypass-auth"];
   if (bypassHeader === "1") {
     const userIdHeader = request.headers["x-test-user-id"];
@@ -26,6 +27,7 @@ export async function ensureAuthenticated(
       return;
     }
   }
+  // Verify JWT token
   try {
     await (request as any).jwtVerify();
   } catch (_err) {
