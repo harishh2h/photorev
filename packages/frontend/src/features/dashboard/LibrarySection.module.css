@@ -1,5 +1,5 @@
 .section {
-  margin-bottom: var(--space-12);
+  margin-bottom: var(--space-8);
 }
 
 .headingRow {
@@ -11,7 +11,7 @@
 
 .heading {
   font-family: var(--font-base);
-  font-size: var(--text-xl);
+  font-size: var(--text-3xl);
   font-weight: 600;
   color: var(--color-text);
   margin: 0;
@@ -19,15 +19,15 @@
 
 .viewAll {
   font-family: var(--font-base);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: 500;
-  color: var(--color-accent);
+  color: #086441;
   text-decoration: none;
   transition: color var(--duration-fast) var(--ease-out);
 }
 
 .viewAll:hover {
-  color: var(--color-accent-hover);
+  color: var(--color-accent);
 }
 
 .viewAll:focus-visible {
@@ -37,18 +37,21 @@
 
 .grid {
   display: grid;
-  grid-template-columns: 2fr 1fr;
-  grid-template-rows: auto auto auto;
-  grid-template-areas:
-    'large small1'
-    'wide1 wide2'
-    'small2 large2';
-  gap: var(--bento-gap, var(--space-5));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
 }
 
-.grid > *:nth-child(1) { grid-area: large; animation-delay: 0ms; }
-.grid > *:nth-child(2) { grid-area: small1; animation-delay: 80ms; }
-.grid > *:nth-child(3) { grid-area: wide1; animation-delay: 160ms; }
-.grid > *:nth-child(4) { grid-area: wide2; animation-delay: 240ms; }
-.grid > *:nth-child(5) { grid-area: small2; animation-delay: 320ms; }
-.grid > *:nth-child(6) { grid-area: large2; animation-delay: 400ms; }
+@media (max-width: 1023px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .heading {
+    font-size: var(--text-2xl);
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

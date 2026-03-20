@@ -5,9 +5,7 @@ import { useAuth } from './useAuth.js'
 import { useToast } from '@/components/Toast/index.js'
 import styles from './AuthForm.module.css'
 
-const WELCOME_HEADING = 'Welcome back!'
-const WELCOME_SUBTEXT =
-  "Simplify your photo review workflow and get client feedback in one place. Get started for free."
+const BRAND_MONOGRAM = 'PR'
 
 export default function AuthForm({ mode, onToggleMode }) {
   const [email, setEmail] = useState('')
@@ -48,22 +46,38 @@ export default function AuthForm({ mode, onToggleMode }) {
 
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
-      <div className={styles.welcomeBlock}>
-        <h1 className={styles.heading}>{isSignIn ? WELCOME_HEADING : 'Create account'}</h1>
-        <p className={styles.subtext}>
-          {isSignIn ? WELCOME_SUBTEXT : 'Join PhotoRev to share sessions and collect client selections.'}
-        </p>
+      <div className={styles.brandBlock}>
+        <span className={styles.monogram}>{BRAND_MONOGRAM}</span>
+        <h1 className={styles.heading}>PhotoRev</h1>
+      </div>
+      <div className={styles.modeTabs}>
+        <button
+          type="button"
+          className={`${styles.modeTab} ${isSignIn ? styles.modeTabActive : ''}`}
+          onClick={() => !isSignIn && onToggleMode()}
+          disabled={isSubmitting}
+        >
+          Login
+        </button>
+        <button
+          type="button"
+          className={`${styles.modeTab} ${!isSignIn ? styles.modeTabActive : ''}`}
+          onClick={() => isSignIn && onToggleMode()}
+          disabled={isSubmitting}
+        >
+          Register
+        </button>
       </div>
       {!isSignIn && (
         <div className={styles.fieldGroup}>
-          <label htmlFor="auth-name" className={styles.label}>Name</label>
+          <label htmlFor="auth-name" className={styles.label}>Full name</label>
           <input
             id="auth-name"
             type="text"
             className={styles.input}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Your name"
+            placeholder="John Doe"
             autoComplete="name"
             required={!isSignIn}
             disabled={isSubmitting}
@@ -71,28 +85,21 @@ export default function AuthForm({ mode, onToggleMode }) {
         </div>
       )}
       <div className={styles.fieldGroup}>
-        <label htmlFor="auth-email" className={styles.label}>Email</label>
+        <label htmlFor="auth-email" className={styles.label}>Email address</label>
         <input
           id="auth-email"
           type="email"
           className={styles.input}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
+          placeholder="enter@email.com"
           autoComplete="email"
           required
           disabled={isSubmitting}
         />
       </div>
       <div className={styles.fieldGroup}>
-        <div className={styles.labelRow}>
-          <label htmlFor="auth-password" className={styles.label}>Password</label>
-          {isSignIn && (
-            <a href="#" className={styles.forgotLink} onClick={(e) => e.preventDefault()}>
-              Forgot Password?
-            </a>
-          )}
-        </div>
+        <label htmlFor="auth-password" className={styles.label}>Password</label>
         <div className={styles.inputWrap}>
           <input
             id="auth-password"
@@ -135,23 +142,23 @@ export default function AuthForm({ mode, onToggleMode }) {
           {isSubmitting ? (
             <span className={styles.spinner} aria-hidden />
           ) : (
-            isSignIn ? 'Login' : 'Sign up'
+            isSignIn ? 'Login' : 'Create Account'
           )}
+          {!isSubmitting && <span className={styles.arrow} aria-hidden>→</span>}
         </button>
-        {isSignIn && (
+        {!isSignIn && (
           <>
             <div className={styles.divider}>
-              <span className={styles.dividerText}>or continue with</span>
+              <span className={styles.dividerText}>OR</span>
             </div>
             <div className={styles.socialRow}>
               <button type="button" className={styles.socialBtn} aria-label="Google">
-                <span className={styles.socialIcon} aria-hidden>G</span>
+                <span className={styles.socialIconGoogle} aria-hidden>G</span>
+                <span className={styles.socialLabel}>Google</span>
               </button>
               <button type="button" className={styles.socialBtn} aria-label="Apple">
                 <svg className={styles.socialIconSvg} viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-              </button>
-              <button type="button" className={styles.socialBtn} aria-label="Facebook">
-                <span className={styles.socialIcon} aria-hidden>f</span>
+                <span className={styles.socialLabel}>Apple</span>
               </button>
             </div>
           </>
@@ -166,8 +173,7 @@ export default function AuthForm({ mode, onToggleMode }) {
             onClick={onToggleMode}
             disabled={isSubmitting}
           >
-            {isSignIn ? 'Register now' : 'Sign in'}
-            <span className={styles.arrow} aria-hidden>→</span>
+            {isSignIn ? 'Register' : 'Login'}
           </button>
         </div>
       </div>

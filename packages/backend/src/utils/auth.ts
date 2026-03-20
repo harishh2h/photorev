@@ -31,6 +31,7 @@ export async function ensureAuthenticated(
   try {
     await (request as any).jwtVerify();
   } catch (_err) {
+    console.error("Unauthorized", _err);
     reply.status(401).send({ message: "Unauthorized" });
   }
 }

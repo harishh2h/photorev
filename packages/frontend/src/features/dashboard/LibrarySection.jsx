@@ -8,9 +8,9 @@ export default function LibrarySection({ projects = [] }) {
   return (
     <section className={styles.section}>
       <div className={styles.headingRow}>
-        <h2 className={styles.heading}>Your Libraries</h2>
+        <h2 className={styles.heading}>Active Projects</h2>
         <a href="/library" className={styles.viewAll}>
-          View all →
+          View All
         </a>
       </div>
       <div className={styles.grid}>
@@ -18,10 +18,9 @@ export default function LibrarySection({ projects = [] }) {
           <LibraryCard
             key={project.id}
             name={project.name}
-            photoCount={project.photoCount}
-            createdAt={project.createdAt}
             status={project.status}
-            coverImageUrls={project.coverImageUrls}
+            subtitle={project.subtitle}
+            coverImageUrl={project.coverImageUrl}
             animationDelay={index * STAGGER_MS}
           />
         ))}
@@ -35,10 +34,9 @@ LibrarySection.propTypes = {
     PropTypes.shape({
       id: PropTypes.string.isRequired,
       name: PropTypes.string.isRequired,
-      photoCount: PropTypes.number.isRequired,
-      createdAt: PropTypes.string.isRequired,
       status: PropTypes.string.isRequired,
-      coverImageUrls: PropTypes.arrayOf(PropTypes.string),
+      subtitle: PropTypes.string.isRequired,
+      coverImageUrl: PropTypes.string.isRequired,
     })
   ),
 }

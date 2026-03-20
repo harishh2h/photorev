@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import buildPhotosHandler from "../handler/photos.handler";
 import { ensureAuthenticated } from "../utils/auth";
-import { uploadPhotoSchema } from "../utils/types"; 
 
 const listPhotosSchema = {
   querystring: {
@@ -87,10 +86,7 @@ async function photosRoutes(
     handler.listLibraryPhotos,
   );
 
-  fastify.post('/upload',
-     { schema: uploadPhotoSchema, preHandler: ensureAuthenticated },
-      handler.uploadPhoto,
-    );
+  fastify.post("/upload", { preHandler: ensureAuthenticated }, handler.uploadPhoto);
 }
 
 export default photosRoutes;
