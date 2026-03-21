@@ -155,27 +155,10 @@
 }
 
 @media (max-width: 767px) {
-  .floatingCard {
-    opacity: 0.18;
+  .gridTexture {
+    opacity: 0.45;
   }
-  .topLeftLarge {
-    left: -125px;
-    top: 56px;
-    width: 170px;
-  }
-  .topRight {
-    right: -134px;
-    top: 68px;
-    width: 176px;
-  }
-  .bottomRightTop {
-    right: -132px;
-    bottom: 72px;
-    width: 140px;
-  }
-  .topLeftSmall,
-  .bottomLeft,
-  .bottomRightBottom {
+  .floatingLayer {
     display: none;
   }
   .formShell {

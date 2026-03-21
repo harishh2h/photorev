@@ -35,6 +35,18 @@
   box-shadow: var(--shadow-focus);
 }
 
+.cardLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-lg);
+}
+
+.cardLink:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

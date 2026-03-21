@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types'
+import { Link } from 'react-router-dom'
 import LibraryCard from './LibraryCard'
 import styles from './LibrarySection.module.css'
 
@@ -15,14 +16,19 @@ export default function LibrarySection({ projects = [] }) {
       </div>
       <div className={styles.grid}>
         {projects.map((project, index) => (
-          <LibraryCard
+          <Link
             key={project.id}
-            name={project.name}
-            status={project.status}
-            subtitle={project.subtitle}
-            coverImageUrl={project.coverImageUrl}
-            animationDelay={index * STAGGER_MS}
-          />
+            to={`/projects/${project.id}`}
+            className={styles.cardLink}
+          >
+            <LibraryCard
+              name={project.name}
+              status={project.status}
+              subtitle={project.subtitle}
+              coverImageUrl={project.coverImageUrl}
+              animationDelay={index * STAGGER_MS}
+            />
+          </Link>
         ))}
       </div>
     </section>

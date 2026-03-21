@@ -1,0 +1,25 @@
+.page {
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6);
+}
+
+.title {
+  font-family: var(--font-base);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 var(--space-2);
+}
+
+.lead {
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+  margin: 0;
+}

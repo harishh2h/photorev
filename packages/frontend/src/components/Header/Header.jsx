@@ -1,27 +1,37 @@
 import PropTypes from 'prop-types'
+import { NavLink, Link } from 'react-router-dom'
+import { useDropdown } from '@/hooks/useDropdown.js'
 import styles from './Header.module.css'
 
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', href: '#', isActive: true },
-  { id: 'projects', label: 'Projects', href: '#' },
-  { id: 'uploads', label: 'Uploads', href: '#' },
+  { id: 'dashboard', label: 'Dashboard', to: '/', end: true },
+  { id: 'projects', label: 'Projects', to: '/projects' },
+  { id: 'uploads', label: 'Uploads', to: '/uploads' },
 ]
 
 export default function Header({ userDisplayName = 'User', onLogout }) {
+  const userMenu = useDropdown()
+  const handleLogoutClick = () => {
+    userMenu.close()
+    if (onLogout) onLogout()
+  }
   return (
     <header className={styles.header}>
-      <a href="/" className={styles.wordmark}>
+      <Link to="/" className={styles.wordmark}>
         PhotoRev
-      </a>
-      <nav className={styles.nav}>
+      </Link>
+      <nav className={styles.nav} aria-label="Main">
         {NAV_ITEMS.map((item) => (
-          <a
+          <NavLink
             key={item.id}
-            href={item.href}
-            className={`${styles.navLink} ${item.isActive ? styles.navLinkActive : ''}`}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) =>
+              `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
+            }
           >
             {item.label}
-          </a>
+          </NavLink>
         ))}
       </nav>
       <div className={styles.userActions}>
@@ -32,9 +42,40 @@ export default function Header({ userDisplayName = 'User', onLogout }) {
             <path d="M9 17a3 3 0 0 0 6 0" />
           </svg>
         </button>
-        <button type="button" className={styles.avatarButton} onClick={onLogout} title="Sign out">
-          {userDisplayName.charAt(0).toUpperCase()}
-        </button>
+        <div className={styles.dropdownWrap}>
+          <button
+            type="button"
+            ref={userMenu.triggerRef}
+            className={styles.avatarButton}
+            onClick={userMenu.toggle}
+            aria-expanded={userMenu.isOpen}
+            aria-haspopup="true"
+            aria-label="Account menu"
+          >
+            {userDisplayName.charAt(0).toUpperCase()}
+          </button>
+          {userMenu.isOpen && (
+            <div ref={userMenu.panelRef} className={styles.panel} role="menu">
+              <NavLink
+                to="/profile"
+                className={styles.panelItem}
+                role="menuitem"
+                onClick={userMenu.close}
+              >
+                Profile
+              </NavLink>
+              <div className={styles.panelSeparator} aria-hidden />
+              <button
+                type="button"
+                className={`${styles.panelItem} ${styles.panelItemLogout}`}
+                role="menuitem"
+                onClick={handleLogoutClick}
+              >
+                Log out
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )

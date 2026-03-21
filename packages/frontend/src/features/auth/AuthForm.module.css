@@ -57,6 +57,34 @@
   border-radius: 6px;
 }
 
+.formBody {
+  animation: authPanelIn var(--stagger-duration) var(--ease-out) both;
+}
+
+@keyframes authPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .formBody {
+    animation: none;
+  }
+}
+
+.fieldsShell {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .heading {
   font-family: var(--font-base);
   font-size: var(--text-3xl);
@@ -67,10 +95,8 @@
 
 .label {
   font-family: var(--font-base);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: var(--color-text-muted);
 }
 
@@ -146,7 +172,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  margin-top: var(--space-3);
+  margin-top: var(--space-5);
 }
 
 .btnPrimary {
@@ -202,111 +228,6 @@
   }
 }
 
-.divider {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin: var(--space-2) 0;
-}
-
-.divider::before,
-.divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--color-border);
-}
-
-.dividerText {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-.socialRow {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.socialBtn {
-  min-width: 154px;
-  min-height: 48px;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: var(--border-width) solid var(--color-border);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    background var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-.socialBtn:hover {
-  background: var(--color-surface-hover);
-}
-
-.socialBtn:active {
-  transform: scale(0.97);
-}
-
-.socialBtn:focus-visible {
-  box-shadow: var(--shadow-focus);
-}
-
-.socialIconGoogle {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: #db4437;
-}
-
-.socialIconSvg {
-  width: 18px;
-  height: 18px;
-}
-
-.socialLabel {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--color-text);
-}
-
-.toggleWrap {
-  text-align: center;
-  margin-top: var(--space-2);
-}
-
-.togglePrompt {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.toggleLink {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--color-text);
-  font-weight: 600;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  transition: color var(--duration-fast) var(--ease-out);
-}
-
-.toggleLink:hover {
-  color: var(--color-accent);
-}
-
 @media (max-width: 420px) {
   .form {
     gap: var(--space-3);
@@ -321,7 +242,7 @@
     font-size: var(--text-lg);
   }
   .label {
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
   }
   .input {
     font-size: var(--text-sm);
@@ -330,10 +251,7 @@
   .btnPrimary {
     width: 100%;
   }
-  .toggleWrap {
-    margin-top: var(--space-1);
-  }
-  .socialBtn {
-    width: 100%;
+  .fieldsShell {
+    min-height: 176px;
   }
 }
