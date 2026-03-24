@@ -165,6 +165,7 @@ function buildPhotosHandler(
         return;
       }
 
+      // permission check
       const canUpload = await service.canUploadToProject({
         userId,
         projectId,
@@ -212,21 +213,6 @@ function buildPhotosHandler(
       } catch (_err) {
         await removeUploadDir(projectId, photoId);
         sendFailure(reply, 500, "Failed to insert photo into database", null);
-        return;
-      }
-
-      try {
-        await fastify.db(PROCESSING_JOBS_TABLE).insert(
-          JOB_TYPES.map((job_type) => ({
-            photo_id: photo.id,
-            job_type,
-            status: "queued",
-          })),
-        );
-      } catch (_err) {
-        await fastify.db("photos").where("id", photo.id).del();
-        await removeUploadDir(projectId, photoId);
-        sendFailure(reply, 500, "Failed to queue processing jobs", null);
         return;
       }
 

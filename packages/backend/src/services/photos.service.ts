@@ -268,12 +268,27 @@ function buildPhotosService(
       height: photo.height ?? null,
     };
     if (photo.id) row.id = photo.id;
-    const inserted = await db<PhotoRecord>("photos")
-      .insert(row, "*")
-      .then((rows: PhotoRecord[]) => rows);
-    const insertedPhoto = inserted[0];
-    if (!insertedPhoto) return null;
-    return mapPhotoRecordToDto(insertedPhoto);
+    
+    let result = await db.transaction(async (trx:Knex.Transaction)=> {
+      const inserted = await trx<PhotoRecord>("photos").insert(row,"*");
+      const insertedPhoto = inserted[0];
+      if(!insertedPhoto){
+        throw new Error("Photo insert returned no row")
+      }
+
+      await trx("processing_jobs").insert([
+        {photo_id : insertedPhoto.id, job_type: "thumbnail"},
+        {photo_id : insertedPhoto.id, job_type: "preview"},
+        {photo_id : insertedPhoto.id, job_type: "metadata"},
+      ])
+
+      return insertedPhoto;
+      
+    })
+
+    // TODO : emit job runner
+    
+    return mapPhotoRecordToDto(result);
   }
 
   return {
