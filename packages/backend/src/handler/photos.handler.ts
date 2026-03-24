@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { randomUUID } from "crypto";
 import { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from "fastify";
 import buildPhotosService, {
@@ -6,8 +8,9 @@ import buildPhotosService, {
   ListPhotosFilters,
   UpdatePhotoMetadataParams,
 } from "../services/photos.service";
+import { sendFailure, sendSuccess } from "../utils/api-response";
 import { getAuthenticatedUserId } from "../utils/auth";
-import { streamFileToDisk, removeUploadDir } from "../utils/storage";
+import { getStorageRoot, streamFileToDisk, removeUploadDir } from "../utils/storage";
 import { PROCESSING_JOBS_TABLE } from "../models/processing-job";
 import type { ProcessingJobType } from "../models/processing-job";
 
@@ -26,6 +29,7 @@ function getMultipartField(
 export interface PhotosHandlerMethods {
   listPhotos: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   getPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  streamPhotoContent: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   listLibraryPhotos: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   updatePhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   uploadPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
@@ -57,7 +61,7 @@ function buildPhotosHandler(
         decision: query.decision,
       };
       const result = await service.listPhotos(filters, userId);
-      reply.status(200).send(result);
+      sendSuccess(reply, 200, result, "OK");
     },
     getPhoto: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -68,10 +72,45 @@ function buildPhotosHandler(
       };
       const found = await service.getPhoto(params);
       if (!found) {
-        reply.status(404).send({ message: "Photo not found" });
+        sendFailure(reply, 404, "Photo not found", null);
         return;
       }
-      reply.status(200).send(found);
+      sendSuccess(reply, 200, found, "OK");
+    },
+    streamPhotoContent: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const userId = getAuthenticatedUserId(request);
+      const paramsRaw = request.params as { photoId: string };
+      const params: GetPhotoParams = {
+        userId,
+        photoId: paramsRaw.photoId,
+      };
+      const photo = await service.getPhoto(params);
+      if (!photo) {
+        sendFailure(reply, 404, "Photo not found", null);
+        return;
+      }
+      const relative =
+        photo.previewPath || photo.thumbnailPath || photo.originalPath;
+      if (!relative) {
+        sendFailure(reply, 404, "No file available", null);
+        return;
+      }
+      const absolutePath = path.join(getStorageRoot(), relative);
+      try {
+        await fs.promises.access(absolutePath);
+      } catch {
+        sendFailure(reply, 404, "File not on disk", null);
+        return;
+      }
+      const mimeType =
+        photo.mimeType ||
+        (relative.toLowerCase().endsWith(".png")
+          ? "image/png"
+          : relative.toLowerCase().endsWith(".webp")
+            ? "image/webp"
+            : "image/jpeg");
+      reply.type(mimeType);
+      return reply.send(fs.createReadStream(absolutePath));
     },
     listLibraryPhotos: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -84,7 +123,7 @@ function buildPhotosHandler(
         pageSize: query.pageSize,
       };
       const result = await service.listLibraryPhotos(params);
-      reply.status(200).send(result);
+      sendSuccess(reply, 200, result, "OK");
     },
     updatePhoto: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -98,10 +137,10 @@ function buildPhotosHandler(
       };
       const updated = await service.updatePhotoMetadata(params);
       if (!updated) {
-        reply.status(403).send({ message: "Not allowed to update this photo" });
+        sendFailure(reply, 403, "Not allowed to update this photo", null);
         return;
       }
-      reply.status(200).send(updated);
+      sendSuccess(reply, 200, updated, "Photo updated");
     },
 
     uploadPhoto: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -109,7 +148,7 @@ function buildPhotosHandler(
 
       const data = await request.file();
       if (!data) {
-        reply.status(400).send({ message: "No file uploaded" });
+        sendFailure(reply, 400, "No file uploaded", null);
         return;
       }
 
@@ -117,9 +156,12 @@ function buildPhotosHandler(
       const libraryId = getMultipartField(data.fields as Record<string, { value?: string } | { value?: string }[]>, "libraryId");
 
       if (!projectId || !libraryId) {
-        reply.status(400).send({
-          message: "projectId and libraryId are required; send them as form fields before the file",
-        });
+        sendFailure(
+          reply,
+          400,
+          "projectId and libraryId are required; send them as form fields before the file",
+          null,
+        );
         return;
       }
 
@@ -129,7 +171,7 @@ function buildPhotosHandler(
         libraryId,
       });
       if (!canUpload) {
-        reply.status(403).send({ message: "Not allowed to upload to this project or library" });
+        sendFailure(reply, 403, "Not allowed to upload to this project or library", null);
         return;
       }
 
@@ -143,8 +185,8 @@ function buildPhotosHandler(
           projectId,
           photoId,
         );
-      } catch (err) {
-        reply.status(500).send({ message: "Failed to save file to disk" });
+      } catch (_err) {
+        sendFailure(reply, 500, "Failed to save file to disk", null);
         return;
       }
 
@@ -164,12 +206,12 @@ function buildPhotosHandler(
         });
         if (!photo) {
           await removeUploadDir(projectId, photoId);
-          reply.status(500).send({ message: "Failed to insert photo into database" });
+          sendFailure(reply, 500, "Failed to insert photo into database", null);
           return;
         }
-      } catch {
+      } catch (_err) {
         await removeUploadDir(projectId, photoId);
-        reply.status(500).send({ message: "Failed to insert photo into database" });
+        sendFailure(reply, 500, "Failed to insert photo into database", null);
         return;
       }
 
@@ -181,17 +223,14 @@ function buildPhotosHandler(
             status: "queued",
           })),
         );
-      } catch {
+      } catch (_err) {
         await fastify.db("photos").where("id", photo.id).del();
         await removeUploadDir(projectId, photoId);
-        reply.status(500).send({ message: "Failed to queue processing jobs" });
+        sendFailure(reply, 500, "Failed to queue processing jobs", null);
         return;
       }
 
-      reply.status(201).send({
-        message: "Photo uploaded successfully",
-        data: { photoId: photo.id },
-      });
+      sendSuccess(reply, 201, { photoId: photo.id }, "Photo uploaded successfully");
     },
   };
 
@@ -199,4 +238,3 @@ function buildPhotosHandler(
 }
 
 export default buildPhotosHandler;
-

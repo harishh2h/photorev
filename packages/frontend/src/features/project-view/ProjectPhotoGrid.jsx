@@ -1,11 +1,12 @@
 import PropTypes from 'prop-types'
+import ProjectPhotoImage from './ProjectPhotoImage.jsx'
 import styles from './ProjectPhotoGrid.module.css'
 
 /**
- * @param {{ photos: Array<{ id: string; src: string; alt: string; isLiked: boolean; isRejected: boolean; selectionLabel: string | null }> }} props
+ * @param {{ photos: Array<{ id: string; alt: string; isLiked: boolean; isRejected: boolean; selectionLabel: string | null }>; token: string }} props
  * @returns {import('react').JSX.Element}
  */
-export default function ProjectPhotoGrid({ photos }) {
+export default function ProjectPhotoGrid({ photos, token }) {
   return (
     <ul className={styles.grid}>
       {photos.map((photo, index) => (
@@ -18,7 +19,12 @@ export default function ProjectPhotoGrid({ photos }) {
             className={`${styles.card} ${photo.isRejected ? styles.cardRejected : ''}`}
           >
             <div className={styles.imageWrap}>
-              <img className={styles.image} src={photo.src} alt={photo.alt} loading="lazy" />
+              <ProjectPhotoImage
+                photoId={photo.id}
+                token={token}
+                alt={photo.alt}
+                className={styles.image}
+              />
               <div className={styles.cornerBadges}>
                 {photo.isLiked ? (
                   <span className={`${styles.cornerIcon} ${styles.cornerLiked}`} aria-label="Liked">
@@ -54,10 +60,10 @@ export default function ProjectPhotoGrid({ photos }) {
 }
 
 ProjectPhotoGrid.propTypes = {
+  token: PropTypes.string.isRequired,
   photos: PropTypes.arrayOf(
     PropTypes.shape({
       id: PropTypes.string.isRequired,
-      src: PropTypes.string.isRequired,
       alt: PropTypes.string.isRequired,
       isLiked: PropTypes.bool.isRequired,
       isRejected: PropTypes.bool.isRequired,

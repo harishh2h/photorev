@@ -23,3 +23,10 @@
   color: var(--color-text-muted);
   margin: 0;
 }
+
+.errorText {
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--color-danger);
+  margin: 0 0 var(--space-4);
+}

@@ -5,16 +5,21 @@ export default function LibraryCard({
   name,
   status,
   subtitle,
-  coverImageUrl,
+  coverImageUrl = '',
   animationDelay = 0,
 }) {
+  const hasCover = typeof coverImageUrl === 'string' && coverImageUrl.length > 0
   return (
     <article
       className={styles.card}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className={styles.imageWrap}>
-        <img src={coverImageUrl} alt="" />
+        {hasCover ? (
+          <img src={coverImageUrl} alt="" />
+        ) : (
+          <div className={styles.imagePlaceholder} aria-hidden />
+        )}
       </div>
       <div className={styles.content}>
         <span className={styles.tag}>{status}</span>
@@ -29,6 +34,6 @@ LibraryCard.propTypes = {
   name: PropTypes.string.isRequired,
   status: PropTypes.string.isRequired,
   subtitle: PropTypes.string.isRequired,
-  coverImageUrl: PropTypes.string.isRequired,
+  coverImageUrl: PropTypes.string,
   animationDelay: PropTypes.number,
 }

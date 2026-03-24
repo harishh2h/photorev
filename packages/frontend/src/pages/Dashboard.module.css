@@ -9,6 +9,17 @@
   padding: var(--space-8) var(--space-6) var(--space-10);
 }
 
+.loading,
+.loadError {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-4);
+}
+
+.loadError {
+  color: var(--color-danger);
+}
+
 @media (max-width: 767px) {
   .main {
     padding: var(--space-6) var(--space-4) var(--space-8);

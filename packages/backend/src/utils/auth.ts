@@ -1,4 +1,5 @@
 import { FastifyReply, FastifyRequest } from "fastify";
+import { sendFailure } from "./api-response";
 
 export interface AuthUserPayload {
   readonly id: string;
@@ -30,9 +31,9 @@ export async function ensureAuthenticated(
   // Verify JWT token
   try {
     await (request as any).jwtVerify();
-  } catch (_err) {
-    console.error("Unauthorized", _err);
-    reply.status(401).send({ message: "Unauthorized" });
+  } catch (err) {
+    request.log.warn({ err }, "Unauthorized");
+    sendFailure(reply, 401, "Unauthorized", null);
   }
 }
 

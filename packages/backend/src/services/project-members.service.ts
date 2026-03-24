@@ -80,9 +80,22 @@ function buildProjectMembersService(
     return Boolean(ownerRow);
   }
 
+  async function ensureRequesterIsMember(
+    requesterId: string,
+    projectId: string,
+  ): Promise<boolean> {
+    const row = await db<ProjectMemberRecord>("project_members")
+      .where({
+        project_id: projectId,
+        user_id: requesterId,
+      })
+      .first();
+    return Boolean(row);
+  }
+
   async function listMembers(params: ListMembersParams): Promise<ProjectMemberDto[]> {
-    const isOwner = await ensureRequesterIsOwner(params.requesterId, params.projectId);
-    if (!isOwner) {
+    const isMember = await ensureRequesterIsMember(params.requesterId, params.projectId);
+    if (!isMember) {
       return [];
     }
     const rows = await db("project_members")

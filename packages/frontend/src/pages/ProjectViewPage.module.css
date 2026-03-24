@@ -20,3 +20,18 @@
     padding: 0 var(--space-8) var(--space-12);
   }
 }
+
+.feedback,
+.error {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-4);
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.feedback {
+  color: var(--color-text-muted);
+}

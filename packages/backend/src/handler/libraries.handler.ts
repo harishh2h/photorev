@@ -6,6 +6,7 @@ import buildLibrariesService, {
   ListLibrariesFilters,
   UpdateLibraryParams,
 } from "../services/libraries.service";
+import { sendFailure, sendSuccess } from "../utils/api-response";
 import { getAuthenticatedUserId } from "../utils/auth";
 
 export interface LibrariesHandlerMethods {
@@ -36,7 +37,7 @@ function buildLibrariesHandler(
         projectId: query.projectId,
       };
       const result = await service.listLibraries(filters, userId);
-      reply.status(200).send(result);
+      sendSuccess(reply, 200, result, "OK");
     },
     createLibrary: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -55,10 +56,10 @@ function buildLibrariesHandler(
       };
       const created = await service.createLibrary(params);
       if (!created) {
-        reply.status(403).send({ message: "Not allowed to create library for this project" });
+        sendFailure(reply, 403, "Not allowed to create library for this project", null);
         return;
       }
-      reply.status(201).send(created);
+      sendSuccess(reply, 201, created, "Library created");
     },
     getLibrary: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -69,10 +70,10 @@ function buildLibrariesHandler(
       };
       const found = await service.getLibrary(params);
       if (!found) {
-        reply.status(404).send({ message: "Library not found" });
+        sendFailure(reply, 404, "Library not found", null);
         return;
       }
-      reply.status(200).send(found);
+      sendSuccess(reply, 200, found, "OK");
     },
     updateLibrary: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -93,10 +94,10 @@ function buildLibrariesHandler(
       };
       const updated = await service.updateLibrary(params);
       if (!updated) {
-        reply.status(403).send({ message: "Not allowed to update this library" });
+        sendFailure(reply, 403, "Not allowed to update this library", null);
         return;
       }
-      reply.status(200).send(updated);
+      sendSuccess(reply, 200, updated, "Library updated");
     },
     archiveLibrary: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -107,10 +108,10 @@ function buildLibrariesHandler(
       };
       const ok = await service.archiveLibrary(params);
       if (!ok) {
-        reply.status(403).send({ message: "Not allowed to archive this library" });
+        sendFailure(reply, 403, "Not allowed to archive this library", null);
         return;
       }
-      reply.status(204).send();
+      sendSuccess(reply, 200, null, "Library archived");
     },
   };
 
@@ -118,4 +119,3 @@ function buildLibrariesHandler(
 }
 
 export default buildLibrariesHandler;
-

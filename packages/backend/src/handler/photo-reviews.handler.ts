@@ -4,6 +4,7 @@ import buildPhotoReviewsService, {
   ListUserReviewsFilters,
   UpsertReviewParams,
 } from "../services/photo-reviews.service";
+import { sendFailure, sendSuccess } from "../utils/api-response";
 import { getAuthenticatedUserId } from "../utils/auth";
 
 export interface PhotoReviewsHandlerMethods {
@@ -38,10 +39,10 @@ function buildPhotoReviewsHandler(
       };
       const review = await service.upsertReview(params);
       if (!review) {
-        reply.status(403).send({ message: "Not allowed to review this photo" });
+        sendFailure(reply, 403, "Not allowed to review this photo", null);
         return;
       }
-      reply.status(200).send(review);
+      sendSuccess(reply, 200, review, "Review saved");
     },
     listUserReviews: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -60,7 +61,7 @@ function buildPhotoReviewsHandler(
         decision: query.decision,
       };
       const result = await service.listUserReviews(userId, filters);
-      reply.status(200).send(result);
+      sendSuccess(reply, 200, result, "OK");
     },
     listPhotoReviews: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -73,7 +74,7 @@ function buildPhotoReviewsHandler(
         pageSize: query.pageSize,
       };
       const result = await service.listPhotoReviews(params);
-      reply.status(200).send(result);
+      sendSuccess(reply, 200, result, "OK");
     },
   };
 
@@ -81,4 +82,3 @@ function buildPhotoReviewsHandler(
 }
 
 export default buildPhotoReviewsHandler;
-

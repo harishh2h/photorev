@@ -1,4 +1,4 @@
-import Fastify, { FastifyInstance } from "fastify";
+import Fastify, { FastifyError, FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
@@ -7,10 +7,43 @@ import routes from "./routes";
 import { db } from "./db";
 import jwtPlugin from "./plugins/jwt";
 import multipart from "@fastify/multipart";
+import { sendFailure } from "./utils/api-response";
+
+const CLIENT_ERROR_MESSAGES: Record<number, string> = {
+  400: "Bad request",
+  401: "Unauthorized",
+  403: "Forbidden",
+  404: "Not found",
+  409: "Conflict",
+  422: "Invalid input",
+};
 
 function buildApp(opts: BuildOptions = {}): FastifyInstance {
 
   const app = Fastify(opts);
+
+  app.setErrorHandler((error: FastifyError, request, reply) => {
+    if (reply.sent) {
+      return;
+    }
+    request.log.error(error);
+    const rawCode = error.statusCode ?? 500;
+    const statusCode = rawCode >= 400 && rawCode < 600 ? rawCode : 500;
+    if (error.validation) {
+      sendFailure(reply, 400, "Validation failed", { validation: error.validation });
+      return;
+    }
+    if (statusCode >= 500) {
+      sendFailure(reply, statusCode, "Something went wrong", null);
+      return;
+    }
+    const message = CLIENT_ERROR_MESSAGES[statusCode] ?? "Request failed";
+    sendFailure(reply, statusCode, message, null);
+  });
+
+  app.setNotFoundHandler((_request, reply) => {
+    sendFailure(reply, 404, "Not found", null);
+  });
   app.register(cors, {
     origin: process.env.CORS_ORIGIN ?? true,
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],

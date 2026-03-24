@@ -5,6 +5,7 @@ import buildProjectMembersService, {
   RemoveMemberParams,
   UpdateMemberParams,
 } from "../services/project-members.service";
+import { sendFailure, sendSuccess } from "../utils/api-response";
 import { getAuthenticatedUserId } from "../utils/auth";
 
 export interface ProjectMembersHandlerMethods {
@@ -30,10 +31,10 @@ function buildProjectMembersHandler(
       };
       const members = await service.listMembers(params);
       if (members.length === 0) {
-        reply.status(403).send({ message: "Not allowed to view members for this project" });
+        sendFailure(reply, 403, "Not allowed to view members for this project", null);
         return;
       }
-      reply.status(200).send(members);
+      sendSuccess(reply, 200, members, "OK");
     },
     addMember: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const requesterId = getAuthenticatedUserId(request);
@@ -47,10 +48,10 @@ function buildProjectMembersHandler(
       };
       const member = await service.addMember(params);
       if (!member) {
-        reply.status(403).send({ message: "Not allowed to add member to this project" });
+        sendFailure(reply, 403, "Not allowed to add member to this project", null);
         return;
       }
-      reply.status(201).send(member);
+      sendSuccess(reply, 201, member, "Member added");
     },
     removeMember: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const requesterId = getAuthenticatedUserId(request);
@@ -62,10 +63,10 @@ function buildProjectMembersHandler(
       };
       const ok = await service.removeMember(params);
       if (!ok) {
-        reply.status(403).send({ message: "Not allowed to remove this member" });
+        sendFailure(reply, 403, "Not allowed to remove this member", null);
         return;
       }
-      reply.status(204).send();
+      sendSuccess(reply, 200, null, "Member removed");
     },
     updateMember: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const requesterId = getAuthenticatedUserId(request);
@@ -79,10 +80,10 @@ function buildProjectMembersHandler(
       };
       const member = await service.updateMember(params);
       if (!member) {
-        reply.status(403).send({ message: "Not allowed to update this member" });
+        sendFailure(reply, 403, "Not allowed to update this member", null);
         return;
       }
-      reply.status(200).send(member);
+      sendSuccess(reply, 200, member, "Member updated");
     },
   };
 
@@ -90,4 +91,3 @@ function buildProjectMembersHandler(
 }
 
 export default buildProjectMembersHandler;
-

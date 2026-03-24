@@ -65,6 +65,7 @@
 
 .imageWrap {
   position: relative;
+  display: flex;
   aspect-ratio: 3 / 4;
   overflow: hidden;
   background: var(--color-accent-subtle);

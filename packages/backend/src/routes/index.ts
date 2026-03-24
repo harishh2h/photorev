@@ -5,10 +5,11 @@ import librariesRoutes from "./libraries.routes";
 import photosRoutes from "./photos.routes";
 import photoReviewsRoutes from "./photo-reviews.routes";
 import projectsRoutes from "./projects.routes";
+import { sendSuccess } from "../utils/api-response";
 
 async function routes(fastify: FastifyInstance, opts: FastifyPluginOptions): Promise<void> {
-  fastify.get("/health", (request, reply) => {
-    reply.send({ message: "ok" });
+  fastify.get("/health", (_request, reply) => {
+    sendSuccess(reply, 200, null, "ok");
   });
   fastify.register(authRoutes, { prefix: "/auth" });
   fastify.register(projectsRoutes, { prefix: "/projects" });

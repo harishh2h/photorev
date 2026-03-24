@@ -71,6 +71,11 @@ async function photosRoutes(
     handler.listPhotos,
   );
   fastify.get(
+    "/:photoId/content",
+    { schema: photoIdParamsSchema, preHandler: ensureAuthenticated },
+    handler.streamPhotoContent,
+  );
+  fastify.get(
     "/:photoId",
     { schema: photoIdParamsSchema, preHandler: ensureAuthenticated },
     handler.getPhoto,

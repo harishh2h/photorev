@@ -7,10 +7,10 @@ import ProjectGridOverlays from './ProjectGridOverlays.jsx'
 import styles from './ProjectViewScreen.module.css'
 
 /**
- * @param {{ data: ReturnType<typeof import('@/constants/mockData.js').getProjectViewData> }} props
+ * @param {{ data: object; token: string }} props
  * @returns {import('react').JSX.Element}
  */
-export default function ProjectViewScreen({ data }) {
+export default function ProjectViewScreen({ data, token }) {
   const [activeFilter, setActiveFilter] = useState('all')
   const filteredPhotos = useMemo(() => {
     if (activeFilter === 'all') return data.photos
@@ -34,7 +34,7 @@ export default function ProjectViewScreen({ data }) {
         <div className={styles.main}>
           <div className={styles.gridRegion}>
             {filteredPhotos.length > 0 ? (
-              <ProjectPhotoGrid photos={filteredPhotos} />
+              <ProjectPhotoGrid photos={filteredPhotos} token={token} />
             ) : (
               <p className={styles.empty}>No photos match this filter.</p>
             )}
@@ -60,7 +60,6 @@ export default function ProjectViewScreen({ data }) {
 
 const photoShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
-  src: PropTypes.string.isRequired,
   alt: PropTypes.string.isRequired,
   isLiked: PropTypes.bool.isRequired,
   isRejected: PropTypes.bool.isRequired,
@@ -75,6 +74,7 @@ const collaboratorMemberShape = PropTypes.shape({
 })
 
 ProjectViewScreen.propTypes = {
+  token: PropTypes.string.isRequired,
   data: PropTypes.shape({
     projectTitle: PropTypes.string.isRequired,
     collaboratingLabel: PropTypes.string.isRequired,

@@ -1,4 +1,6 @@
-const baseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+import { getApiBaseUrl, isApiEnvelope } from './httpClient.js'
+
+const baseUrl = getApiBaseUrl()
 
 /**
  * @param {{ email: string, password: string }} payload
@@ -11,11 +13,23 @@ export async function login({ email, password }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     })
-    const body = await res.json().catch(() => ({}))
-    if (res.ok) {
-      return { success: true, data: { token: body.token, user: body.user }, message: body.message }
+    const body = await res.json().catch(() => null)
+    if (!isApiEnvelope(body)) {
+      return { success: false, message: 'Request failed' }
     }
-    return { success: false, message: body?.message || 'Request failed' }
+    if (res.ok && !body.error && body.data && typeof body.data === 'object') {
+      const d = /** @type {{ token?: string; user?: { id: string; email: string; name: string } }} */ (
+        body.data
+      )
+      if (d.token && d.user) {
+        return {
+          success: true,
+          data: { token: d.token, user: d.user },
+          message: body.message,
+        }
+      }
+    }
+    return { success: false, message: body.message || 'Request failed' }
   } catch {
     return { success: false, message: 'Request failed' }
   }
@@ -32,11 +46,14 @@ export async function register({ email, password, name }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, name }),
     })
-    const body = await res.json().catch(() => ({}))
-    if (res.ok) {
-      return { success: true, message: body?.message }
+    const body = await res.json().catch(() => null)
+    if (!isApiEnvelope(body)) {
+      return { success: false, message: 'Request failed' }
     }
-    return { success: false, message: body?.message || 'Request failed' }
+    if (res.ok && !body.error) {
+      return { success: true, message: body.message }
+    }
+    return { success: false, message: body.message || 'Request failed' }
   } catch {
     return { success: false, message: 'Request failed' }
   }

@@ -23,7 +23,7 @@ const listProjectsSchema = {
 const createProjectSchema = {
   body: {
     type: "object",
-    required: ["name", "rootPath"],
+    required: ["name"],
     properties: {
       name: { type: "string", minLength: 1, maxLength: 255 },
       rootPath: { type: "string", minLength: 1 },

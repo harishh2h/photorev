@@ -1,5 +1,8 @@
+import path from "path";
+import { randomUUID } from "crypto";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { Knex } from "knex";
+import { getStorageRoot } from "../utils/storage";
 import { applyPagination, buildPaginatedResult, PaginatedResult, PaginationParams } from "../utils/pagination";
 
 export type ProjectStatus = "active" | "processing" | "completed";
@@ -32,7 +35,7 @@ export interface ListProjectsFilters extends PaginationParams {
 export interface CreateProjectParams {
   readonly userId: string;
   readonly name: string;
-  readonly rootPath: string;
+  readonly rootPath?: string;
 }
 
 export interface UpdateProjectParams {
@@ -115,11 +118,17 @@ function buildProjectsService(
 
   async function createProject(params: CreateProjectParams): Promise<ProjectDto> {
     const result = await db.transaction(async (trx: Knex.Transaction) => {
+      const projectId = randomUUID();
+      const rootPath =
+        typeof params.rootPath === "string" && params.rootPath.length > 0
+          ? params.rootPath
+          : path.join(getStorageRoot(), "projects", projectId);
       const insertedProjects = await trx<ProjectRecord>("projects")
         .insert(
           {
+            id: projectId,
             name: params.name,
-            root_path: params.rootPath,
+            root_path: rootPath,
             created_by: params.userId,
           },
           "*",

@@ -2,6 +2,18 @@
   margin-bottom: var(--space-8);
 }
 
+.hint,
+.empty {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4);
+}
+
+.empty {
+  margin-bottom: var(--space-6);
+}
+
 .headingRow {
   display: flex;
   align-items: center;
@@ -21,13 +33,13 @@
   font-family: var(--font-base);
   font-size: var(--text-base);
   font-weight: 500;
-  color: #086441;
+  color: var(--color-accent);
   text-decoration: none;
   transition: color var(--duration-fast) var(--ease-out);
 }
 
 .viewAll:hover {
-  color: var(--color-accent);
+  color: var(--color-accent-hover);
 }
 
 .viewAll:focus-visible {

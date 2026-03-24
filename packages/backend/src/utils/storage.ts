@@ -4,6 +4,10 @@ import { pipeline } from "stream";
 
 const STORAGE_ROOT =
   process.env.STORAGE_ROOT ?? path.join(process.cwd(), "storage");
+
+export function getStorageRoot(): string {
+  return STORAGE_ROOT;
+}
 const ALLOWED_MIME = [
   "image/jpeg",
   "image/png",

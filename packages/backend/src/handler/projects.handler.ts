@@ -6,6 +6,7 @@ import buildProjectsService, {
   ListProjectsFilters,
   UpdateProjectParams,
 } from "../services/projects.service";
+import { sendFailure, sendSuccess } from "../utils/api-response";
 import { getAuthenticatedUserId } from "../utils/auth";
 
 export interface ProjectsHandlerMethods {
@@ -33,18 +34,18 @@ function buildProjectsHandler(
         isActive: (request.query as any).isActive,
       };
       const result = await service.listProjects(filters, userId);
-      reply.status(200).send(result);
+      sendSuccess(reply, 200, result, "OK");
     },
     createProject: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
-      const body = request.body as { name: string; rootPath: string };
+      const body = request.body as { name: string; rootPath?: string };
       const params: CreateProjectParams = {
         userId,
         name: body.name,
         rootPath: body.rootPath,
       };
       const created = await service.createProject(params);
-      reply.status(201).send(created);
+      sendSuccess(reply, 201, created, "Project created");
     },
     getProject: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -54,10 +55,10 @@ function buildProjectsHandler(
         projectId: params.projectId,
       });
       if (!found) {
-        reply.status(404).send({ message: "Project not found" });
+        sendFailure(reply, 404, "Project not found", null);
         return;
       }
-      reply.status(200).send(found);
+      sendSuccess(reply, 200, found, "OK");
     },
     updateProject: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -78,10 +79,10 @@ function buildProjectsHandler(
       };
       const updated = await service.updateProject(params);
       if (!updated) {
-        reply.status(403).send({ message: "Not allowed to update this project" });
+        sendFailure(reply, 403, "Not allowed to update this project", null);
         return;
       }
-      reply.status(200).send(updated);
+      sendSuccess(reply, 200, updated, "Project updated");
     },
     archiveProject: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -92,10 +93,10 @@ function buildProjectsHandler(
       };
       const ok = await service.archiveProject(params);
       if (!ok) {
-        reply.status(403).send({ message: "Not allowed to archive this project" });
+        sendFailure(reply, 403, "Not allowed to archive this project", null);
         return;
       }
-      reply.status(204).send();
+      sendSuccess(reply, 200, null, "Project archived");
     },
     deleteProject: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -106,10 +107,10 @@ function buildProjectsHandler(
       };
       const ok = await service.deleteProject(params);
       if (!ok) {
-        reply.status(403).send({ message: "Not allowed to delete this project" });
+        sendFailure(reply, 403, "Not allowed to delete this project", null);
         return;
       }
-      reply.status(204).send();
+      sendSuccess(reply, 200, null, "Project deleted");
     },
   };
 
@@ -117,4 +118,3 @@ function buildProjectsHandler(
 }
 
 export default buildProjectsHandler;
-

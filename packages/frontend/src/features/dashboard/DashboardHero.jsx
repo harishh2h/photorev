@@ -1,82 +1,129 @@
 import PropTypes from 'prop-types'
+import { Link } from 'react-router-dom'
 import styles from './DashboardHero.module.css'
 
 export default function DashboardHero({
   displayName = 'there',
   activeSessionCount = 0,
   pendingReviews = 0,
-  featuredProject,
+  featuredProject = null,
   recentActivity = [],
+  onNewProjectClick = undefined,
 }) {
+  const hasFeatured = featuredProject != null && featuredProject.id != null
   return (
     <section className={styles.hero}>
       <div className={styles.topRow}>
         <div>
           <h1 className={styles.greeting}>Good morning, {displayName}.</h1>
           <p className={styles.subtitle}>
-            {activeSessionCount} sessions active, <span>{pendingReviews} need attention.</span>
+            {activeSessionCount} active project{activeSessionCount === 1 ? '' : 's'}
+            {pendingReviews > 0 ? (
+              <>
+                , <span>{pendingReviews} photo{pendingReviews === 1 ? '' : 's'} still processing</span>
+              </>
+            ) : null}
+            .
           </p>
         </div>
-        <button type="button" className={styles.newProjectBtn}>
+        <button
+          type="button"
+          className={styles.newProjectBtn}
+          onClick={() => onNewProjectClick?.()}
+        >
           + New Project
         </button>
       </div>
       <div className={styles.overviewGrid}>
         <article className={styles.featuredCard}>
-          <div className={styles.featuredImageWrap}>
-            <img src={featuredProject.coverImageUrl} alt="" />
-            <span className={styles.reviewBadge}>IN REVIEW</span>
-          </div>
-          <div className={styles.featuredContent}>
-            <h2 className={styles.featuredTitle}>{featuredProject.name}</h2>
-            <p className={styles.featuredDescription}>{featuredProject.description}</p>
-            <div className={styles.metrics}>
-              <div>
-                <p className={styles.metricValue}>{featuredProject.totalPhotos}</p>
-                <p className={styles.metricLabel}>TOTAL PHOTOS</p>
+          {hasFeatured ? (
+            <>
+              <div className={styles.featuredImageWrap}>
+                <div className={styles.featuredPlaceholder} aria-hidden />
+                <span className={styles.reviewBadge}>
+                  {(featuredProject.status || 'active').toUpperCase()}
+                </span>
               </div>
-              <div>
-                <p className={`${styles.metricValue} ${styles.metricWarning}`}>{featuredProject.flaggedPhotos}</p>
-                <p className={styles.metricLabel}>FLAGGED</p>
+              <div className={styles.featuredContent}>
+                <h2 className={styles.featuredTitle}>{featuredProject.name}</h2>
+                <p className={styles.featuredDescription}>
+                  {featuredProject.description || 'Open this project to upload photos, run reviews, and export selections.'}
+                </p>
+                <div className={styles.metrics}>
+                  <div>
+                    <p className={styles.metricValue}>{featuredProject.totalPhotos}</p>
+                    <p className={styles.metricLabel}>TOTAL PHOTOS</p>
+                  </div>
+                  <div>
+                    <p className={`${styles.metricValue} ${styles.metricWarning}`}>
+                      {featuredProject.inProgressPhotos}
+                    </p>
+                    <p className={styles.metricLabel}>IN PROGRESS</p>
+                  </div>
+                </div>
+                <Link to={`/projects/${featuredProject.id}`} className={styles.continueBtn}>
+                  Open project <span aria-hidden>→</span>
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className={styles.emptyFeatured}>
+              <div className={styles.emptyVisual} aria-hidden />
+              <div className={styles.emptyCopy}>
+                <h2 className={styles.featuredTitle}>No projects yet</h2>
+                <p className={styles.featuredDescription}>
+                  Create a project to get a dedicated space for uploads and client review sessions.
+                </p>
+                <button type="button" className={styles.continueBtn} onClick={() => onNewProjectClick?.()}>
+                  Create your first project <span aria-hidden>→</span>
+                </button>
               </div>
             </div>
-            <button type="button" className={styles.continueBtn}>
-              Continue Review <span aria-hidden>→</span>
-            </button>
-          </div>
+          )}
         </article>
         <aside className={styles.activityCard}>
-          <h3 className={styles.activityTitle}>Recent Activity</h3>
+          <h3 className={styles.activityTitle}>Activity</h3>
           <div className={styles.activityList}>
-            {recentActivity.map((entry) => (
-              <div key={entry.id} className={styles.activityItem}>
-                <span className={styles.activityAvatar}>{entry.actorInitial}</span>
-                <div>
-                  <p className={styles.activityText}>{entry.message}</p>
-                  <p className={styles.activityTime}>{entry.timeLabel}</p>
+            {recentActivity.length > 0 ? (
+              recentActivity.map((entry) => (
+                <div key={entry.id} className={styles.activityItem}>
+                  <span className={styles.activityAvatar}>{entry.actorInitial}</span>
+                  <div>
+                    <p className={styles.activityText}>{entry.message}</p>
+                    <p className={styles.activityTime}>{entry.timeLabel}</p>
+                  </div>
+                  <span className={styles.activityDot} style={{ background: entry.dotColor }} />
                 </div>
-                <span className={styles.activityDot} style={{ background: entry.dotColor }} />
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className={styles.activityEmpty}>
+                No audit events yet. Uploads and review actions will show up here when the API exposes an activity feed.
+              </p>
+            )}
           </div>
-          <button type="button" className={styles.auditBtn}>VIEW FULL AUDIT LOG</button>
+          <button type="button" className={styles.auditBtn} disabled>
+            Audit log (soon)
+          </button>
         </aside>
       </div>
     </section>
   )
 }
 
+const featuredShape = PropTypes.shape({
+  id: PropTypes.string.isRequired,
+  name: PropTypes.string.isRequired,
+  description: PropTypes.string,
+  status: PropTypes.string,
+  totalPhotos: PropTypes.number.isRequired,
+  inProgressPhotos: PropTypes.number.isRequired,
+})
+
 DashboardHero.propTypes = {
   displayName: PropTypes.string,
   activeSessionCount: PropTypes.number,
   pendingReviews: PropTypes.number,
-  featuredProject: PropTypes.shape({
-    name: PropTypes.string.isRequired,
-    description: PropTypes.string.isRequired,
-    coverImageUrl: PropTypes.string.isRequired,
-    totalPhotos: PropTypes.number.isRequired,
-    flaggedPhotos: PropTypes.number.isRequired,
-  }).isRequired,
+  featuredProject: featuredShape,
   recentActivity: PropTypes.arrayOf(
     PropTypes.shape({
       id: PropTypes.string.isRequired,
@@ -86,4 +133,5 @@ DashboardHero.propTypes = {
       dotColor: PropTypes.string.isRequired,
     })
   ),
+  onNewProjectClick: PropTypes.func,
 }
