@@ -137,9 +137,10 @@ function buildLibrariesService(
     if (filters.projectId) {
       baseQuery.where("library.project_id", filters.projectId);
     }
-    const countResult = await baseQuery.clone().count<{ count: string }[]>({
-      count: "*",
-    });
+    const countResult = await baseQuery
+      .clone()
+      .clearSelect()
+      .count<{ count: string }[]>({ count: "*" });
     const total = Number(countResult[0]?.count ?? 0);
     const pagedQuery = applyPagination(baseQuery, filters);
     const rows = await pagedQuery;

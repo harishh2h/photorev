@@ -165,9 +165,10 @@ function buildPhotoReviewsService(
     if (typeof filters.decision !== "undefined") {
       baseQuery.where("photo_reviews.decision", filters.decision);
     }
-    const countResult = await baseQuery.clone().count<{ count: string }[]>({
-      count: "*",
-    });
+    const countResult = await baseQuery
+      .clone()
+      .clearSelect()
+      .count<{ count: string }[]>({ count: "*" });
     const total = Number(countResult[0]?.count ?? 0);
     const pagedQuery = applyPagination(baseQuery, filters);
     const rows = await pagedQuery;
@@ -185,9 +186,10 @@ function buildPhotoReviewsService(
     const baseQuery = db<PhotoReviewRecord>("photo_reviews")
       .select<PhotoReviewRecord[]>("photo_reviews.*")
       .where("photo_reviews.photo_id", params.photoId);
-    const countResult = await baseQuery.clone().count<{ count: string }[]>({
-      count: "*",
-    });
+    const countResult = await baseQuery
+      .clone()
+      .clearSelect()
+      .count<{ count: string }[]>({ count: "*" });
     const total = Number(countResult[0]?.count ?? 0);
     const pagedQuery = applyPagination(baseQuery, params);
     const rows = await pagedQuery;

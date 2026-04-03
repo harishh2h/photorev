@@ -107,9 +107,10 @@ function buildProjectsService(
     if (typeof filters.isActive !== "undefined") {
       baseQuery.where("projects.is_active", filters.isActive);
     }
-    const countResult = await baseQuery.clone().count<{ count: string }[]>({
-      count: "*",
-    });
+    const countResult = await baseQuery
+      .clone()
+      .clearSelect()
+      .count<{ count: string }[]>({ count: "*" });
     const total = Number(countResult[0]?.count ?? 0);
     const rows = (await applyPagination(baseQuery, filters)) as ProjectRecord[];
     const items = rows.map(mapProjectRecordToDto);

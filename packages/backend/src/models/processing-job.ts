@@ -18,6 +18,11 @@ export interface ProcessingJob {
   completed_at: Date | null
 }
 
+/** Job row plus `photos.original_path` (relative to storage root), set when claiming work. */
+export interface ProcessingJobWithOriginalPath extends ProcessingJob {
+  readonly original_path: string
+}
+
 export interface ProcessingJobInsert {
   photo_id: string
   job_type: ProcessingJobType

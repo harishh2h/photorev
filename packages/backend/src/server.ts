@@ -1,8 +1,9 @@
-import 'dotenv/config';
-import buildApp from './app';
-import { config } from './config/config';
-import path from 'path';
-import fs from 'fs';
+import "dotenv/config";
+import fs from "fs";
+import path from "path";
+import buildApp from "./app";
+import { config } from "./config/config";
+import { initJobSystem } from "./workers";
 
 const server = buildApp({
     logger : {
@@ -41,6 +42,14 @@ const start = async (): Promise<void> => {
 
     } catch (error) {
         server.log.error(error);
+        process.exit(1);
+    }
+
+    try {
+        await initJobSystem();
+        server.log.info("Job system initialized (orphan recovery, queued work, shutdown hooks)");
+    } catch (error) {
+        server.log.error(error, "Job system initialization failed");
         process.exit(1);
     }
 

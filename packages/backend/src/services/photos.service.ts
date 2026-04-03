@@ -6,6 +6,7 @@ import {
   PaginatedResult,
   PaginationParams,
 } from "../utils/pagination";
+import { jobRunner } from "../workers";
 
 export interface PhotoInsert {
   id?: string;
@@ -155,9 +156,10 @@ function buildPhotosService(
         .where("photo_reviews.user_id", userId)
         .andWhere("photo_reviews.decision", filters.decision);
     }
-    const countResult = await baseQuery.clone().count<{ count: string }[]>({
-      count: "*",
-    });
+    const countResult = await baseQuery
+      .clone()
+      .clearSelect()
+      .count<{ count: string }[]>({ count: "*" });
     const total = Number(countResult[0]?.count ?? 0);
     const pagedQuery = applyPagination(baseQuery, filters);
     const rows = await pagedQuery;
@@ -177,9 +179,10 @@ function buildPhotosService(
         );
       })
       .where("photos.library_id", params.libraryId);
-    const countResult = await baseQuery.clone().count<{ count: string }[]>({
-      count: "*",
-    });
+    const countResult = await baseQuery
+      .clone()
+      .clearSelect()
+      .count<{ count: string }[]>({ count: "*" });
     const total = Number(countResult[0]?.count ?? 0);
     const pagedQuery = applyPagination(baseQuery, params);
     const rows = await pagedQuery;
@@ -268,27 +271,26 @@ function buildPhotosService(
       height: photo.height ?? null,
     };
     if (photo.id) row.id = photo.id;
-    
-    let result = await db.transaction(async (trx:Knex.Transaction)=> {
-      const inserted = await trx<PhotoRecord>("photos").insert(row,"*");
-      const insertedPhoto = inserted[0];
-      if(!insertedPhoto){
-        throw new Error("Photo insert returned no row")
-      }
-
-      await trx("processing_jobs").insert([
-        {photo_id : insertedPhoto.id, job_type: "thumbnail"},
-        {photo_id : insertedPhoto.id, job_type: "preview"},
-        {photo_id : insertedPhoto.id, job_type: "metadata"},
-      ])
-
-      return insertedPhoto;
-      
-    })
-
-    // TODO : emit job runner
-    
-    return mapPhotoRecordToDto(result);
+    try {
+      const result = await db.transaction(async (trx: Knex.Transaction) => {
+        const inserted = await trx<PhotoRecord>("photos").insert(row, "*");
+        const insertedPhoto = inserted[0];
+        if (!insertedPhoto) {
+          throw new Error("Photo insert returned no row");
+        }
+        await trx("processing_jobs").insert([
+          { photo_id: insertedPhoto.id, job_type: "thumbnail" },
+          { photo_id: insertedPhoto.id, job_type: "preview" },
+          { photo_id: insertedPhoto.id, job_type: "metadata" },
+        ]);
+        return insertedPhoto;
+      });
+      jobRunner.notify();
+      return mapPhotoRecordToDto(result);
+    } catch (err) {
+      fastify.log.error({ err }, "insertPhoto failed");
+      return null;
+    }
   }
 
   return {
