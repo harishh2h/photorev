@@ -73,9 +73,9 @@ export class JobRunner {
       UPDATE processing_jobs AS pj
       SET status = 'processing',
           started_at = NOW()
-      FROM next_job
-      INNER JOIN photos AS p ON p.id = pj.photo_id
+      FROM next_job, photos AS p
       WHERE pj.id = next_job.id
+        AND p.id = pj.photo_id
       RETURNING
         pj.id,
         pj.photo_id,
