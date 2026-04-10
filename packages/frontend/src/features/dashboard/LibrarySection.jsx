@@ -7,9 +7,9 @@ import styles from './LibrarySection.module.css'
 const STAGGER_MS = 80
 
 /**
- * @param {{ projects?: object[]; isLoading?: boolean }} props
+ * @param {{ projects?: object[]; isLoading?: boolean; authToken?: string }} props
  */
-export default function LibrarySection({ projects = [], isLoading = false }) {
+export default function LibrarySection({ projects = [], isLoading = false, authToken = '' }) {
   return (
     <section className={styles.section}>
       <div className={styles.headingRow}>
@@ -39,7 +39,15 @@ export default function LibrarySection({ projects = [], isLoading = false }) {
                   ? `Created ${formatShortDate(project.createdAt)}`
                   : 'Project'
               }
-              coverImageUrl=""
+              coverPhotoId={
+                typeof project.metadata?.bannerPhotoId === 'string'
+                  ? project.metadata.bannerPhotoId
+                  : ''
+              }
+              authToken={authToken}
+              coverImageUrl={
+                typeof project.metadata?.banner === 'string' ? project.metadata.banner : ''
+              }
               animationDelay={index * STAGGER_MS}
             />
           </NavLink>
@@ -56,7 +64,12 @@ LibrarySection.propTypes = {
       name: PropTypes.string.isRequired,
       status: PropTypes.string,
       createdAt: PropTypes.string,
+      metadata: PropTypes.shape({
+        banner: PropTypes.string,
+        bannerPhotoId: PropTypes.string,
+      }),
     })
   ),
   isLoading: PropTypes.bool,
+  authToken: PropTypes.string,
 }

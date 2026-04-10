@@ -8,6 +8,24 @@ const STORAGE_ROOT =
 export function getStorageRoot(): string {
   return STORAGE_ROOT;
 }
+
+/**
+ * Finds the first file in `dirAbsolute` whose name is `preview.<ext>` (any extension, case-insensitive).
+ * Used so preview delivery does not assume a fixed extension.
+ */
+export async function findPreviewFileAbsolute(dirAbsolute: string): Promise<string | null> {
+  let names: string[];
+  try {
+    names = await fs.promises.readdir(dirAbsolute);
+  } catch {
+    return null;
+  }
+  const match = names.find((n) => n.toLowerCase().startsWith("preview."));
+  if (!match) {
+    return null;
+  }
+  return path.join(dirAbsolute, match);
+}
 const ALLOWED_MIME = [
   "image/jpeg",
   "image/png",

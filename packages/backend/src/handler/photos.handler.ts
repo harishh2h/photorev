@@ -10,11 +10,28 @@ import buildPhotosService, {
 } from "../services/photos.service";
 import { sendFailure, sendSuccess } from "../utils/api-response";
 import { getAuthenticatedUserId } from "../utils/auth";
-import { getStorageRoot, streamFileToDisk, removeUploadDir } from "../utils/storage";
+import { getStorageRoot, findPreviewFileAbsolute, streamFileToDisk, removeUploadDir } from "../utils/storage";
 import { PROCESSING_JOBS_TABLE } from "../models/processing-job";
 import type { ProcessingJobType } from "../models/processing-job";
 
 const JOB_TYPES: ProcessingJobType[] = ["thumbnail", "preview", "metadata"];
+
+function getMimeTypeForImagePath(filePath: string): string {
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith(".png")) {
+    return "image/png";
+  }
+  if (lower.endsWith(".webp")) {
+    return "image/webp";
+  }
+  if (lower.endsWith(".gif")) {
+    return "image/gif";
+  }
+  if (lower.endsWith(".tif") || lower.endsWith(".tiff")) {
+    return "image/tiff";
+  }
+  return "image/jpeg";
+}
 
 function getMultipartField(
   fields: Record<string, { value?: string } | { value?: string }[] | undefined>,
@@ -89,26 +106,34 @@ function buildPhotosHandler(
         sendFailure(reply, 404, "Photo not found", null);
         return;
       }
-      const relative =
-        photo.previewPath || photo.thumbnailPath || photo.originalPath;
-      if (!relative) {
-        sendFailure(reply, 404, "No file available", null);
-        return;
+      const storageRoot = getStorageRoot();
+      const photoDir = path.join(storageRoot, "photos", photo.projectId, photo.id);
+      let absolutePath: string | null = null;
+      const diskPreview = await findPreviewFileAbsolute(photoDir);
+      if (diskPreview) {
+        try {
+          await fs.promises.access(diskPreview);
+          absolutePath = diskPreview;
+        } catch {
+          absolutePath = null;
+        }
       }
-      const absolutePath = path.join(getStorageRoot(), relative);
+      if (!absolutePath) {
+        const relative =
+          photo.previewPath || photo.thumbnailPath || photo.originalPath;
+        if (!relative) {
+          sendFailure(reply, 404, "No file available", null);
+          return;
+        }
+        absolutePath = path.join(storageRoot, relative);
+      }
       try {
         await fs.promises.access(absolutePath);
       } catch {
         sendFailure(reply, 404, "File not on disk", null);
         return;
       }
-      const mimeType =
-        photo.mimeType ||
-        (relative.toLowerCase().endsWith(".png")
-          ? "image/png"
-          : relative.toLowerCase().endsWith(".webp")
-            ? "image/webp"
-            : "image/jpeg");
+      const mimeType = getMimeTypeForImagePath(absolutePath) || photo.mimeType || "image/jpeg";
       reply.type(mimeType);
       return reply.send(fs.createReadStream(absolutePath));
     },

@@ -4,6 +4,7 @@ import buildProjectsService, {
   CreateProjectParams,
   DeleteProjectParams,
   ListProjectsFilters,
+  ProjectMetadata,
   UpdateProjectParams,
 } from "../services/projects.service";
 import { sendFailure, sendSuccess } from "../utils/api-response";
@@ -38,11 +39,12 @@ function buildProjectsHandler(
     },
     createProject: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
-      const body = request.body as { name: string; rootPath?: string };
+      const body = request.body as { name: string; rootPath?: string; metadata?: ProjectMetadata };
       const params: CreateProjectParams = {
         userId,
         name: body.name,
         rootPath: body.rootPath,
+        metadata: body.metadata,
       };
       const created = await service.createProject(params);
       sendSuccess(reply, 201, created, "Project created");
@@ -68,6 +70,7 @@ function buildProjectsHandler(
         status?: "active" | "processing" | "completed";
         isActive?: boolean;
         rootPath?: string;
+        metadata?: ProjectMetadata;
       };
       const params: UpdateProjectParams = {
         userId,
@@ -76,6 +79,7 @@ function buildProjectsHandler(
         status: body.status,
         isActive: body.isActive,
         rootPath: body.rootPath,
+        metadata: body.metadata,
       };
       const updated = await service.updateProject(params);
       if (!updated) {

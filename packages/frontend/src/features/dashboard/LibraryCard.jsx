@@ -1,22 +1,35 @@
 import PropTypes from 'prop-types'
+import AuthenticatedPhotoImage from '@/components/AuthenticatedPhotoImage'
 import styles from './LibraryCard.module.css'
 
 export default function LibraryCard({
   name,
   status,
   subtitle,
+  coverPhotoId = '',
+  authToken = '',
   coverImageUrl = '',
   animationDelay = 0,
 }) {
-  const hasCover = typeof coverImageUrl === 'string' && coverImageUrl.length > 0
+  const usePhoto =
+    typeof coverPhotoId === 'string' && coverPhotoId.length > 0 && typeof authToken === 'string' && authToken.length > 0
+  const legacyUrl = typeof coverImageUrl === 'string' && coverImageUrl.length > 0 ? coverImageUrl : ''
   return (
     <article
       className={styles.card}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className={styles.imageWrap}>
-        {hasCover ? (
-          <img src={coverImageUrl} alt="" />
+        {usePhoto ? (
+          <AuthenticatedPhotoImage
+            photoId={coverPhotoId}
+            token={authToken}
+            legacyImageUrl={legacyUrl}
+            placeholderClassName={styles.imagePlaceholder}
+            alt=""
+          />
+        ) : legacyUrl.length > 0 ? (
+          <img src={legacyUrl} alt="" />
         ) : (
           <div className={styles.imagePlaceholder} aria-hidden />
         )}
@@ -34,6 +47,8 @@ LibraryCard.propTypes = {
   name: PropTypes.string.isRequired,
   status: PropTypes.string.isRequired,
   subtitle: PropTypes.string.isRequired,
+  coverPhotoId: PropTypes.string,
+  authToken: PropTypes.string,
   coverImageUrl: PropTypes.string,
   animationDelay: PropTypes.number,
 }

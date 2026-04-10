@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "pnpm --filter @photorev/frontend dev",
     "backend:dev": "pnpm --filter @photorev/backend dev",
+    "migrate:latest": "pnpm --filter @photorev/backend migrate:latest",
+    "migrate:rollback": "pnpm --filter @photorev/backend migrate:rollback",
+    "migrate:list": "pnpm --filter @photorev/backend migrate:list",
+    "migrate:make": "pnpm --filter @photorev/backend migrate:make",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

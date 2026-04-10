@@ -23,6 +23,7 @@ CREATE TABLE projects (
         CHECK (status IN ('active', 'processing', 'completed')),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     root_path TEXT NOT NULL, -- root path of the project
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_by UUID NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 

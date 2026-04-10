@@ -41,6 +41,11 @@ export default function Dashboard() {
   }, [token, featured?.id])
   const featuredProject = useMemo(() => {
     if (!featured) return null
+    const meta = featured.metadata || {}
+    const bannerPhotoId =
+      typeof meta.bannerPhotoId === 'string' && meta.bannerPhotoId.length > 0 ? meta.bannerPhotoId : ''
+    const banner = meta.banner
+    const bannerUrl = typeof banner === 'string' && banner.length > 0 ? banner : ''
     return {
       id: featured.id,
       name: featured.name,
@@ -48,9 +53,10 @@ export default function Dashboard() {
       status: featured.status,
       totalPhotos: featuredStats?.total ?? 0,
       inProgressPhotos: featuredStats?.inProgress ?? 0,
+      bannerPhotoId,
+      bannerUrl,
     }
   }, [featured, featuredStats])
-  const pendingReviews = featuredStats?.inProgress ?? 0
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
@@ -81,14 +87,12 @@ export default function Dashboard() {
           <p className={styles.loading}>Loading projects…</p>
         ) : null}
         <DashboardHero
-          displayName={displayName}
-          activeSessionCount={projects.length}
-          pendingReviews={pendingReviews}
           featuredProject={featuredProject}
+          authToken={token || ''}
           recentActivity={[]}
           onNewProjectClick={handleOpenAddProject}
         />
-        <LibrarySection projects={projects} isLoading={isLoading} />
+        <LibrarySection projects={projects} isLoading={isLoading} authToken={token || ''} />
       </main>
       <AddProjectModal
         isOpen={isAddProjectOpen}

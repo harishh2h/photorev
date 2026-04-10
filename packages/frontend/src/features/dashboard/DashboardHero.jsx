@@ -1,31 +1,23 @@
 import PropTypes from 'prop-types'
 import { Link } from 'react-router-dom'
+import AuthenticatedPhotoImage from '@/components/AuthenticatedPhotoImage'
 import styles from './DashboardHero.module.css'
 
 export default function DashboardHero({
-  displayName = 'there',
-  activeSessionCount = 0,
-  pendingReviews = 0,
   featuredProject = null,
+  authToken = '',
   recentActivity = [],
   onNewProjectClick = undefined,
 }) {
   const hasFeatured = featuredProject != null && featuredProject.id != null
+  const bannerPhotoId =
+    hasFeatured && typeof featuredProject.bannerPhotoId === 'string' ? featuredProject.bannerPhotoId : ''
+  const bannerUrl = hasFeatured && typeof featuredProject.bannerUrl === 'string' ? featuredProject.bannerUrl : ''
+  const usePhotoBanner = bannerPhotoId.length > 0 && authToken.length > 0
+  const useLegacyBanner = !usePhotoBanner && bannerUrl.length > 0
   return (
     <section className={styles.hero}>
       <div className={styles.topRow}>
-        <div>
-          <h1 className={styles.greeting}>Good morning, {displayName}.</h1>
-          <p className={styles.subtitle}>
-            {activeSessionCount} active project{activeSessionCount === 1 ? '' : 's'}
-            {pendingReviews > 0 ? (
-              <>
-                , <span>{pendingReviews} photo{pendingReviews === 1 ? '' : 's'} still processing</span>
-              </>
-            ) : null}
-            .
-          </p>
-        </div>
         <button
           type="button"
           className={styles.newProjectBtn}
@@ -39,7 +31,19 @@ export default function DashboardHero({
           {hasFeatured ? (
             <>
               <div className={styles.featuredImageWrap}>
-                <div className={styles.featuredPlaceholder} aria-hidden />
+                {usePhotoBanner ? (
+                  <AuthenticatedPhotoImage
+                    photoId={bannerPhotoId}
+                    token={authToken}
+                    legacyImageUrl=""
+                    placeholderClassName={styles.featuredPlaceholder}
+                    alt=""
+                  />
+                ) : useLegacyBanner ? (
+                  <img src={bannerUrl} alt="" />
+                ) : (
+                  <div className={styles.featuredPlaceholder} aria-hidden />
+                )}
                 <span className={styles.reviewBadge}>
                   {(featuredProject.status || 'active').toUpperCase()}
                 </span>
@@ -117,12 +121,12 @@ const featuredShape = PropTypes.shape({
   status: PropTypes.string,
   totalPhotos: PropTypes.number.isRequired,
   inProgressPhotos: PropTypes.number.isRequired,
+  bannerUrl: PropTypes.string,
+  bannerPhotoId: PropTypes.string,
 })
 
 DashboardHero.propTypes = {
-  displayName: PropTypes.string,
-  activeSessionCount: PropTypes.number,
-  pendingReviews: PropTypes.number,
+  authToken: PropTypes.string,
   featuredProject: featuredShape,
   recentActivity: PropTypes.arrayOf(
     PropTypes.shape({

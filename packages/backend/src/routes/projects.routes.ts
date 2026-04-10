@@ -20,6 +20,15 @@ const listProjectsSchema = {
   },
 };
 
+const projectMetadataSchema = {
+  type: "object",
+  additionalProperties: true,
+  properties: {
+    banner: { type: "string", maxLength: 2048 },
+    bannerPhotoId: { type: "string", format: "uuid" },
+  },
+} as const;
+
 const createProjectSchema = {
   body: {
     type: "object",
@@ -27,6 +36,7 @@ const createProjectSchema = {
     properties: {
       name: { type: "string", minLength: 1, maxLength: 255 },
       rootPath: { type: "string", minLength: 1 },
+      metadata: projectMetadataSchema,
     },
     additionalProperties: false,
   },
@@ -51,6 +61,7 @@ const updateProjectSchema = {
       },
       isActive: { type: "boolean" },
       rootPath: { type: "string", minLength: 1 },
+      metadata: projectMetadataSchema,
     },
     additionalProperties: false,
   },
