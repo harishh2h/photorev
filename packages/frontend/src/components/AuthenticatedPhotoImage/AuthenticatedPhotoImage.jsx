@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types'
 import { usePhotoContentBlobUrl } from '@/hooks/usePhotoContentBlobUrl.js'
-import styles from './AuthenticatedPhotoImage.module.css'
+
+const loadingPlaceholder =
+  'min-h-full min-w-full bg-[#EDF7F2] bg-[radial-gradient(circle_at_1px_1px,rgba(110,231,183,0.4)_1px,transparent_0)] bg-[length:16px_16px]'
 
 /**
  * Renders a photo preview from GET /photos/:id/content (auth). Falls back to legacy absolute URL when provided.
@@ -21,7 +23,7 @@ export default function AuthenticatedPhotoImage({
     typeof legacyImageUrl === 'string' && legacyImageUrl.length > 0 ? legacyImageUrl : ''
   const src = objectUrl || legacy
   if (!src && isLoading) {
-    return <div className={`${styles.loading} ${placeholderClassName}`.trim()} aria-hidden />
+    return <div className={`${loadingPlaceholder} ${placeholderClassName}`.trim()} aria-hidden />
   }
   if (!src) {
     return <div className={placeholderClassName} aria-hidden />

@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import Header from '@/components/Header'
 import { useAuth } from '@/features/auth/index.js'
-import styles from './PlaceholderPage.module.css'
 
 export default function ProfilePage() {
   const { user, logout } = useAuth()
@@ -12,11 +11,11 @@ export default function ProfilePage() {
     navigate('/login', { replace: true })
   }
   return (
-    <div className={styles.page}>
+    <div className="min-h-screen bg-base-100">
       <Header userDisplayName={displayName} onLogout={handleLogout} />
-      <main className={styles.main}>
-        <h1 className={styles.title}>Profile</h1>
-        <p className={styles.lead}>{user?.email || user?.name || 'Signed in'}</p>
+      <main className="mx-auto max-w-[1280px] px-4 py-8 md:px-6">
+        <h1 className="m-0 mb-2 font-base text-3xl font-bold text-base-content">Profile</h1>
+        <p className="m-0 font-base text-base text-muted">{user?.email || user?.name || 'Signed in'}</p>
       </main>
     </div>
   )

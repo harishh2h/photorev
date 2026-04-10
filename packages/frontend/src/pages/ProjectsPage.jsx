@@ -3,7 +3,6 @@ import Header from '@/components/Header'
 import LibrarySection from '@/features/dashboard/LibrarySection'
 import { useAuth } from '@/features/auth/index.js'
 import { useProjects } from '@/hooks/useProjects.js'
-import styles from './PlaceholderPage.module.css'
 
 export default function ProjectsPage() {
   const { user, token, logout } = useAuth()
@@ -15,17 +14,17 @@ export default function ProjectsPage() {
     navigate('/login', { replace: true })
   }
   return (
-    <div className={styles.page}>
+    <div className="min-h-screen bg-base-100">
       <Header userDisplayName={displayName} onLogout={handleLogout} />
-      <main className={styles.main}>
-        <h1 className={styles.title}>Projects</h1>
-        <p className={styles.lead}>Open a project to upload photos and run reviews.</p>
+      <main className="mx-auto max-w-[1280px] px-4 py-8 md:px-6">
+        <h1 className="m-0 mb-2 font-base text-3xl font-bold text-base-content">Projects</h1>
+        <p className="m-0 mb-4 font-base text-base text-muted">Open a project to upload photos and run reviews.</p>
         {error ? (
-          <p className={styles.errorText} role="alert">
+          <p className="mb-4 font-base text-base text-error" role="alert">
             {error}
           </p>
         ) : null}
-        <LibrarySection projects={projects} isLoading={isLoading} />
+        <LibrarySection projects={projects} isLoading={isLoading} authToken={token || ''} />
       </main>
     </div>
   )

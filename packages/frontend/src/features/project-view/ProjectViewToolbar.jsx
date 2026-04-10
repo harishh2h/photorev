@@ -1,5 +1,4 @@
 import PropTypes from 'prop-types'
-import styles from './ProjectViewToolbar.module.css'
 
 const FILTER_ITEMS = [
   { id: 'all', label: 'All' },
@@ -14,9 +13,15 @@ const FILTER_ITEMS = [
  */
 export default function ProjectViewToolbar({ projectTitle, filterCounts, activeFilter, onFilterChange }) {
   return (
-    <div className={styles.bar}>
-      <h1 className={styles.projectTitle}>{projectTitle}</h1>
-      <div className={styles.filters} role="tablist" aria-label="Photo filters">
+    <div className="flex flex-col items-start gap-4 border-b-[1.5px] border-base-300 py-4 pb-6 md:flex-row md:items-center md:justify-between md:gap-6">
+      <h1 className="m-0 max-w-full min-w-0 font-base text-2xl font-bold leading-tight text-base-content md:text-3xl lg:text-4xl">
+        {projectTitle}
+      </h1>
+      <div
+        className="flex w-full max-w-full items-center gap-1 overflow-x-auto scroll-smooth rounded-full border-[1.5px] border-base-300 bg-base-200/60 p-1 [scrollbar-width:none] md:ml-auto md:w-auto md:flex-initial md:flex-none [&::-webkit-scrollbar]:hidden"
+        role="tablist"
+        aria-label="Photo filters"
+      >
         {FILTER_ITEMS.map((item) => {
           const count = filterCounts[item.id] ?? 0
           const isActive = activeFilter === item.id
@@ -26,11 +31,15 @@ export default function ProjectViewToolbar({ projectTitle, filterCounts, activeF
               type="button"
               role="tab"
               aria-selected={isActive}
-              className={`${styles.filterBtn} ${isActive ? styles.filterBtnActive : ''}`}
+              className={`inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border-[1.5px] px-4 font-base text-sm font-medium transition-[background-color,color,border-color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:shadow-focus ${
+                isActive
+                  ? 'border-base-300 bg-base-100 text-base-content shadow-card'
+                  : 'cursor-pointer border-transparent bg-transparent text-muted hover:text-base-content'
+              }`}
               onClick={() => onFilterChange(item.id)}
             >
-              <span className={styles.filterLabel}>{item.label}</span>
-              <span className={styles.filterCount}>{count}</span>
+              <span>{item.label}</span>
+              <span className="font-semibold text-accent">{count}</span>
             </button>
           )
         })}

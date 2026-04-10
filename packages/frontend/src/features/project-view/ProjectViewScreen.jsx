@@ -4,7 +4,6 @@ import ProjectViewToolbar from './ProjectViewToolbar.jsx'
 import ProjectPhotoGrid from './ProjectPhotoGrid.jsx'
 import ProjectViewSidebar from './ProjectViewSidebar.jsx'
 import ProjectGridOverlays from './ProjectGridOverlays.jsx'
-import styles from './ProjectViewScreen.module.css'
 
 /**
  * @param {{ data: object; token: string }} props
@@ -23,25 +22,24 @@ export default function ProjectViewScreen({ data, token }) {
   const handleSettings = useCallback(() => {}, [])
   const handleAddPhotos = useCallback(() => {}, [])
   return (
-    <div className={styles.shell}>
+    <div className="lg:pr-[min(300px,100vw)]">
       <ProjectViewToolbar
         projectTitle={data.projectTitle}
         filterCounts={data.filterCounts}
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
       />
-      <div className={styles.layout}>
-        <div className={styles.main}>
-          <div className={styles.gridRegion}>
+      <div className="flex flex-col gap-6 pb-20 pt-4 lg:block lg:pb-20">
+        <div className="min-w-0">
+          <div className="relative pb-16">
             {filteredPhotos.length > 0 ? (
               <ProjectPhotoGrid photos={filteredPhotos} token={token} />
             ) : (
-              <p className={styles.empty}>No photos match this filter.</p>
+              <p className="m-0 rounded-card border-[1.5px] border-dashed border-base-300 bg-base-100 px-4 py-10 text-center font-base text-base text-muted">
+                No photos match this filter.
+              </p>
             )}
-            <ProjectGridOverlays
-              collaboratingLabel={data.collaboratingLabel}
-              onAddPhotos={handleAddPhotos}
-            />
+            <ProjectGridOverlays collaboratingLabel={data.collaboratingLabel} onAddPhotos={handleAddPhotos} />
           </div>
         </div>
         <ProjectViewSidebar

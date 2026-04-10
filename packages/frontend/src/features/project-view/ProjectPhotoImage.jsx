@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import { fetchPhotoContentBlob } from '@/services/photoService.js'
-import styles from './ProjectPhotoImage.module.css'
+
+const fallbackClass =
+  'min-h-full w-full flex-1 bg-[#EDF7F2] bg-[radial-gradient(circle_at_1px_1px,rgba(110,231,183,0.45)_1px,transparent_0)] bg-[length:14px_14px]'
 
 /**
  * @param {{ photoId: string; token: string; alt: string; className?: string }} props
@@ -30,11 +32,7 @@ export default function ProjectPhotoImage({ photoId, token, alt, className = '' 
   }, [photoId, token])
   if (hasError || !objectUrl) {
     return (
-      <div
-        className={`${styles.fallback} ${className}`.trim()}
-        role="img"
-        aria-label={alt}
-      />
+      <div className={`${fallbackClass} ${className}`.trim()} role="img" aria-label={alt} />
     )
   }
   return <img src={objectUrl} alt={alt} className={className} />

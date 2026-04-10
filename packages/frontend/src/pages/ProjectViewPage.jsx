@@ -3,7 +3,6 @@ import Header from '@/components/Header'
 import { ProjectViewScreen } from '@/features/project-view'
 import { useAuth } from '@/features/auth/index.js'
 import { useProjectViewData } from '@/hooks/useProjectViewData.js'
-import styles from './ProjectViewPage.module.css'
 
 export default function ProjectViewPage() {
   const { projectId } = useParams()
@@ -16,12 +15,12 @@ export default function ProjectViewPage() {
     navigate('/login', { replace: true })
   }
   return (
-    <div className={styles.page}>
+    <div className="min-h-screen bg-base-100">
       <Header userDisplayName={displayName} onLogout={handleLogout} />
-      <main className={styles.main}>
-        {isLoading ? <p className={styles.feedback}>Loading project…</p> : null}
+      <main className="mx-auto max-w-[1400px] px-4 pb-10 pt-0 md:px-6 md:pb-12 lg:px-8">
+        {isLoading ? <p className="mb-4 font-base text-sm text-muted">Loading project…</p> : null}
         {error ? (
-          <p className={styles.error} role="alert">
+          <p className="mb-4 font-base text-sm text-error" role="alert">
             {error}
           </p>
         ) : null}
@@ -29,10 +28,10 @@ export default function ProjectViewPage() {
           <ProjectViewScreen data={data} token={token} />
         ) : null}
         {!isLoading && !error && data == null && token ? (
-          <p className={styles.feedback}>No data for this project.</p>
+          <p className="mb-4 font-base text-sm text-muted">No data for this project.</p>
         ) : null}
         {!token ? (
-          <p className={styles.error} role="alert">
+          <p className="mb-4 font-base text-sm text-error" role="alert">
             Sign in to view this project.
           </p>
         ) : null}

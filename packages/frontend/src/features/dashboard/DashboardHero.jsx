@@ -1,7 +1,11 @@
 import PropTypes from 'prop-types'
 import { Link } from 'react-router-dom'
 import AuthenticatedPhotoImage from '@/components/AuthenticatedPhotoImage'
-import styles from './DashboardHero.module.css'
+
+const featuredPh =
+  'illustration-placeholder min-h-[200px] w-full md:min-h-[260px]'
+const emptyVisualPh =
+  'min-h-[180px] rounded-[calc(1.5rem-8px)] border-[1.5px] border-base-300 bg-base-200 bg-[radial-gradient(circle_at_1px_1px,rgba(16,185,129,0.28)_1px,transparent_0)] bg-[length:14px_14px]'
 
 export default function DashboardHero({
   featuredProject = null,
@@ -16,96 +20,108 @@ export default function DashboardHero({
   const usePhotoBanner = bannerPhotoId.length > 0 && authToken.length > 0
   const useLegacyBanner = !usePhotoBanner && bannerUrl.length > 0
   return (
-    <section className={styles.hero}>
-      <div className={styles.topRow}>
+    <section className="mb-10 md:mb-12">
+      <div className="mb-6 flex flex-col items-stretch justify-end gap-4 max-md:items-start md:flex-row md:items-center">
         <button
           type="button"
-          className={styles.newProjectBtn}
+          className="btn btn-primary ml-auto min-h-11 rounded-full border-0 px-6 font-base text-base font-semibold text-primary-content transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus max-md:ml-0 max-md:w-full md:ml-auto"
           onClick={() => onNewProjectClick?.()}
         >
           + New Project
         </button>
       </div>
-      <div className={styles.overviewGrid}>
-        <article className={styles.featuredCard}>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
+        <article className="grid grid-cols-1 gap-5 overflow-hidden rounded-card border-[1.5px] border-base-300 bg-base-100 p-4 md:grid-cols-[300px_1fr]">
           {hasFeatured ? (
             <>
-              <div className={styles.featuredImageWrap}>
+              <div className="relative min-h-[200px] overflow-hidden rounded-[calc(1.5rem-8px)] md:min-h-[260px]">
                 {usePhotoBanner ? (
                   <AuthenticatedPhotoImage
                     photoId={bannerPhotoId}
                     token={authToken}
                     legacyImageUrl=""
-                    placeholderClassName={styles.featuredPlaceholder}
+                    placeholderClassName={featuredPh}
                     alt=""
                   />
                 ) : useLegacyBanner ? (
-                  <img src={bannerUrl} alt="" />
+                  <img src={bannerUrl} alt="" className="block min-h-[260px] h-auto w-full object-cover" />
                 ) : (
-                  <div className={styles.featuredPlaceholder} aria-hidden />
+                  <div className={featuredPh} aria-hidden />
                 )}
-                <span className={styles.reviewBadge}>
+                <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-2 font-base text-xs font-bold text-accent-content">
                   {(featuredProject.status || 'active').toUpperCase()}
                 </span>
               </div>
-              <div className={styles.featuredContent}>
-                <h2 className={styles.featuredTitle}>{featuredProject.name}</h2>
-                <p className={styles.featuredDescription}>
-                  {featuredProject.description || 'Open this project to upload photos, run reviews, and export selections.'}
+              <div className="flex flex-col justify-center">
+                <h2 className="m-0 font-base text-3xl text-base-content">{featuredProject.name}</h2>
+                <p className="my-3 mb-5 font-base text-base text-muted">
+                  {featuredProject.description ||
+                    'Open this project to upload photos, run reviews, and export selections.'}
                 </p>
-                <div className={styles.metrics}>
+                <div className="mb-5 flex gap-10 max-md:gap-6">
                   <div>
-                    <p className={styles.metricValue}>{featuredProject.totalPhotos}</p>
-                    <p className={styles.metricLabel}>TOTAL PHOTOS</p>
+                    <p className="m-0 font-base text-[2.3rem] font-bold text-base-content">{featuredProject.totalPhotos}</p>
+                    <p className="mt-1 font-base text-xs uppercase tracking-[0.06em] text-muted">TOTAL PHOTOS</p>
                   </div>
                   <div>
-                    <p className={`${styles.metricValue} ${styles.metricWarning}`}>
-                      {featuredProject.inProgressPhotos}
-                    </p>
-                    <p className={styles.metricLabel}>IN PROGRESS</p>
+                    <p className="m-0 font-base text-[2.3rem] font-bold text-warning">{featuredProject.inProgressPhotos}</p>
+                    <p className="mt-1 font-base text-xs uppercase tracking-[0.06em] text-muted">IN PROGRESS</p>
                   </div>
                 </div>
-                <Link to={`/projects/${featuredProject.id}`} className={styles.continueBtn}>
+                <Link
+                  to={`/projects/${featuredProject.id}`}
+                  className="btn btn-primary inline-flex w-fit min-h-11 items-center gap-2 rounded-full border-0 px-8 font-base text-base font-semibold text-primary-content no-underline transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
+                >
                   Open project <span aria-hidden>→</span>
                 </Link>
               </div>
             </>
           ) : (
-            <div className={styles.emptyFeatured}>
-              <div className={styles.emptyVisual} aria-hidden />
-              <div className={styles.emptyCopy}>
-                <h2 className={styles.featuredTitle}>No projects yet</h2>
-                <p className={styles.featuredDescription}>
+            <div className="grid grid-cols-1 items-center gap-5 p-2 md:grid-cols-[minmax(0,200px)_1fr]">
+              <div className={emptyVisualPh} aria-hidden />
+              <div className="flex flex-col gap-3">
+                <h2 className="m-0 font-base text-3xl text-base-content">No projects yet</h2>
+                <p className="font-base text-base text-muted">
                   Create a project to get a dedicated space for uploads and client review sessions.
                 </p>
-                <button type="button" className={styles.continueBtn} onClick={() => onNewProjectClick?.()}>
+                <button
+                  type="button"
+                  className="btn btn-primary inline-flex w-fit min-h-11 items-center gap-2 rounded-full border-0 px-8 font-base text-base font-semibold text-primary-content transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
+                  onClick={() => onNewProjectClick?.()}
+                >
                   Create your first project <span aria-hidden>→</span>
                 </button>
               </div>
             </div>
           )}
         </article>
-        <aside className={styles.activityCard}>
-          <h3 className={styles.activityTitle}>Activity</h3>
-          <div className={styles.activityList}>
+        <aside className="flex flex-col rounded-card bg-[#067a4c] p-5 text-[#eafff5]">
+          <h3 className="m-0 mb-4 font-base text-2xl font-semibold">Activity</h3>
+          <div className="flex flex-1 flex-col gap-3">
             {recentActivity.length > 0 ? (
               recentActivity.map((entry) => (
-                <div key={entry.id} className={styles.activityItem}>
-                  <span className={styles.activityAvatar}>{entry.actorInitial}</span>
+                <div key={entry.id} className="grid grid-cols-[30px_1fr_auto] items-center gap-3">
+                  <span className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white/20 font-base text-xs font-semibold">
+                    {entry.actorInitial}
+                  </span>
                   <div>
-                    <p className={styles.activityText}>{entry.message}</p>
-                    <p className={styles.activityTime}>{entry.timeLabel}</p>
+                    <p className="m-0 font-base text-sm text-[#f4fff8]">{entry.message}</p>
+                    <p className="mt-0.5 font-base text-xs text-[#b3e7cf]">{entry.timeLabel}</p>
                   </div>
-                  <span className={styles.activityDot} style={{ background: entry.dotColor }} />
+                  <span className="h-[7px] w-[7px] rounded-full" style={{ background: entry.dotColor }} />
                 </div>
               ))
             ) : (
-              <p className={styles.activityEmpty}>
+              <p className="m-0 font-base text-sm leading-relaxed text-[#d8f5e8]">
                 No audit events yet. Uploads and review actions will show up here when the API exposes an activity feed.
               </p>
             )}
           </div>
-          <button type="button" className={styles.auditBtn} disabled>
+          <button
+            type="button"
+            className="btn mt-4 min-h-10 rounded-full border-[1.5px] border-white/20 bg-white/10 font-base text-sm font-semibold text-[#effff6] opacity-45"
+            disabled
+          >
             Audit log (soon)
           </button>
         </aside>

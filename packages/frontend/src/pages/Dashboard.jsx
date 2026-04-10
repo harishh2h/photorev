@@ -8,7 +8,6 @@ import { useAuth } from '@/features/auth/index.js'
 import { useProjects } from '@/hooks/useProjects.js'
 import { createProject } from '@/services/projectService.js'
 import { listPhotos } from '@/services/photoService.js'
-import styles from './Dashboard.module.css'
 
 export default function Dashboard() {
   const { user, token, logout } = useAuth()
@@ -75,16 +74,16 @@ export default function Dashboard() {
     [token, refetch, navigate]
   )
   return (
-    <div className={styles.page}>
+    <div className="min-h-screen bg-base-100">
       <Header userDisplayName={displayName} onLogout={handleLogout} />
-      <main className={styles.main}>
+      <main className="mx-auto max-w-[1280px] px-4 py-6 pb-10 md:px-6 md:py-8 md:pb-10">
         {error ? (
-          <p className={styles.loadError} role="alert">
+          <p className="mb-4 font-base text-sm text-error" role="alert">
             {error}
           </p>
         ) : null}
         {isLoading && projects.length === 0 ? (
-          <p className={styles.loading}>Loading projects…</p>
+          <p className="mb-4 font-base text-sm text-muted">Loading projects…</p>
         ) : null}
         <DashboardHero
           featuredProject={featuredProject}

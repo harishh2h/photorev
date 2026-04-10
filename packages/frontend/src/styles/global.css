@@ -8,47 +8,168 @@
   box-sizing: border-box;
 }
 
-body {
-  margin: 0;
-  font-family: var(--font-base);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+  body {
+    @apply m-0 font-base antialiased text-base-content bg-base-100;
+  }
+
+  /* Pill & Sage: inputs/buttons/cards use 1.5px borders (not hairline 1px). */
+  .input,
+  .select,
+  .select select,
+  .textarea,
+  .btn:not(.btn-ghost):not(.btn-link),
+  .card {
+    border-width: 1.5px;
+  }
+
+  .btn-ghost,
+  .btn-link {
+    border-width: 0;
+  }
 }
 
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
+@layer components {
+  .animate-fade-up {
+    animation: fadeUp 380ms cubic-bezier(0, 0, 0.2, 1) both;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
-/**
- * Default when no image: geometric illustration using accent palette.
- * Design system: accent-subtle base + accent-mid dots/lines — never solid grey.
- */
-.illustration-placeholder {
-  position: absolute;
-  inset: 0;
-  background-color: var(--color-accent-subtle);
-  background-image: radial-gradient(
-      circle at 50% 50%,
-      var(--color-accent-mid) 1.5px,
-      transparent 1.5px
-    ),
-    radial-gradient(
-      circle at 20% 30%,
-      var(--color-accent-mid) 1px,
-      transparent 1px
-    ),
-    radial-gradient(
-      circle at 80% 70%,
-      var(--color-accent-mid) 1px,
-      transparent 1px
-    );
-  background-size: 24px 24px, 40px 40px, 36px 36px;
-  background-position: 0 0, 0 0, 12px 12px;
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .toast-enter {
+    animation: toastIn 250ms cubic-bezier(0, 0, 0.2, 1) both;
+  }
+
+  .toast-exit {
+    animation: toastOut 250ms cubic-bezier(0, 0, 0.2, 1) both;
+  }
+
+  @keyframes toastIn {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes toastOut {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+
+  .modal-overlay-in {
+    animation: modalFadeIn 250ms cubic-bezier(0, 0, 0.2, 1) both;
+  }
+
+  @keyframes modalFadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .modal-panel-up {
+    animation: modalPanelUp 380ms cubic-bezier(0, 0, 0.2, 1) both;
+  }
+
+  @keyframes modalPanelUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .modal-float-stat {
+    animation: modalFloatStat 380ms cubic-bezier(0, 0, 0.2, 1) both;
+  }
+
+  @keyframes modalFloatStat {
+    from {
+      opacity: 0;
+      transform: rotate(0deg) translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: rotate(-1deg) translateY(0);
+    }
+  }
+
+  .dropdown-panel-in {
+    animation: panelIn 150ms cubic-bezier(0, 0, 0.2, 1) forwards;
+  }
+
+  @keyframes panelIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    border-radius: 9999px;
+    /* theme.colors.border */
+    background: #e8ece9;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    /* theme.colors.textMuted */
+    background: #7a8a82;
+  }
+
+  /* No-image geometric placeholder — colors mirror theme.js accentSubtle / accentMid */
+  .illustration-placeholder {
+    position: absolute;
+    inset: 0;
+    background-color: #edf7f2;
+    background-image: radial-gradient(
+        circle at 50% 50%,
+        #6ee7b7 1.5px,
+        transparent 1.5px
+      ),
+      radial-gradient(
+        circle at 20% 30%,
+        #6ee7b7 1px,
+        transparent 1px
+      ),
+      radial-gradient(
+        circle at 80% 70%,
+        #6ee7b7 1px,
+        transparent 1px
+      );
+    background-size: 24px 24px, 40px 40px, 36px 36px;
+    background-position: 0 0, 0 0, 12px 12px;
+  }
 }

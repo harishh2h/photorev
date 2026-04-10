@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import PropTypes from 'prop-types'
 import { useAuth } from './useAuth.js'
 import { useToast } from '@/components/Toast/index.js'
-import styles from './AuthForm.module.css'
 
 const BRAND_MONOGRAM = 'PR'
+
+const inputClass =
+  'input input-bordered w-full min-h-11 rounded-full border-[1.5px] border-base-300 bg-[#fbfbfb] px-5 py-3 font-base text-base text-base-content transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-base-300 focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(16,185,129,0.2)] max-[420px]:px-4 max-[420px]:text-sm'
 
 export default function AuthForm({ mode, onToggleMode }) {
   const [email, setEmail] = useState('')
@@ -41,18 +43,26 @@ export default function AuthForm({ mode, onToggleMode }) {
       setIsSubmitting(false)
     }
   }
+
+  const tabClass = (active) =>
+    `border-b-2 bg-transparent px-0 pb-1 font-base text-base font-medium transition-[color,border-color] duration-150 ease-out focus-visible:rounded-md focus-visible:outline-none focus-visible:shadow-focus max-[420px]:text-lg ${
+      active ? 'border-accent text-base-content' : 'cursor-pointer border-transparent text-muted'
+    }`
+
   return (
-    <form className={styles.form} onSubmit={handleSubmit} noValidate>
-      <div className={styles.brandBlock}>
-        <span className={styles.monogram}>{BRAND_MONOGRAM}</span>
-        <h1 className={styles.heading}>PhotoRev</h1>
+    <form className="flex w-full flex-col gap-4 max-[420px]:gap-3" onSubmit={handleSubmit} noValidate>
+      <div className="flex flex-col items-center gap-2">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-accent font-base text-base font-bold text-accent-content">
+          {BRAND_MONOGRAM}
+        </span>
+        <h1 className="m-0 font-base text-3xl font-bold text-base-content max-[420px]:text-2xl">PhotoRev</h1>
       </div>
-      <div className={styles.modeTabs} role="tablist" aria-label="Account mode">
+      <div className="mb-1 flex justify-center gap-4 max-[420px]:gap-3" role="tablist" aria-label="Account mode">
         <button
           type="button"
           role="tab"
           aria-selected={isSignIn}
-          className={`${styles.modeTab} ${isSignIn ? styles.modeTabActive : ''}`}
+          className={tabClass(isSignIn)}
           onClick={() => !isSignIn && onToggleMode()}
           disabled={isSubmitting}
         >
@@ -62,22 +72,24 @@ export default function AuthForm({ mode, onToggleMode }) {
           type="button"
           role="tab"
           aria-selected={!isSignIn}
-          className={`${styles.modeTab} ${!isSignIn ? styles.modeTabActive : ''}`}
+          className={tabClass(!isSignIn)}
           onClick={() => isSignIn && onToggleMode()}
           disabled={isSubmitting}
         >
           Register
         </button>
       </div>
-      <div key={mode} className={styles.formBody}>
-        <div className={styles.fieldsShell}>
+      <div key={mode} className="animate-fade-up motion-reduce:animate-none">
+        <div className="flex min-h-[200px] flex-col gap-4 max-[420px]:min-h-[176px]">
           {!isSignIn && (
-            <div className={styles.fieldGroup}>
-              <label htmlFor="auth-name" className={styles.label}>Full name</label>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="auth-name" className="font-base text-sm font-medium text-muted max-[420px]:text-xs">
+                Full name
+              </label>
               <input
                 id="auth-name"
                 type="text"
-                className={styles.input}
+                className={inputClass}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="John Doe"
@@ -87,12 +99,14 @@ export default function AuthForm({ mode, onToggleMode }) {
               />
             </div>
           )}
-          <div className={styles.fieldGroup}>
-            <label htmlFor="auth-email" className={styles.label}>Email address</label>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="auth-email" className="font-base text-sm font-medium text-muted max-[420px]:text-xs">
+              Email address
+            </label>
             <input
               id="auth-email"
               type="email"
-              className={styles.input}
+              className={inputClass}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="enter@email.com"
@@ -101,13 +115,15 @@ export default function AuthForm({ mode, onToggleMode }) {
               disabled={isSubmitting}
             />
           </div>
-          <div className={styles.fieldGroup}>
-            <label htmlFor="auth-password" className={styles.label}>Password</label>
-            <div className={styles.inputWrap}>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="auth-password" className="font-base text-sm font-medium text-muted max-[420px]:text-xs">
+              Password
+            </label>
+            <div className="relative flex items-center">
               <input
                 id="auth-password"
                 type={showPassword ? 'text' : 'password'}
-                className={styles.input}
+                className={`${inputClass} pr-12`}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -117,7 +133,7 @@ export default function AuthForm({ mode, onToggleMode }) {
               />
               <button
                 type="button"
-                className={styles.passwordToggle}
+                className="absolute right-3 flex h-11 w-11 min-h-11 min-w-11 items-center justify-center rounded-full border-0 bg-transparent text-muted transition-[color,background-color] duration-150 ease-out hover:bg-base-200 hover:text-base-content focus-visible:outline-none focus-visible:shadow-focus"
                 onClick={() => setShowPassword((p) => !p)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 tabIndex={-1}
@@ -137,18 +153,20 @@ export default function AuthForm({ mode, onToggleMode }) {
             </div>
           </div>
         </div>
-        <div className={styles.actions}>
+        <div className="mt-5 flex flex-col gap-4">
           <button
             type="submit"
-            className={styles.btnPrimary}
+            className="btn btn-primary inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border-0 px-8 font-base text-base font-semibold text-primary-content transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-40 max-[420px]:w-full"
             disabled={isSubmitting}
           >
             {isSubmitting ? (
-              <span className={styles.spinner} aria-hidden />
+              <span className="loading loading-spinner loading-sm text-primary-content" aria-hidden />
             ) : (
-              isSignIn ? 'Login' : 'Create account'
+              <>
+                {isSignIn ? 'Login' : 'Create account'}
+                <span aria-hidden>→</span>
+              </>
             )}
-            {!isSubmitting && <span className={styles.arrow} aria-hidden>→</span>}
           </button>
         </div>
       </div>

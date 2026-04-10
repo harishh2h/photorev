@@ -1,14 +1,13 @@
 import PropTypes from 'prop-types'
 import ResumeCard from './ResumeCard'
-import styles from './ResumeSection.module.css'
 
 const STAGGER_MS = 80
 
 export default function ResumeSection({ items = [] }) {
   return (
-    <section className={styles.section}>
-      <h2 className={styles.heading}>Continue Reviewing</h2>
-      <div className={styles.row}>
+    <section className="mb-12">
+      <h2 className="m-0 mb-6 font-base text-xl font-semibold text-base-content">Continue Reviewing</h2>
+      <div className="scrollbar-thin flex gap-6 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:thin]">
         {items.map((item, index) => (
           <ResumeCard
             key={item.id}
