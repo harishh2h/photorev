@@ -24,7 +24,6 @@ function buildPhotoReviewsHandler(
       const userId = getAuthenticatedUserId(request);
       const paramsRaw = request.params as { photoId: string };
       const body = request.body as {
-        libraryId: string;
         seen?: boolean;
         decision?: number | null;
         renamedTo?: string | null;
@@ -32,7 +31,6 @@ function buildPhotoReviewsHandler(
       const params: UpsertReviewParams = {
         userId,
         photoId: paramsRaw.photoId,
-        libraryId: body.libraryId,
         seen: body.seen,
         decision: body.decision,
         renamedTo: body.renamedTo,
@@ -50,14 +48,12 @@ function buildPhotoReviewsHandler(
         page?: number;
         pageSize?: number;
         projectId?: string;
-        libraryId?: string;
         decision?: number;
       };
       const filters: ListUserReviewsFilters = {
         page: query.page,
         pageSize: query.pageSize,
         projectId: query.projectId,
-        libraryId: query.libraryId,
         decision: query.decision,
       };
       const result = await service.listUserReviews(userId, filters);

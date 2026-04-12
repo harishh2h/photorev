@@ -30,10 +30,9 @@ export const LoginSchema = {
 export const uploadPhotoSchema = {
   body: {
     type: "object",
-    required: ["projectId", "libraryId"],
+    required: ["projectId"],
     properties: {
       projectId: { type: "string", format: "uuid" },
-      libraryId: { type: "string", format: "uuid" },
     },
     additionalProperties: true,
   },

@@ -6,7 +6,6 @@ export interface PhotoReview {
   id: string
   photo_id: string
   user_id: string
-  library_id: string
   seen: boolean
   decision: ReviewDecision
   renamed_to: string | null
@@ -17,7 +16,6 @@ export interface PhotoReview {
 export interface PhotoReviewInsert {
   photo_id: string
   user_id: string
-  library_id: string
   seen?: boolean
   decision?: ReviewDecision
   renamed_to?: string | null

@@ -1,6 +1,5 @@
 export * from './user'
 export * from './project'
-export * from './library'
 export * from './photo'
 export * from './photo-review'
 export * from './processing-job'

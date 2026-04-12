@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types'
 import { NavLink } from 'react-router-dom'
-import LibraryCard from './LibraryCard'
+import ProjectCard from './ProjectCard'
 import { formatShortDate } from '@/utils/formatDate.js'
 
 const STAGGER_MS = 80
@@ -8,7 +8,7 @@ const STAGGER_MS = 80
 /**
  * @param {{ projects?: object[]; isLoading?: boolean; authToken?: string }} props
  */
-export default function LibrarySection({ projects = [], isLoading = false, authToken = '' }) {
+export default function ProjectsSection({ projects = [], isLoading = false, authToken = '' }) {
   return (
     <section className="mb-8">
       <div className="mb-6 flex items-center justify-between">
@@ -33,7 +33,7 @@ export default function LibrarySection({ projects = [], isLoading = false, authT
             to={`/projects/${project.id}`}
             className="block rounded-card text-inherit no-underline focus-visible:outline-none focus-visible:shadow-focus"
           >
-            <LibraryCard
+            <ProjectCard
               name={project.name}
               status={String(project.status || 'active').toUpperCase()}
               subtitle={
@@ -53,7 +53,7 @@ export default function LibrarySection({ projects = [], isLoading = false, authT
   )
 }
 
-LibrarySection.propTypes = {
+ProjectsSection.propTypes = {
   projects: PropTypes.arrayOf(
     PropTypes.shape({
       id: PropTypes.string.isRequired,

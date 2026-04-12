@@ -4,13 +4,31 @@ import ProjectViewToolbar from './ProjectViewToolbar.jsx'
 import ProjectPhotoGrid from './ProjectPhotoGrid.jsx'
 import ProjectViewSidebar from './ProjectViewSidebar.jsx'
 import ProjectGridOverlays from './ProjectGridOverlays.jsx'
+import ProjectUploadStatusFloat from './ProjectUploadStatusFloat.jsx'
+import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
 
 /**
- * @param {{ data: object; token: string }} props
+ * @param {{ data: object; token: string; projectId: string; onRefresh: () => void }} props
  * @returns {import('react').JSX.Element}
  */
-export default function ProjectViewScreen({ data, token }) {
+export default function ProjectViewScreen({ data, token, projectId, onRefresh }) {
   const [activeFilter, setActiveFilter] = useState('all')
+  const {
+    fileInputRef,
+    uploadConcurrency,
+    handleConcurrencyChange,
+    isUploading,
+    uploadJobs,
+    uploadMessage,
+    showUploadPanel,
+    canRetryFailed,
+    openFilePicker,
+    handleFileInputChange,
+    dismissUploadPanel,
+    retryFailedUploads,
+    maxUploadConcurrency,
+  } = useProjectPhotoUpload({ token, projectId, onAfterBatch: onRefresh })
+
   const filteredPhotos = useMemo(() => {
     if (activeFilter === 'all') return data.photos
     if (activeFilter === 'liked') return data.photos.filter((p) => p.isLiked)
@@ -20,18 +38,40 @@ export default function ProjectViewScreen({ data, token }) {
   const handleFinalize = useCallback(() => {}, [])
   const handleShare = useCallback(() => {}, [])
   const handleSettings = useCallback(() => {}, [])
-  const handleAddPhotos = useCallback(() => {}, [])
   return (
     <div className="lg:pr-[min(300px,100vw)]">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={handleFileInputChange}
+      />
       <ProjectViewToolbar
         projectTitle={data.projectTitle}
         filterCounts={data.filterCounts}
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
       />
-      <div className="flex flex-col gap-6 pb-20 pt-4 lg:block lg:pb-20">
+      {showUploadPanel ? (
+        <ProjectUploadStatusFloat
+          isUploading={isUploading}
+          uploadJobs={uploadJobs}
+          uploadMessage={uploadMessage}
+          uploadConcurrency={uploadConcurrency}
+          maxConcurrency={maxUploadConcurrency}
+          onConcurrencyChange={handleConcurrencyChange}
+          onDismiss={dismissUploadPanel}
+          canRetryFailed={canRetryFailed}
+          onRetryFailed={retryFailedUploads}
+        />
+      ) : null}
+      <div className="flex flex-col gap-6 pb-28 pt-4 lg:block lg:pb-32">
         <div className="min-w-0">
-          <div className="relative pb-16">
+          <div className="relative pb-8 lg:pb-10">
             {filteredPhotos.length > 0 ? (
               <ProjectPhotoGrid photos={filteredPhotos} token={token} />
             ) : (
@@ -39,7 +79,11 @@ export default function ProjectViewScreen({ data, token }) {
                 No photos match this filter.
               </p>
             )}
-            <ProjectGridOverlays collaboratingLabel={data.collaboratingLabel} onAddPhotos={handleAddPhotos} />
+            <ProjectGridOverlays
+              collaboratingLabel={data.collaboratingLabel}
+              onAddPhotos={openFilePicker}
+              isUploading={isUploading}
+            />
           </div>
         </div>
         <ProjectViewSidebar
@@ -59,6 +103,7 @@ export default function ProjectViewScreen({ data, token }) {
 const photoShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
   alt: PropTypes.string.isRequired,
+  status: PropTypes.oneOf(['pending', 'ready', 'failed']),
   isLiked: PropTypes.bool.isRequired,
   isRejected: PropTypes.bool.isRequired,
   hasConflict: PropTypes.bool.isRequired,
@@ -73,6 +118,8 @@ const collaboratorMemberShape = PropTypes.shape({
 
 ProjectViewScreen.propTypes = {
   token: PropTypes.string.isRequired,
+  projectId: PropTypes.string.isRequired,
+  onRefresh: PropTypes.func.isRequired,
   data: PropTypes.shape({
     projectTitle: PropTypes.string.isRequired,
     collaboratingLabel: PropTypes.string.isRequired,

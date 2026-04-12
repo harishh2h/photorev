@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import ProjectPhotoImage from './ProjectPhotoImage.jsx'
 
 /**
- * @param {{ photos: Array<{ id: string; alt: string; isLiked: boolean; isRejected: boolean; selectionLabel: string | null }>; token: string }} props
+ * @param {{ photos: Array<{ id: string; alt: string; status?: 'pending' | 'ready' | 'failed'; isLiked: boolean; isRejected: boolean; selectionLabel: string | null }>; token: string }} props
  * @returns {import('react').JSX.Element}
  */
 export default function ProjectPhotoGrid({ photos, token }) {
@@ -28,6 +28,7 @@ export default function ProjectPhotoGrid({ photos, token }) {
                 photoId={photo.id}
                 token={token}
                 alt={photo.alt}
+                status={photo.status}
                 className={`block h-full w-full object-cover transition-transform duration-[380ms] ease-out group-hover:scale-[1.04] ${
                   photo.isRejected ? 'opacity-70 grayscale group-hover:opacity-[0.82]' : ''
                 }`}
@@ -78,6 +79,7 @@ ProjectPhotoGrid.propTypes = {
     PropTypes.shape({
       id: PropTypes.string.isRequired,
       alt: PropTypes.string.isRequired,
+      status: PropTypes.oneOf(['pending', 'ready', 'failed']),
       isLiked: PropTypes.bool.isRequired,
       isRejected: PropTypes.bool.isRequired,
       selectionLabel: PropTypes.string,

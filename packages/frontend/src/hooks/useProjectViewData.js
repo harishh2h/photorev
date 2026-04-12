@@ -1,30 +1,57 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { getProject } from '@/services/projectService.js'
 import { listPhotos } from '@/services/photoService.js'
 import { listMyPhotoReviews } from '@/services/photoReviewService.js'
 import { listProjectMembers } from '@/services/projectMemberService.js'
 
+const PENDING_POLL_MS = 2500
+
 /**
  * @param {string | undefined} projectId
  * @param {string | null} token
  * @param {{ id?: string; name?: string; email?: string } | null} currentUser
- * @returns {{ data: object | null; isLoading: boolean; error: string | null; refetch: () => void }}
+ * @returns {{ data: object | null; isLoading: boolean; isRefreshing: boolean; error: string | null; refetch: () => void }}
  */
 export function useProjectViewData(projectId, token, currentUser) {
   const [data, setData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
   const [reloadKey, setReloadKey] = useState(0)
+  /** @type {import('react').MutableRefObject<{ projectId: string | undefined; token: string | null } | null>} */
+  const prevScopeRef = useRef(null)
+  const isRefreshingRef = useRef(false)
+  isRefreshingRef.current = isRefreshing
+
   const refetch = useCallback(() => {
     setReloadKey((k) => k + 1)
   }, [])
+
+  useEffect(() => {
+    const prev = prevScopeRef.current
+    if (prev == null) {
+      prevScopeRef.current = { projectId, token }
+      return
+    }
+    if (prev.projectId !== projectId || prev.token !== token) {
+      prevScopeRef.current = { projectId, token }
+      setReloadKey(0)
+      setData(null)
+      setIsLoading(true)
+      setIsRefreshing(false)
+      setError(null)
+    }
+  }, [projectId, token])
+
   useEffect(() => {
     if (!projectId || !token) {
       setData(null)
       setIsLoading(false)
+      setIsRefreshing(false)
       setError(!token ? 'Sign in required' : null)
       return undefined
     }
+    const isColdLoad = reloadKey === 0
     let cancelled = false
     async function loadAllPhotos() {
       const first = await listPhotos(token, { projectId, page: 1, pageSize: 100 })
@@ -50,7 +77,11 @@ export function useProjectViewData(projectId, token, currentUser) {
       return items
     }
     async function run() {
-      setIsLoading(true)
+      if (isColdLoad) {
+        setIsLoading(true)
+      } else {
+        setIsRefreshing(true)
+      }
       setError(null)
       try {
         const [project, photoItems, reviewItems, members] = await Promise.all([
@@ -66,9 +97,12 @@ export function useProjectViewData(projectId, token, currentUser) {
         })
         const photos = photoItems.map((p) => {
           const dec = decisionByPhoto.get(p.id)
+          const rawStatus = typeof p.status === 'string' ? p.status : 'pending'
+          const status = rawStatus === 'ready' || rawStatus === 'failed' ? rawStatus : 'pending'
           return {
             id: p.id,
             alt: typeof p.originalName === 'string' ? p.originalName : 'Photo',
+            status,
             isLiked: dec === 1,
             isRejected: dec === -1,
             hasConflict: false,
@@ -122,11 +156,19 @@ export function useProjectViewData(projectId, token, currentUser) {
         setData(viewData)
       } catch (err) {
         if (!cancelled) {
-          setData(null)
+          if (isColdLoad) {
+            setData(null)
+          }
           setError(err instanceof Error ? err.message : 'Failed to load project')
         }
       } finally {
-        if (!cancelled) setIsLoading(false)
+        if (!cancelled) {
+          if (isColdLoad) {
+            setIsLoading(false)
+          } else {
+            setIsRefreshing(false)
+          }
+        }
       }
     }
     run()
@@ -141,5 +183,33 @@ export function useProjectViewData(projectId, token, currentUser) {
     currentUser?.name,
     currentUser?.email,
   ])
-  return { data, isLoading, error, refetch }
+
+  const pendingPollSignature = useMemo(() => {
+    if (!data?.photos?.length) {
+      return ''
+    }
+    return data.photos
+      .filter((p) => p.status === 'pending')
+      .map((p) => p.id)
+      .sort()
+      .join(',')
+  }, [data])
+
+  useEffect(() => {
+    if (!projectId || !token) {
+      return undefined
+    }
+    if (!pendingPollSignature) {
+      return undefined
+    }
+    const id = window.setInterval(() => {
+      if (isRefreshingRef.current) {
+        return
+      }
+      refetch()
+    }, PENDING_POLL_MS)
+    return () => window.clearInterval(id)
+  }, [pendingPollSignature, projectId, token, refetch])
+
+  return { data, isLoading, isRefreshing, error, refetch }
 }

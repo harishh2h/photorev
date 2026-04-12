@@ -2,7 +2,51 @@ import { apiFetch, getApiBaseUrl, isApiEnvelope } from './httpClient.js'
 
 /**
  * @param {string} token
- * @param {{ page?: number; pageSize?: number; projectId?: string; libraryId?: string }} [params]
+ * @param {string} projectId
+ * @param {File} file
+ * @returns {Promise<{ photoId: string }>}
+ */
+export async function uploadPhoto(token, projectId, file) {
+  const base = getApiBaseUrl()
+  const form = new FormData()
+  form.append('projectId', projectId)
+  form.append('file', file)
+
+  const res = await fetch(`${base}/photos/upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  })
+
+  /** @type {unknown} */
+  let parsed = null
+  const contentType = res.headers.get('content-type') || ''
+  if (contentType.includes('application/json')) {
+    const text = await res.text()
+    if (text) {
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        parsed = null
+      }
+    }
+  }
+  if (!isApiEnvelope(parsed)) {
+    throw new Error(`Upload failed (${res.status})`)
+  }
+  if (!res.ok || parsed.error) {
+    throw new Error(parsed.message)
+  }
+  const data = /** @type {{ photoId?: string }} */ (parsed.data)
+  if (typeof data?.photoId !== 'string') {
+    throw new Error('Invalid upload response')
+  }
+  return { photoId: data.photoId }
+}
+
+/**
+ * @param {string} token
+ * @param {{ page?: number; pageSize?: number; projectId?: string }} [params]
  * @returns {Promise<{ items: object[]; total: number; page: number; pageSize: number }>}
  */
 export async function listPhotos(token, params = {}) {
@@ -10,7 +54,6 @@ export async function listPhotos(token, params = {}) {
   if (params.page) search.set('page', String(params.page))
   if (params.pageSize) search.set('pageSize', String(params.pageSize))
   if (params.projectId) search.set('projectId', params.projectId)
-  if (params.libraryId) search.set('libraryId', params.libraryId)
   const qs = search.toString()
   const path = qs ? `/photos?${qs}` : '/photos'
   const { ok, message, data } = await apiFetch(path, { token })

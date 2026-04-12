@@ -13,9 +13,7 @@ const upsertReviewSchema = {
   },
   body: {
     type: "object",
-    required: ["libraryId"],
     properties: {
-      libraryId: { type: "string", format: "uuid" },
       seen: { type: "boolean" },
       decision: { type: ["integer", "null"], enum: [-1, 0, 1, null] },
       renamedTo: { type: ["string", "null"], maxLength: 1024 },
@@ -31,7 +29,6 @@ const listUserReviewsSchema = {
       page: { type: "integer", minimum: 1 },
       pageSize: { type: "integer", minimum: 1, maximum: 100 },
       projectId: { type: "string", format: "uuid" },
-      libraryId: { type: "string", format: "uuid" },
       decision: { type: "integer", enum: [-1, 0, 1] },
     },
     additionalProperties: false,
@@ -81,4 +78,3 @@ async function photoReviewsRoutes(
 }
 
 export default photoReviewsRoutes;
-

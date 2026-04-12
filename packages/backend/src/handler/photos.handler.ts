@@ -4,17 +4,12 @@ import { randomUUID } from "crypto";
 import { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from "fastify";
 import buildPhotosService, {
   GetPhotoParams,
-  ListLibraryPhotosParams,
   ListPhotosFilters,
   UpdatePhotoMetadataParams,
 } from "../services/photos.service";
 import { sendFailure, sendSuccess } from "../utils/api-response";
 import { getAuthenticatedUserId } from "../utils/auth";
 import { getStorageRoot, findPreviewFileAbsolute, streamFileToDisk, removeUploadDir } from "../utils/storage";
-import { PROCESSING_JOBS_TABLE } from "../models/processing-job";
-import type { ProcessingJobType } from "../models/processing-job";
-
-const JOB_TYPES: ProcessingJobType[] = ["thumbnail", "preview", "metadata"];
 
 function getMimeTypeForImagePath(filePath: string): string {
   const lower = filePath.toLowerCase();
@@ -47,7 +42,6 @@ export interface PhotosHandlerMethods {
   listPhotos: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   getPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   streamPhotoContent: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-  listLibraryPhotos: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   updatePhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   uploadPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 }
@@ -65,7 +59,6 @@ function buildPhotosHandler(
         page?: number;
         pageSize?: number;
         projectId?: string;
-        libraryId?: string;
         search?: string;
         decision?: number;
       };
@@ -73,7 +66,6 @@ function buildPhotosHandler(
         page: query.page,
         pageSize: query.pageSize,
         projectId: query.projectId,
-        libraryId: query.libraryId,
         search: query.search,
         decision: query.decision,
       };
@@ -137,19 +129,6 @@ function buildPhotosHandler(
       reply.type(mimeType);
       return reply.send(fs.createReadStream(absolutePath));
     },
-    listLibraryPhotos: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-      const userId = getAuthenticatedUserId(request);
-      const paramsRaw = request.params as { libraryId: string };
-      const query = request.query as { page?: number; pageSize?: number };
-      const params: ListLibraryPhotosParams = {
-        userId,
-        libraryId: paramsRaw.libraryId,
-        page: query.page,
-        pageSize: query.pageSize,
-      };
-      const result = await service.listLibraryPhotos(params);
-      sendSuccess(reply, 200, result, "OK");
-    },
     updatePhoto: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
       const paramsRaw = request.params as { photoId: string };
@@ -178,26 +157,23 @@ function buildPhotosHandler(
       }
 
       const projectId = getMultipartField(data.fields as Record<string, { value?: string } | { value?: string }[]>, "projectId");
-      const libraryId = getMultipartField(data.fields as Record<string, { value?: string } | { value?: string }[]>, "libraryId");
 
-      if (!projectId || !libraryId) {
+      if (!projectId) {
         sendFailure(
           reply,
           400,
-          "projectId and libraryId are required; send them as form fields before the file",
+          "projectId is required; send it as a form field before the file",
           null,
         );
         return;
       }
 
-      // permission check
       const canUpload = await service.canUploadToProject({
         userId,
         projectId,
-        libraryId,
       });
       if (!canUpload) {
-        sendFailure(reply, 403, "Not allowed to upload to this project or library", null);
+        sendFailure(reply, 403, "Not allowed to upload to this project", null);
         return;
       }
 
@@ -221,7 +197,6 @@ function buildPhotosHandler(
         photo = await service.insertPhoto({
           id: photoId,
           project_id: projectId,
-          library_id: libraryId,
           original_path: saved.filePath,
           original_name: saved.originalName,
           mime_type: saved.mimeType,

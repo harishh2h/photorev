@@ -4,7 +4,7 @@ import AuthenticatedPhotoImage from '@/components/AuthenticatedPhotoImage'
 const placeholderClass =
   'h-full min-h-[260px] w-full bg-[#EDF7F2] bg-[radial-gradient(circle_at_1px_1px,rgba(110,231,183,0.42)_1px,transparent_0)] bg-[length:14px_14px] transition-transform duration-[380ms] ease-out group-hover:scale-[1.04]'
 
-export default function LibraryCard({
+export default function ProjectCard({
   name,
   status,
   subtitle,
@@ -55,7 +55,7 @@ export default function LibraryCard({
   )
 }
 
-LibraryCard.propTypes = {
+ProjectCard.propTypes = {
   name: PropTypes.string.isRequired,
   status: PropTypes.string.isRequired,
   subtitle: PropTypes.string.isRequired,

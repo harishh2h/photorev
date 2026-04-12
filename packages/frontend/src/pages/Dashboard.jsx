@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '@/components/Header'
 import DashboardHero from '@/features/dashboard/DashboardHero'
-import LibrarySection from '@/features/dashboard/LibrarySection'
+import ProjectsSection from '@/features/dashboard/ProjectsSection'
 import { AddProjectModal } from '@/features/projects'
 import { useAuth } from '@/features/auth/index.js'
 import { useProjects } from '@/hooks/useProjects.js'
@@ -91,7 +91,7 @@ export default function Dashboard() {
           recentActivity={[]}
           onNewProjectClick={handleOpenAddProject}
         />
-        <LibrarySection projects={projects} isLoading={isLoading} authToken={token || ''} />
+        <ProjectsSection projects={projects} isLoading={isLoading} authToken={token || ''} />
       </main>
       <AddProjectModal
         isOpen={isAddProjectOpen}

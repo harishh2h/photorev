@@ -11,7 +11,6 @@ export interface PhotoReviewRecord {
   readonly id: string;
   readonly photo_id: string;
   readonly user_id: string;
-  readonly library_id: string;
   readonly seen: boolean;
   readonly decision: number | null;
   readonly renamed_to: string | null;
@@ -23,7 +22,6 @@ export interface PhotoReviewDto {
   readonly id: string;
   readonly photoId: string;
   readonly userId: string;
-  readonly libraryId: string;
   readonly seen: boolean;
   readonly decision: number | null;
   readonly renamedTo: string | null;
@@ -34,7 +32,6 @@ export interface PhotoReviewDto {
 export interface UpsertReviewParams {
   readonly userId: string;
   readonly photoId: string;
-  readonly libraryId: string;
   readonly seen?: boolean;
   readonly decision?: number | null;
   readonly renamedTo?: string | null;
@@ -42,7 +39,6 @@ export interface UpsertReviewParams {
 
 export interface ListUserReviewsFilters extends PaginationParams {
   readonly projectId?: string;
-  readonly libraryId?: string;
   readonly decision?: number;
 }
 
@@ -67,7 +63,6 @@ function mapReviewRecordToDto(record: PhotoReviewRecord): PhotoReviewDto {
     id: record.id,
     photoId: record.photo_id,
     userId: record.user_id,
-    libraryId: record.library_id,
     seen: record.seen,
     decision: record.decision,
     renamedTo: record.renamed_to,
@@ -117,7 +112,6 @@ function buildPhotoReviewsService(
         {
           photo_id: params.photoId,
           user_id: params.userId,
-          library_id: params.libraryId,
           seen: baseUpdate.seen ?? true,
           decision:
             typeof (baseUpdate as any).decision === "undefined"
@@ -139,6 +133,9 @@ function buildPhotoReviewsService(
       .merge(baseUpdate as any)
       .then((rows: PhotoReviewRecord[]) => rows);
     const review = insertedRows[0];
+    if (!review) {
+      return null;
+    }
     return mapReviewRecordToDto(review);
   }
 
@@ -158,9 +155,6 @@ function buildPhotoReviewsService(
       .where("photo_reviews.user_id", userId);
     if (filters.projectId) {
       baseQuery.where("photos.project_id", filters.projectId);
-    }
-    if (filters.libraryId) {
-      baseQuery.where("photo_reviews.library_id", filters.libraryId);
     }
     if (typeof filters.decision !== "undefined") {
       baseQuery.where("photo_reviews.decision", filters.decision);
@@ -205,4 +199,3 @@ function buildPhotoReviewsService(
 }
 
 export default buildPhotoReviewsService;
-

@@ -5,7 +5,6 @@ export type PhotoStatus = 'pending' | 'ready' | 'failed'
 export interface Photo {
   id: string
   project_id: string
-  library_id: string
   original_path: string
   thumbnail_path: string | null
   hash: string | null
@@ -23,7 +22,6 @@ export interface Photo {
 export interface PhotoInsert {
   id?: string
   project_id: string
-  library_id: string
   original_path: string
   thumbnail_path?: string | null
   hash?: string | null

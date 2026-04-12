@@ -11,7 +11,6 @@ import { jobRunner } from "../workers";
 export interface PhotoInsert {
   id?: string;
   project_id: string;
-  library_id: string;
   original_path: string;
   original_name: string;
   mime_type?: string;
@@ -24,7 +23,6 @@ export interface PhotoInsert {
 export interface PhotoRecord {
   readonly id: string;
   readonly project_id: string;
-  readonly library_id: string;
   readonly original_path: string;
   thumbnail_path: string | null;
   readonly hash: string | null;
@@ -42,7 +40,6 @@ export interface PhotoRecord {
 export interface PhotoDto {
   readonly id: string;
   readonly projectId: string;
-  readonly libraryId: string;
   readonly originalPath: string;
   readonly thumbnailPath: string | null;
   readonly hash: string | null;
@@ -59,7 +56,6 @@ export interface PhotoDto {
 
 export interface ListPhotosFilters extends PaginationParams {
   readonly projectId?: string;
-  readonly libraryId?: string;
   readonly search?: string;
   readonly decision?: number;
 }
@@ -67,11 +63,6 @@ export interface ListPhotosFilters extends PaginationParams {
 export interface GetPhotoParams {
   readonly userId: string;
   readonly photoId: string;
-}
-
-export interface ListLibraryPhotosParams extends PaginationParams {
-  readonly userId: string;
-  readonly libraryId: string;
 }
 
 export interface UpdatePhotoMetadataParams {
@@ -84,16 +75,12 @@ export interface UpdatePhotoMetadataParams {
 export interface CanUploadToProjectParams {
   readonly userId: string;
   readonly projectId: string;
-  readonly libraryId: string;
 }
 
 export interface PhotosServiceMethods {
   listPhotos: (
     filters: ListPhotosFilters,
     userId: string,
-  ) => Promise<PaginatedResult<PhotoDto>>;
-  listLibraryPhotos: (
-    params: ListLibraryPhotosParams,
   ) => Promise<PaginatedResult<PhotoDto>>;
   getPhoto: (params: GetPhotoParams) => Promise<PhotoDto | null>;
   updatePhotoMetadata: (params: UpdatePhotoMetadataParams) => Promise<PhotoDto | null>;
@@ -107,7 +94,6 @@ function mapPhotoRecordToDto(record: PhotoRecord): PhotoDto {
   return {
     id: record.id,
     projectId: record.project_id,
-    libraryId: record.library_id,
     originalPath: record.original_path,
     thumbnailPath: record.thumbnail_path,
     hash: record.hash,
@@ -144,9 +130,6 @@ function buildPhotosService(
     if (filters.projectId) {
       baseQuery.where("photos.project_id", filters.projectId);
     }
-    if (filters.libraryId) {
-      baseQuery.where("photos.library_id", filters.libraryId);
-    }
     if (filters.search) {
       baseQuery.whereILike("photos.original_name", `%${filters.search}%`);
     }
@@ -161,33 +144,11 @@ function buildPhotosService(
       .clearSelect()
       .count<{ count: string }[]>({ count: "*" });
     const total = Number(countResult[0]?.count ?? 0);
-    const pagedQuery = applyPagination(baseQuery, filters);
-    const rows = await pagedQuery;
+    const rows = await applyPagination(baseQuery, filters)
+      .orderBy("photos.created_at", "asc")
+      .orderBy("photos.id", "asc");
     const items = rows.map(mapPhotoRecordToDto);
     return buildPaginatedResult(items, total, filters.page, filters.pageSize);
-  }
-
-  async function listLibraryPhotos(
-    params: ListLibraryPhotosParams,
-  ): Promise<PaginatedResult<PhotoDto>> {
-    const baseQuery = db<PhotoRecord>("photos")
-      .select<PhotoRecord[]>("photos.*")
-      .join("project_members", function joinProjectMembers() {
-        this.on("project_members.project_id", "photos.project_id").andOn(
-          "project_members.user_id",
-          db.raw("?", [params.userId]),
-        );
-      })
-      .where("photos.library_id", params.libraryId);
-    const countResult = await baseQuery
-      .clone()
-      .clearSelect()
-      .count<{ count: string }[]>({ count: "*" });
-    const total = Number(countResult[0]?.count ?? 0);
-    const pagedQuery = applyPagination(baseQuery, params);
-    const rows = await pagedQuery;
-    const items = rows.map(mapPhotoRecordToDto);
-    return buildPaginatedResult(items, total, params.page, params.pageSize);
   }
 
   async function getPhoto(params: GetPhotoParams): Promise<PhotoDto | null> {
@@ -250,10 +211,8 @@ function buildPhotosService(
     params: CanUploadToProjectParams,
   ): Promise<boolean> {
     const row = await db("project_members")
-      .join("library", "library.project_id", "project_members.project_id")
       .where("project_members.user_id", params.userId)
       .where("project_members.project_id", params.projectId)
-      .where("library.id", params.libraryId)
       .first();
     return Boolean(row);
   }
@@ -261,7 +220,6 @@ function buildPhotosService(
   async function insertPhoto(photo: PhotoInsert): Promise<PhotoDto | null> {
     const row: Record<string, unknown> = {
       project_id: photo.project_id,
-      library_id: photo.library_id,
       original_path: photo.original_path,
       original_name: photo.original_name,
       mime_type: photo.mime_type,
@@ -295,7 +253,6 @@ function buildPhotosService(
 
   return {
     listPhotos,
-    listLibraryPhotos,
     getPhoto,
     updatePhotoMetadata,
     insertPhoto,
@@ -304,4 +261,3 @@ function buildPhotosService(
 }
 
 export default buildPhotosService;
-

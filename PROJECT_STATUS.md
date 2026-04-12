@@ -2,19 +2,14 @@
 
 ### Overview
 
-- **Domain**: Local-first collaborative photo review system (users, projects, libraries, photos, photo reviews).
+- **Domain**: Local-first collaborative photo review system (users, projects, photos, photo reviews).
 - **Backend stack**: Fastify v5, Knex + PostgreSQL, JWT auth, Jest tests.
 
 ### Database & Schema
 
-- PostgreSQL schema defined in `packages/backend/src/db/schema.sql`:
-  - `users`, `projects`, `library`, `photos`, `photo_reviews`.
-  - Indices for photos and reviews.
-- Additional table via migration:
-  - `project_members`:
-    - Composite primary key `(project_id, user_id)`.
-    - `is_owner` boolean, `created_at` timestamp.
-    - Used for access control (ownership and membership).
+- PostgreSQL schema reference in `packages/backend/src/db/schema.sql` (Knex migrations are authoritative):
+  - `users`, `projects`, `project_members`, `photos`, `processing_jobs`, `photo_reviews`.
+  - Indices for photos, reviews, and processing jobs.
 
 ### Auth & Security
 
@@ -54,29 +49,20 @@
     - `PATCH /:userId` – update ownership flag.
   - Service: `services/project-members.service.ts`.
 
-- **Libraries**
-  - Routes: `/libraries`
-    - `POST /` – create library under a project (owners only).
-    - `GET /` – list by `projectId` (members).
-    - `GET /:libraryId` – get library (members).
-    - `PATCH /:libraryId` – update (owners only).
-    - `POST /:libraryId/archive` – soft-archive (owners only).
-  - Service: `services/libraries.service.ts`.
-
 - **Photos**
   - Routes: `/photos`
-    - `GET /` – list with filters (`projectId`, `libraryId`, `search`, optional `decision` via joined reviews).
+    - `GET /` – list with filters (`projectId`, `search`, optional `decision` via joined reviews).
     - `GET /:photoId` – get single photo (members only).
     - `PATCH /:photoId` – limited metadata update (`metadata`, `thumbnailPath`) for members.
-    - `GET /libraries/:libraryId/photos` – list photos by library for members.
+    - `POST /upload` – multipart upload; form fields include `projectId` (member of project).
   - Service: `services/photos.service.ts`.
 
 - **Photo reviews**
   - Routes: `/photo-reviews`
     - `PUT /:photoId` – upsert current user’s review for a photo:
-      - Body: `{ libraryId, seen?, decision?, renamedTo? }`.
+      - Body: `{ seen?, decision?, renamedTo? }`.
       - Updates `seen_at` and `voted_at` as appropriate.
-    - `GET /me` – list current user’s reviews with filters (`projectId`, `libraryId`, `decision`).
+    - `GET /me` – list current user’s reviews with filters (`projectId`, `decision`).
     - `GET /photos/:photoId/reviews` – list reviews for a photo (members only).
   - Service: `services/photo-reviews.service.ts` with `ON CONFLICT (photo_id, user_id) DO UPDATE` via Knex.
 
@@ -92,7 +78,6 @@
     - `/auth` → `auth.routes.ts`
     - `/projects` → `projects.routes.ts`
     - project members routes (no prefix, nested under `/projects/:projectId/members`)
-    - `/libraries` → `libraries.routes.ts`
     - `/photos` → `photos.routes.ts`
     - `/photo-reviews` → `photo-reviews.routes.ts`
 

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import Header from '@/components/Header'
-import LibrarySection from '@/features/dashboard/LibrarySection'
+import ProjectsSection from '@/features/dashboard/ProjectsSection'
 import { useAuth } from '@/features/auth/index.js'
 import { useProjects } from '@/hooks/useProjects.js'
 
@@ -24,7 +24,7 @@ export default function ProjectsPage() {
             {error}
           </p>
         ) : null}
-        <LibrarySection projects={projects} isLoading={isLoading} authToken={token || ''} />
+        <ProjectsSection projects={projects} isLoading={isLoading} authToken={token || ''} />
       </main>
     </div>
   )

@@ -9,7 +9,6 @@ const listPhotosSchema = {
       page: { type: "integer", minimum: 1 },
       pageSize: { type: "integer", minimum: 1, maximum: 100 },
       projectId: { type: "string", format: "uuid" },
-      libraryId: { type: "string", format: "uuid" },
       search: { type: "string" },
       decision: { type: "integer", enum: [-1, 0, 1] },
     },
@@ -35,25 +34,6 @@ const updatePhotoSchema = {
     properties: {
       metadata: {},
       thumbnailPath: { type: "string" },
-    },
-    additionalProperties: false,
-  },
-};
-
-const libraryPhotosParamsSchema = {
-  params: {
-    type: "object",
-    required: ["libraryId"],
-    properties: {
-      libraryId: { type: "string", format: "uuid" },
-    },
-    additionalProperties: false,
-  },
-  querystring: {
-    type: "object",
-    properties: {
-      page: { type: "integer", minimum: 1 },
-      pageSize: { type: "integer", minimum: 1, maximum: 100 },
     },
     additionalProperties: false,
   },
@@ -85,14 +65,8 @@ async function photosRoutes(
     { schema: updatePhotoSchema, preHandler: ensureAuthenticated },
     handler.updatePhoto,
   );
-  fastify.get(
-    "/libraries/:libraryId/photos",
-    { schema: libraryPhotosParamsSchema, preHandler: ensureAuthenticated },
-    handler.listLibraryPhotos,
-  );
 
   fastify.post("/upload", { preHandler: ensureAuthenticated }, handler.uploadPhoto);
 }
 
 export default photosRoutes;
-

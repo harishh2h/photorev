@@ -124,6 +124,7 @@ export class JobRunner {
         });
     }
     await this.markDone(job.id);
+    await this.syncPhotoProcessingStatus(job.photo_id);
   }
 
   private async markDone(jobId: string): Promise<void> {
@@ -149,6 +150,26 @@ export class JobRunner {
           status: "failed",
           error_message: error.message,
         });
+      await this.syncPhotoProcessingStatus(job.photo_id);
+    }
+  }
+
+  /**
+   * Drive photos.status from processing_jobs: ready when all jobs are done, failed if any job failed.
+   */
+  private async syncPhotoProcessingStatus(photoId: string): Promise<void> {
+    const rows = await db("processing_jobs").where("photo_id", photoId).select("status");
+    if (rows.length === 0) {
+      return;
+    }
+    const hasFailed = rows.some((r: { status: string }) => r.status === "failed");
+    const allDone = rows.every((r: { status: string }) => r.status === "done");
+    if (hasFailed) {
+      await db("photos").where("id", photoId).update({ status: "failed" });
+      return;
+    }
+    if (allDone) {
+      await db("photos").where("id", photoId).update({ status: "ready" });
     }
   }
 }

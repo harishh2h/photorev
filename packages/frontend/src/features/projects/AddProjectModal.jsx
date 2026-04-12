@@ -156,7 +156,7 @@ export default function AddProjectModal({ isOpen, onClose, onCreate }) {
                   </p>
                 ) : null}
                 <p className="m-0 font-base text-xs leading-normal text-muted">
-                  Storage path is created for you on the server. Next, add a library and upload photos from the project page.
+                  Storage path is created for you on the server. Open the project page to upload photos.
                 </p>
               </div>
               <div className="mt-2 flex flex-col-reverse gap-3 md:flex-row md:justify-end">

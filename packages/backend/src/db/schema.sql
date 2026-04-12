@@ -1,5 +1,6 @@
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- Reference snapshot: Knex migrations are authoritative. Run `knex migrate:latest` on an empty database.
 
 -- =========================
 -- USERS
@@ -33,28 +34,23 @@ CREATE TABLE projects (
         ON DELETE CASCADE
 );
 
-
-CREATE TABLE library (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    absolute_path TEXT NOT NULL, -- folders inside project.root_path will be multiple libraries, users can also add other paths that is not under project.root_path
-    project_id UUID NOT NULL, -- project that the library belongs to
-    status TEXT NOT NULL DEFAULT 'active'
-        CHECK (status IN ('active', 'processing', 'completed')),
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_by UUID NOT NULL, -- user that created the library
+CREATE TABLE project_members (
+    project_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    is_owner BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT fk_library_project
+    CONSTRAINT fk_project_members_project
         FOREIGN KEY (project_id)
         REFERENCES projects(id)
         ON DELETE CASCADE,
 
-    CONSTRAINT fk_library_user
-        FOREIGN KEY (created_by)
+    CONSTRAINT fk_project_members_user
+        FOREIGN KEY (user_id)
         REFERENCES users(id)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+
+    PRIMARY KEY (project_id, user_id)
 );
 
 -- =========================
@@ -63,9 +59,15 @@ CREATE TABLE library (
 CREATE TABLE photos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL,
-    library_id UUID NOT NULL,
-    filename TEXT NOT NULL,
-    absolute_path TEXT NOT NULL,
+    original_path TEXT NOT NULL,
+    original_name TEXT,
+    mime_type TEXT,
+    file_size BIGINT,
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'ready', 'failed')),
+    width INTEGER,
+    height INTEGER,
+    preview_path TEXT,
     thumbnail_path TEXT,
     hash TEXT,
     metadata JSONB,
@@ -77,6 +79,33 @@ CREATE TABLE photos (
         ON DELETE CASCADE
 );
 
+CREATE TABLE processing_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    photo_id UUID NOT NULL,
+    job_type TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'queued',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 3,
+    error_message TEXT,
+    worker_id TEXT,
+    queued_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+
+    CONSTRAINT fk_processing_job_photo
+        FOREIGN KEY (photo_id)
+        REFERENCES photos(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT processing_jobs_job_type_check
+        CHECK (job_type IN ('thumbnail', 'preview', 'metadata')),
+
+    CONSTRAINT processing_jobs_status_check
+        CHECK (status IN ('queued', 'processing', 'done', 'failed'))
+);
+
+CREATE INDEX idx_processing_jobs_status_queued ON processing_jobs(status, queued_at);
+
 -- =========================
 -- PHOTO REVIEWS
 -- =========================
@@ -84,7 +113,6 @@ CREATE TABLE photo_reviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     photo_id UUID NOT NULL,
     user_id UUID NOT NULL,
-    library_id UUID NOT NULL,
     seen BOOLEAN NOT NULL DEFAULT TRUE,
     decision SMALLINT, -- NULL = seen only, 1 = selected, -1 = rejected
     renamed_to TEXT,
