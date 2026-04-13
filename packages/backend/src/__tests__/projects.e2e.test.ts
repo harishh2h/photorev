@@ -206,5 +206,150 @@ describe("Projects CRUD API", () => {
       await app.close();
     }
   });
+
+  it("should return 404 for cover-photo when user is not a project member", async () => {
+    const app = buildApp({ logger: false });
+    await app.ready();
+    try {
+      const u = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const db = (app as any).db;
+      const owner = await db("users")
+        .insert(
+          { email: `cover_owner_${u}@example.com`, name: "Cover Owner", password_hash: "h", role: "reviewer" },
+          ["id"],
+        )
+        .then((rows: { id: string }[]) => rows[0]);
+      const stranger = await db("users")
+        .insert(
+          { email: `cover_stranger_${u}@example.com`, name: "Stranger", password_hash: "h", role: "reviewer" },
+          ["id"],
+        )
+        .then((rows: { id: string }[]) => rows[0]);
+      const project = await db("projects")
+        .insert(
+          {
+            name: "Cover Test Project",
+            root_path: "/tmp/cover-test",
+            created_by: owner.id,
+          },
+          ["id"],
+        )
+        .then((rows: { id: string }[]) => rows[0]);
+      await db("project_members").insert({ project_id: project.id, user_id: owner.id, is_owner: true });
+      const res = await app.inject({
+        method: "GET",
+        url: `/projects/${project.id}/cover-photo`,
+        headers: {
+          "x-test-bypass-auth": "1",
+          "x-test-user-id": stranger.id,
+        },
+      });
+      expect(res.statusCode).toBe(404);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("should return photoId null for cover-photo when project has no ready previews", async () => {
+    const app = buildApp({ logger: false });
+    await app.ready();
+    try {
+      const u = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const db = (app as any).db;
+      const owner = await db("users")
+        .insert(
+          { email: `cover_empty_${u}@example.com`, name: "Cover Empty", password_hash: "h", role: "reviewer" },
+          ["id"],
+        )
+        .then((rows: { id: string }[]) => rows[0]);
+      const project = await db("projects")
+        .insert(
+          {
+            name: "No Photos Project",
+            root_path: "/tmp/no-photos",
+            created_by: owner.id,
+          },
+          ["id"],
+        )
+        .then((rows: { id: string }[]) => rows[0]);
+      await db("project_members").insert({ project_id: project.id, user_id: owner.id, is_owner: true });
+      const res = await app.inject({
+        method: "GET",
+        url: `/projects/${project.id}/cover-photo`,
+        headers: {
+          "x-test-bypass-auth": "1",
+          "x-test-user-id": owner.id,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { error: boolean; data: { photoId: string | null } };
+      expect(body.error).toBe(false);
+      expect(body.data.photoId).toBeNull();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("should return a random ready photo id for cover-photo", async () => {
+    const app = buildApp({ logger: false });
+    await app.ready();
+    try {
+      const u = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const db = (app as any).db;
+      const owner = await db("users")
+        .insert(
+          { email: `cover_ready_${u}@example.com`, name: "Cover Ready", password_hash: "h", role: "reviewer" },
+          ["id"],
+        )
+        .then((rows: { id: string }[]) => rows[0]);
+      const project = await db("projects")
+        .insert(
+          {
+            name: "Ready Photos Project",
+            root_path: "/tmp/ready-photos",
+            created_by: owner.id,
+          },
+          ["id"],
+        )
+        .then((rows: { id: string }[]) => rows[0]);
+      await db("project_members").insert({ project_id: project.id, user_id: owner.id, is_owner: true });
+      const insertedA = await db("photos").insert(
+        {
+          project_id: project.id,
+          original_path: "/tmp/a.jpg",
+          original_name: "a.jpg",
+          status: "ready",
+          preview_path: "preview.jpeg",
+        },
+        ["id"],
+      );
+      const insertedB = await db("photos").insert(
+        {
+          project_id: project.id,
+          original_path: "/tmp/b.jpg",
+          original_name: "b.jpg",
+          status: "ready",
+          preview_path: "preview.jpeg",
+        },
+        ["id"],
+      );
+      const idA = (insertedA[0] as { id: string }).id;
+      const idB = (insertedB[0] as { id: string }).id;
+      const res = await app.inject({
+        method: "GET",
+        url: `/projects/${project.id}/cover-photo`,
+        headers: {
+          "x-test-bypass-auth": "1",
+          "x-test-user-id": owner.id,
+        },
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { error: boolean; data: { photoId: string | null } };
+      expect(body.error).toBe(false);
+      expect([idA, idB]).toContain(body.data.photoId);
+    } finally {
+      await app.close();
+    }
+  });
 });
 

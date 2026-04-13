@@ -75,10 +75,16 @@ export interface GetProjectParams {
   readonly projectId: string;
 }
 
+/** Result of picking an ephemeral dashboard cover photo (no metadata write). */
+export type RandomCoverPhotoResult =
+  | { readonly access: false }
+  | { readonly access: true; readonly photoId: string | null };
+
 export interface ProjectsServiceMethods {
   listProjects: (filters: ListProjectsFilters, userId: string) => Promise<PaginatedResult<ProjectDto>>;
   createProject: (params: CreateProjectParams) => Promise<ProjectDto>;
   getProject: (params: GetProjectParams) => Promise<ProjectDto | null>;
+  getRandomCoverPhotoId: (params: GetProjectParams) => Promise<RandomCoverPhotoResult>;
   updateProject: (params: UpdateProjectParams) => Promise<ProjectDto | null>;
   archiveProject: (params: ArchiveProjectParams) => Promise<boolean>;
   deleteProject: (params: DeleteProjectParams) => Promise<boolean>;
@@ -200,6 +206,26 @@ function buildProjectsService(
     return mapProjectRecordToDto(row);
   }
 
+  async function getRandomCoverPhotoId(params: GetProjectParams): Promise<RandomCoverPhotoResult> {
+    const member = await db("project_members")
+      .where({
+        project_id: params.projectId,
+        user_id: params.userId,
+      })
+      .first();
+    if (!member) {
+      return { access: false };
+    }
+    const row = await db<{ id: string }>("photos")
+      .select("photos.id")
+      .where("photos.project_id", params.projectId)
+      .where("photos.status", "ready")
+      .whereNotNull("photos.preview_path")
+      .orderByRaw("random()")
+      .first();
+    return { access: true, photoId: row?.id ?? null };
+  }
+
   async function updateProject(params: UpdateProjectParams): Promise<ProjectDto | null> {
     const isOwnerRow = await db("project_members")
       .where({
@@ -289,6 +315,7 @@ function buildProjectsService(
     listProjects,
     createProject,
     getProject,
+    getRandomCoverPhotoId,
     updateProject,
     archiveProject,
     deleteProject,

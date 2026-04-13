@@ -95,6 +95,11 @@ async function projectsRoutes(
     handler.createProject,
   );
   fastify.get(
+    "/:projectId/cover-photo",
+    { schema: singleProjectParamsSchema, preHandler: ensureAuthenticated },
+    handler.getRandomCoverPhoto,
+  );
+  fastify.get(
     "/:projectId",
     { schema: singleProjectParamsSchema, preHandler: ensureAuthenticated },
     handler.getProject,

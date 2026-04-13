@@ -49,3 +49,24 @@ export async function createProject(token, payload) {
   }
   return /** @type {object} */ (data)
 }
+
+/**
+ * Ephemeral random cover for dashboard when no banner is set (member-only).
+ *
+ * @param {string} token
+ * @param {string} projectId
+ * @returns {Promise<string | null>} photo UUID, or null when no ready preview exists
+ */
+export async function fetchRandomProjectCoverPhotoId(token, projectId) {
+  const { ok, message, data } = await apiFetch(`/projects/${projectId}/cover-photo`, { token })
+  if (!ok) {
+    throw new Error(message || 'Failed to load cover')
+  }
+  if (data != null && typeof data === 'object' && 'photoId' in data) {
+    const pid = /** @type {{ photoId?: unknown }} */ (data).photoId
+    if (typeof pid === 'string' && pid.length > 0) {
+      return pid
+    }
+  }
+  return null
+}

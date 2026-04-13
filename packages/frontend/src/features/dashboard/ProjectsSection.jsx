@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types'
 import { NavLink } from 'react-router-dom'
-import ProjectCard from './ProjectCard'
+import LazyCoverProjectCard from './LazyCoverProjectCard'
 import { formatShortDate } from '@/utils/formatDate.js'
 
 const STAGGER_MS = 80
@@ -33,17 +33,18 @@ export default function ProjectsSection({ projects = [], isLoading = false, auth
             to={`/projects/${project.id}`}
             className="block rounded-card text-inherit no-underline focus-visible:outline-none focus-visible:shadow-focus"
           >
-            <ProjectCard
+            <LazyCoverProjectCard
+              projectId={project.id}
               name={project.name}
               status={String(project.status || 'active').toUpperCase()}
               subtitle={
                 project.createdAt ? `Created ${formatShortDate(project.createdAt)}` : 'Project'
               }
-              coverPhotoId={
+              explicitCoverPhotoId={
                 typeof project.metadata?.bannerPhotoId === 'string' ? project.metadata.bannerPhotoId : ''
               }
               authToken={authToken}
-              coverImageUrl={typeof project.metadata?.banner === 'string' ? project.metadata.banner : ''}
+              explicitCoverImageUrl={typeof project.metadata?.banner === 'string' ? project.metadata.banner : ''}
               animationDelay={index * STAGGER_MS}
             />
           </NavLink>

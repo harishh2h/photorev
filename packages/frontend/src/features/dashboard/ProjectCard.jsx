@@ -2,7 +2,7 @@ import PropTypes from 'prop-types'
 import AuthenticatedPhotoImage from '@/components/AuthenticatedPhotoImage'
 
 const placeholderClass =
-  'h-full min-h-[260px] w-full bg-[#EDF7F2] bg-[radial-gradient(circle_at_1px_1px,rgba(110,231,183,0.42)_1px,transparent_0)] bg-[length:14px_14px] transition-transform duration-[380ms] ease-out group-hover:scale-[1.04]'
+  'h-full w-full min-h-0 bg-[#EDF7F2] bg-[radial-gradient(circle_at_1px_1px,rgba(110,231,183,0.42)_1px,transparent_0)] bg-[length:14px_14px] transition-transform duration-[380ms] ease-out group-hover:scale-[1.04]'
 
 export default function ProjectCard({
   name,
@@ -18,10 +18,10 @@ export default function ProjectCard({
   const legacyUrl = typeof coverImageUrl === 'string' && coverImageUrl.length > 0 ? coverImageUrl : ''
   return (
     <article
-      className="group relative min-h-[280px] animate-fade-up overflow-hidden rounded-card bg-accent/10 transition-[transform,box-shadow] duration-[380ms] ease-out motion-reduce:animate-none hover:-translate-y-1 hover:shadow-card-hover"
+      className="group relative aspect-[4/5] w-full max-w-full animate-fade-up overflow-hidden rounded-card bg-accent/10 transition-[transform,box-shadow] duration-[380ms] ease-out motion-reduce:animate-none hover:-translate-y-1 hover:shadow-card-hover"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 min-h-0">
         {usePhoto ? (
           <AuthenticatedPhotoImage
             photoId={coverPhotoId}
@@ -34,7 +34,7 @@ export default function ProjectCard({
           <img
             src={legacyUrl}
             alt=""
-            className="h-full w-full object-cover transition-transform duration-[380ms] ease-out group-hover:scale-[1.04]"
+            className="block h-full w-full min-h-0 object-cover transition-transform duration-[380ms] ease-out group-hover:scale-[1.04]"
           />
         ) : (
           <div className={placeholderClass} aria-hidden />

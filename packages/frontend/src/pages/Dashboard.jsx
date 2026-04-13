@@ -6,7 +6,7 @@ import ProjectsSection from '@/features/dashboard/ProjectsSection'
 import { AddProjectModal } from '@/features/projects'
 import { useAuth } from '@/features/auth/index.js'
 import { useProjects } from '@/hooks/useProjects.js'
-import { createProject } from '@/services/projectService.js'
+import { createProject, fetchRandomProjectCoverPhotoId } from '@/services/projectService.js'
 import { listPhotos } from '@/services/photoService.js'
 
 export default function Dashboard() {
@@ -17,6 +17,15 @@ export default function Dashboard() {
   const displayName = user?.name || 'Karthik'
   const featured = projects[0]
   const [featuredStats, setFeaturedStats] = useState(null)
+  const [heroFallbackCoverPhotoId, setHeroFallbackCoverPhotoId] = useState(/** @type {string | null} */ (null))
+
+  const featuredBannerKey = useMemo(() => {
+    if (!featured) return ''
+    const meta = featured.metadata || {}
+    const p = typeof meta.bannerPhotoId === 'string' ? meta.bannerPhotoId : ''
+    const b = typeof meta.banner === 'string' ? meta.banner : ''
+    return `${p}\0${b}`
+  }, [featured])
   useEffect(() => {
     if (!token || !featured?.id) {
       setFeaturedStats(null)
@@ -38,6 +47,38 @@ export default function Dashboard() {
       cancelled = true
     }
   }, [token, featured?.id])
+
+  useEffect(() => {
+    if (!token || !featured?.id) {
+      setHeroFallbackCoverPhotoId(null)
+      return undefined
+    }
+    const meta = featured.metadata || {}
+    const explicitPhoto =
+      typeof meta.bannerPhotoId === 'string' && meta.bannerPhotoId.length > 0 ? meta.bannerPhotoId : ''
+    const explicitBanner = typeof meta.banner === 'string' && meta.banner.length > 0 ? meta.banner : ''
+    if (explicitPhoto || explicitBanner) {
+      setHeroFallbackCoverPhotoId(null)
+      return undefined
+    }
+    setHeroFallbackCoverPhotoId(null)
+    let cancelled = false
+    fetchRandomProjectCoverPhotoId(token, featured.id)
+      .then((id) => {
+        if (!cancelled) {
+          setHeroFallbackCoverPhotoId(id)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHeroFallbackCoverPhotoId(null)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token, featured?.id, featuredBannerKey])
+
   const featuredProject = useMemo(() => {
     if (!featured) return null
     const meta = featured.metadata || {}
@@ -88,6 +129,7 @@ export default function Dashboard() {
         <DashboardHero
           featuredProject={featuredProject}
           authToken={token || ''}
+          fallbackCoverPhotoId={heroFallbackCoverPhotoId || ''}
           recentActivity={[]}
           onNewProjectClick={handleOpenAddProject}
         />

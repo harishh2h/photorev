@@ -2,22 +2,25 @@ import PropTypes from 'prop-types'
 import { Link } from 'react-router-dom'
 import AuthenticatedPhotoImage from '@/components/AuthenticatedPhotoImage'
 
-const featuredPh =
-  'illustration-placeholder min-h-[200px] w-full md:min-h-[260px]'
+const featuredPh = 'illustration-placeholder h-full w-full min-h-0'
 const emptyVisualPh =
   'min-h-[180px] rounded-[calc(1.5rem-8px)] border-[1.5px] border-base-300 bg-base-200 bg-[radial-gradient(circle_at_1px_1px,rgba(16,185,129,0.28)_1px,transparent_0)] bg-[length:14px_14px]'
 
 export default function DashboardHero({
   featuredProject = null,
   authToken = '',
+  fallbackCoverPhotoId = '',
   recentActivity = [],
   onNewProjectClick = undefined,
 }) {
   const hasFeatured = featuredProject != null && featuredProject.id != null
   const bannerPhotoId =
     hasFeatured && typeof featuredProject.bannerPhotoId === 'string' ? featuredProject.bannerPhotoId : ''
+  const fallbackId =
+    typeof fallbackCoverPhotoId === 'string' && fallbackCoverPhotoId.length > 0 ? fallbackCoverPhotoId : ''
+  const effectivePhotoId = bannerPhotoId.length > 0 ? bannerPhotoId : fallbackId
   const bannerUrl = hasFeatured && typeof featuredProject.bannerUrl === 'string' ? featuredProject.bannerUrl : ''
-  const usePhotoBanner = bannerPhotoId.length > 0 && authToken.length > 0
+  const usePhotoBanner = effectivePhotoId.length > 0 && authToken.length > 0
   const useLegacyBanner = !usePhotoBanner && bannerUrl.length > 0
   return (
     <section className="mb-10 md:mb-12">
@@ -34,17 +37,21 @@ export default function DashboardHero({
         <article className="grid grid-cols-1 gap-5 overflow-hidden rounded-card border-[1.5px] border-base-300 bg-base-100 p-4 md:grid-cols-[300px_1fr]">
           {hasFeatured ? (
             <>
-              <div className="relative min-h-[200px] overflow-hidden rounded-[calc(1.5rem-8px)] md:min-h-[260px]">
+              <div className="relative h-[220px] w-full shrink-0 overflow-hidden rounded-[calc(1.5rem-8px)] sm:h-[240px] md:h-[260px] md:max-w-[300px]">
                 {usePhotoBanner ? (
                   <AuthenticatedPhotoImage
-                    photoId={bannerPhotoId}
+                    photoId={effectivePhotoId}
                     token={authToken}
                     legacyImageUrl=""
                     placeholderClassName={featuredPh}
                     alt=""
                   />
                 ) : useLegacyBanner ? (
-                  <img src={bannerUrl} alt="" className="block min-h-[260px] h-auto w-full object-cover" />
+                  <img
+                    src={bannerUrl}
+                    alt=""
+                    className="block h-full w-full min-h-0 object-cover"
+                  />
                 ) : (
                   <div className={featuredPh} aria-hidden />
                 )}
@@ -143,6 +150,8 @@ const featuredShape = PropTypes.shape({
 
 DashboardHero.propTypes = {
   authToken: PropTypes.string,
+  /** Random ready preview when project has no metadata banner (ephemeral, not saved). */
+  fallbackCoverPhotoId: PropTypes.string,
   featuredProject: featuredShape,
   recentActivity: PropTypes.arrayOf(
     PropTypes.shape({

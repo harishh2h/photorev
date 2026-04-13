@@ -14,6 +14,7 @@ export interface ProjectsHandlerMethods {
   listProjects: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   createProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   getProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  getRandomCoverPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   updateProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   archiveProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   deleteProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
@@ -61,6 +62,19 @@ function buildProjectsHandler(
         return;
       }
       sendSuccess(reply, 200, found, "OK");
+    },
+    getRandomCoverPhoto: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const userId = getAuthenticatedUserId(request);
+      const params = request.params as { projectId: string };
+      const result = await service.getRandomCoverPhotoId({
+        userId,
+        projectId: params.projectId,
+      });
+      if (!result.access) {
+        sendFailure(reply, 404, "Project not found", null);
+        return;
+      }
+      sendSuccess(reply, 200, { photoId: result.photoId }, "OK");
     },
     updateProject: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
