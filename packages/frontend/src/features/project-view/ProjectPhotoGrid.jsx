@@ -2,10 +2,10 @@ import PropTypes from 'prop-types'
 import ProjectPhotoImage from './ProjectPhotoImage.jsx'
 
 /**
- * @param {{ photos: Array<{ id: string; alt: string; status?: 'pending' | 'ready' | 'failed'; isLiked: boolean; isRejected: boolean; selectionLabel: string | null }>; token: string }} props
+ * @param {{ photos: Array<{ id: string; alt: string; status?: 'pending' | 'ready' | 'failed'; isLiked: boolean; isRejected: boolean; selectionLabel: string | null }>; token: string; onOpenPhoto: (photoId: string) => void }} props
  * @returns {import('react').JSX.Element}
  */
-export default function ProjectPhotoGrid({ photos, token }) {
+export default function ProjectPhotoGrid({ photos, token, onOpenPhoto }) {
   return (
     <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 min-[480px]:grid-cols-2 md:grid-cols-3 md:gap-5 lg:grid-cols-4">
       {photos.map((photo, index) => (
@@ -15,14 +15,17 @@ export default function ProjectPhotoGrid({ photos, token }) {
           style={{ animationDelay: `${index * 70}ms` }}
         >
           <article
-            className={`group relative overflow-hidden rounded-card border-[1.5px] bg-base-100 shadow-card transition-[transform,box-shadow] duration-[380ms] ease-out hover:-translate-y-1 hover:shadow-card-hover ${
+            className={`group relative overflow-hidden rounded-card border-[1.5px] bg-base-100 text-left shadow-card transition-[transform,box-shadow] duration-[380ms] ease-out hover:-translate-y-1 hover:shadow-card-hover ${
               photo.isRejected ? 'border-muted/55' : 'border-base-300'
             }`}
           >
-            <div
-              className={`relative flex aspect-[3/4] overflow-hidden bg-[#EDF7F2] bg-[radial-gradient(circle_at_1px_1px,rgba(110,231,183,0.45)_1px,transparent_0)] bg-[length:14px_14px] ${
+            <button
+              type="button"
+              className={`relative flex aspect-[3/4] w-full cursor-pointer overflow-hidden border-0 bg-[#EDF7F2] bg-[radial-gradient(circle_at_1px_1px,rgba(110,231,183,0.45)_1px,transparent_0)] bg-[length:14px_14px] p-0 text-left outline-none transition-[transform] duration-[380ms] focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base-100 ${
                 photo.isRejected ? 'bg-base-300 bg-none after:pointer-events-none after:absolute after:inset-0 after:bg-muted/30' : ''
               }`}
+              onClick={() => onOpenPhoto(photo.id)}
+              aria-label={`Open ${photo.alt || 'photo'} fullscreen`}
             >
               <ProjectPhotoImage
                 photoId={photo.id}
@@ -55,7 +58,7 @@ export default function ProjectPhotoGrid({ photos, token }) {
                   </span>
                 ) : null}
               </div>
-            </div>
+            </button>
             {photo.selectionLabel ? (
               <div className="absolute bottom-3 left-3 inline-flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-full bg-black/70 px-3 py-2 font-base text-xs font-semibold text-primary-content backdrop-blur-md">
                 <span className="flex text-accent-mid" aria-hidden>
@@ -75,6 +78,7 @@ export default function ProjectPhotoGrid({ photos, token }) {
 
 ProjectPhotoGrid.propTypes = {
   token: PropTypes.string.isRequired,
+  onOpenPhoto: PropTypes.func.isRequired,
   photos: PropTypes.arrayOf(
     PropTypes.shape({
       id: PropTypes.string.isRequired,

@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import PropTypes from 'prop-types'
 import ProjectViewToolbar from './ProjectViewToolbar.jsx'
 import ProjectPhotoGrid from './ProjectPhotoGrid.jsx'
@@ -12,6 +13,7 @@ import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
  * @returns {import('react').JSX.Element}
  */
 export default function ProjectViewScreen({ data, token, projectId, onRefresh }) {
+  const navigate = useNavigate()
   const [activeFilter, setActiveFilter] = useState('all')
   const {
     fileInputRef,
@@ -38,6 +40,14 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
   const handleFinalize = useCallback(() => {}, [])
   const handleShare = useCallback(() => {}, [])
   const handleSettings = useCallback(() => {}, [])
+  const openPhotoViewer = useCallback(
+    (photoId) => {
+      navigate(`/projects/${projectId}/photos/${photoId}`, {
+        state: { viewerPhotoIds: filteredPhotos.map((p) => p.id) },
+      })
+    },
+    [navigate, projectId, filteredPhotos]
+  )
   return (
     <div className="lg:pr-[min(300px,100vw)]">
       <input
@@ -73,7 +83,7 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
         <div className="min-w-0">
           <div className="relative pb-8 lg:pb-10">
             {filteredPhotos.length > 0 ? (
-              <ProjectPhotoGrid photos={filteredPhotos} token={token} />
+              <ProjectPhotoGrid photos={filteredPhotos} token={token} onOpenPhoto={openPhotoViewer} />
             ) : (
               <p className="m-0 rounded-card border-[1.5px] border-dashed border-base-300 bg-base-100 px-4 py-10 text-center font-base text-base text-muted">
                 No photos match this filter.
@@ -108,6 +118,7 @@ const photoShape = PropTypes.shape({
   isRejected: PropTypes.bool.isRequired,
   hasConflict: PropTypes.bool.isRequired,
   selectionLabel: PropTypes.string,
+  renamedTo: PropTypes.string,
 })
 
 const collaboratorMemberShape = PropTypes.shape({

@@ -49,6 +49,19 @@ export async function uploadPhoto(token, projectId, file) {
  * @param {{ page?: number; pageSize?: number; projectId?: string }} [params]
  * @returns {Promise<{ items: object[]; total: number; page: number; pageSize: number }>}
  */
+/**
+ * @param {string} token
+ * @param {string} photoId
+ * @returns {Promise<object>}
+ */
+export async function getPhoto(token, photoId) {
+  const { ok, message, data } = await apiFetch(`/photos/${photoId}`, { token })
+  if (!ok) {
+    throw new Error(message)
+  }
+  return /** @type {object} */ (data)
+}
+
 export async function listPhotos(token, params = {}) {
   const search = new URLSearchParams()
   if (params.page) search.set('page', String(params.page))

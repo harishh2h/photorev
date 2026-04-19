@@ -92,11 +92,17 @@ export function useProjectViewData(projectId, token, currentUser) {
         ])
         if (cancelled) return
         const decisionByPhoto = new Map()
+        /** @type {Map<string, { renamedTo: string | null }>} */
+        const reviewExtrasByPhoto = new Map()
         reviewItems.forEach((r) => {
           decisionByPhoto.set(r.photoId, r.decision)
+          reviewExtrasByPhoto.set(r.photoId, {
+            renamedTo: typeof r.renamedTo === 'string' ? r.renamedTo : null,
+          })
         })
         const photos = photoItems.map((p) => {
           const dec = decisionByPhoto.get(p.id)
+          const renamedTo = reviewExtrasByPhoto.get(p.id)?.renamedTo ?? null
           const rawStatus = typeof p.status === 'string' ? p.status : 'pending'
           const status = rawStatus === 'ready' || rawStatus === 'failed' ? rawStatus : 'pending'
           return {
@@ -106,7 +112,8 @@ export function useProjectViewData(projectId, token, currentUser) {
             isLiked: dec === 1,
             isRejected: dec === -1,
             hasConflict: false,
-            selectionLabel: null,
+            selectionLabel: renamedTo ? renamedTo : null,
+            renamedTo,
           }
         })
         const likedCount = photos.filter((p) => p.isLiked).length

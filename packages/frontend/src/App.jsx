@@ -7,6 +7,7 @@ import ProjectsPage from '@/pages/ProjectsPage.jsx'
 import UploadsPage from '@/pages/UploadsPage.jsx'
 import ProfilePage from '@/pages/ProfilePage.jsx'
 import ProjectViewPage from '@/pages/ProjectViewPage.jsx'
+import PhotoViewerPage from '@/pages/PhotoViewerPage.jsx'
 
 export default function App() {
   return (
@@ -26,6 +27,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ProjectsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/projects/:projectId/photos/:photoId"
+          element={
+            <ProtectedRoute>
+              <PhotoViewerPage />
             </ProtectedRoute>
           }
         />
