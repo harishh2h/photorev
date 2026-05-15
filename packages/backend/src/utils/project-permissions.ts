@@ -35,6 +35,7 @@ export async function loadProjectPermissionContext(
       );
     })
     .where("projects.id", projectId)
+    .whereNot("projects.status", "deleted")
     .first<{
       created_by: string;
       member_role: string | null;

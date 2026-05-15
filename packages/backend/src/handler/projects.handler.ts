@@ -162,7 +162,7 @@ function buildProjectsHandler(
         sendFailure(reply, statusCode, msg, null);
         return;
       }
-      sendSuccess(reply, 200, null, "Project deleted");
+      sendSuccess(reply, 200, null, "Project removed");
     },
   };
 

@@ -7,6 +7,7 @@ import ProjectViewSidebar from './ProjectViewSidebar.jsx'
 import ProjectGridOverlays from './ProjectGridOverlays.jsx'
 import ProjectUploadStatusFloat from './ProjectUploadStatusFloat.jsx'
 import { CollaboratorsManageModal } from '@/features/project-collaborators/index.js'
+import { ProjectSettingsModal } from '@/features/project-settings/index.js'
 import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
 
 /**
@@ -17,6 +18,7 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
   const navigate = useNavigate()
   const [activeFilter, setActiveFilter] = useState('all')
   const [collaboratorsOpen, setCollaboratorsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const {
     fileInputRef,
     uploadConcurrency,
@@ -42,6 +44,11 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
   const handleFinalize = useCallback(() => {}, [])
   const handleShare = useCallback(() => {}, [])
   const handleSettings = useCallback(() => {
+    if (data.isProjectCreator) {
+      setSettingsOpen(true)
+    }
+  }, [data.isProjectCreator])
+  const handleManageCollaborators = useCallback(() => {
     if (data.isProjectCreator) {
       setCollaboratorsOpen(true)
     }
@@ -112,8 +119,23 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
           onFinalize={handleFinalize}
           onShare={handleShare}
           onSettings={handleSettings}
+          onManageCollaborators={data.isProjectCreator ? handleManageCollaborators : undefined}
         />
       </div>
+      <ProjectSettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        token={token}
+        projectId={projectId}
+        initialProjectName={data.projectTitle}
+        collaboratorCount={data.collaboratorMembers.length}
+        onRenameSuccess={() => {
+          setSettingsOpen(false)
+          onRefresh()
+        }}
+        onOpenTeam={() => setCollaboratorsOpen(true)}
+        onProjectDeleted={() => navigate('/projects', { replace: true })}
+      />
       <CollaboratorsManageModal
         isOpen={collaboratorsOpen}
         onClose={() => setCollaboratorsOpen(false)}

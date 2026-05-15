@@ -21,7 +21,7 @@ CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     status TEXT NOT NULL DEFAULT 'active'
-        CHECK (status IN ('active', 'processing', 'completed')),
+        CHECK (status IN ('active', 'processing', 'completed', 'deleted')),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     root_path TEXT NOT NULL, -- root path of the project
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,

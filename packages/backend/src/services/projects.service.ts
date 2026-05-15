@@ -4,6 +4,7 @@ import { Knex } from "knex";
 import {
   normalizeProjectRootPathForPersist,
   projectRootPathForApi,
+  removeProjectPhotoStorage,
 } from "../utils/storage";
 import { applyPagination, buildPaginatedResult, PaginatedResult, PaginationParams } from "../utils/pagination";
 import {
@@ -27,7 +28,7 @@ function isPersistableBannerUrl(value: unknown): boolean {
   }
 }
 
-export type ProjectStatus = "active" | "processing" | "completed";
+export type ProjectStatus = "active" | "processing" | "completed" | "deleted";
 
 /**
  * JSON stored in `projects.metadata`.
@@ -266,7 +267,8 @@ function buildProjectsService(
           db.raw("?", [userId]),
         );
       })
-      .join({ owner: "users" }, "owner.id", "projects.created_by");
+      .join({ owner: "users" }, "owner.id", "projects.created_by")
+      .whereNot("projects.status", "deleted");
     if (typeof filters.status !== "undefined") {
       baseQuery.where("projects.status", filters.status);
     }
@@ -344,6 +346,7 @@ function buildProjectsService(
       })
       .join({ owner: "users" }, "owner.id", "projects.created_by")
       .where("projects.id", params.projectId)
+      .whereNot("projects.status", "deleted")
       .first();
     if (!row) {
       return null;
@@ -361,10 +364,12 @@ function buildProjectsService(
 
   async function getRandomCoverPhotoId(params: GetProjectParams): Promise<RandomCoverPhotoResult> {
     const member = await db("project_members")
+      .join("projects", "projects.id", "project_members.project_id")
       .where({
         project_id: params.projectId,
         user_id: params.userId,
       })
+      .whereNot("projects.status", "deleted")
       .first();
     if (!member) {
       return { access: false };
@@ -388,7 +393,7 @@ function buildProjectsService(
       return { ok: false, reason: "forbidden" };
     }
     const existing = await db<ProjectRecord>("projects").where({ id: params.projectId }).first();
-    if (!existing) {
+    if (!existing || existing.status === "deleted") {
       return { ok: false, reason: "not_found" };
     }
     const patch: Partial<ProjectRecord> = {};
@@ -422,6 +427,7 @@ function buildProjectsService(
     }
     const updatedRows = (await db<ProjectRecord>("projects")
       .where("id", params.projectId)
+      .whereNot("status", "deleted")
       .update(patch, "*")
       .then((rows: ProjectRecord[]) => rows)) as ProjectRecord[];
     const updated = updatedRows[0];
@@ -446,8 +452,16 @@ function buildProjectsService(
     if (deny === "forbidden") {
       return { ok: false, reason: "forbidden" };
     }
+    const alive = await db<ProjectRecord>("projects")
+      .where("id", params.projectId)
+      .whereNot("status", "deleted")
+      .first();
+    if (!alive) {
+      return { ok: false, reason: "not_found" };
+    }
     const updatedCount = await db<ProjectRecord>("projects")
       .where("id", params.projectId)
+      .whereNot("status", "deleted")
       .update({
         is_active: false,
         status: "completed",
@@ -463,10 +477,32 @@ function buildProjectsService(
     if (deny === "forbidden") {
       return { ok: false, reason: "forbidden" };
     }
-    const deletedCount = await db<ProjectRecord>("projects")
-      .where("id", params.projectId)
-      .delete();
-    return deletedCount > 0 ? { ok: true } : { ok: false, reason: "not_found" };
+    const row = await db<ProjectRecord>("projects").where({ id: params.projectId }).first();
+    if (!row) {
+      return { ok: false, reason: "not_found" };
+    }
+    if (row.status === "deleted") {
+      return { ok: true };
+    }
+    await db.transaction(async (trx: Knex.Transaction) => {
+      await trx("photos").where("project_id", params.projectId).delete();
+      const updated = await trx<ProjectRecord>("projects")
+        .where("id", params.projectId)
+        .whereNot("status", "deleted")
+        .update({
+          status: "deleted",
+          is_active: false,
+        });
+      if (updated === 0) {
+        throw new Error("project_delete_no_row");
+      }
+    });
+    try {
+      await removeProjectPhotoStorage(params.projectId);
+    } catch (err: unknown) {
+      fastify.log.error({ err, projectId: params.projectId }, "removeProjectPhotoStorage failed after delete");
+    }
+    return { ok: true };
   }
 
   return {

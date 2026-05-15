@@ -175,3 +175,9 @@ export async function removeUploadDir(
   );
   await fs.promises.rm(dir, { recursive: true, force: true });
 }
+
+/** Removes every uploaded/processed file tree under `photos/{projectId}/`. */
+export async function removeProjectPhotoStorage(projectId: string): Promise<void> {
+  const dir = path.join(getStorageRoot(), "photos", projectId);
+  await fs.promises.rm(dir, { recursive: true, force: true });
+}

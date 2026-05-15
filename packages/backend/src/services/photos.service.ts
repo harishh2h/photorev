@@ -129,6 +129,8 @@ function buildPhotosService(
   ): Promise<PaginatedResult<PhotoDto>> {
     const baseQuery = db<PhotoRecord>("photos")
       .select<PhotoRecord[]>("photos.*")
+      .join("projects", "projects.id", "photos.project_id")
+      .whereNot("projects.status", "deleted")
       .join("project_members", function joinProjectMembers() {
         this.on("project_members.project_id", "photos.project_id").andOn(
           "project_members.user_id",
@@ -162,6 +164,8 @@ function buildPhotosService(
   async function getPhoto(params: GetPhotoParams): Promise<PhotoDto | null> {
     const row = await db<PhotoRecord>("photos")
       .select<PhotoRecord[]>("photos.*")
+      .join("projects", "projects.id", "photos.project_id")
+      .whereNot("projects.status", "deleted")
       .join("project_members", function joinProjectMembers() {
         this.on("project_members.project_id", "photos.project_id").andOn(
           "project_members.user_id",

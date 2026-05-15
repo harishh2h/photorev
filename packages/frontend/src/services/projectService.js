@@ -70,3 +70,36 @@ export async function fetchRandomProjectCoverPhotoId(token, projectId) {
   }
   return null
 }
+
+/**
+ * @param {string} token
+ * @param {string} projectId
+ * @param {{ name?: string; status?: string; isActive?: boolean; rootPath?: string; metadata?: object }} payload
+ * @returns {Promise<object>}
+ */
+export async function updateProject(token, projectId, payload) {
+  const { ok, message, data } = await apiFetch(`/projects/${projectId}`, {
+    token,
+    method: 'PATCH',
+    body: payload,
+  })
+  if (!ok) {
+    throw new Error(message)
+  }
+  return /** @type {object} */ (data)
+}
+
+/**
+ * @param {string} token
+ * @param {string} projectId
+ * @returns {Promise<void>}
+ */
+export async function deleteProject(token, projectId) {
+  const { ok, message } = await apiFetch(`/projects/${projectId}`, {
+    token,
+    method: 'DELETE',
+  })
+  if (!ok) {
+    throw new Error(message)
+  }
+}

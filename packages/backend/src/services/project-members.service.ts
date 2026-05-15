@@ -117,6 +117,7 @@ async function fetchMemberDto(
     )
     .where("project_members.project_id", projectId)
     .andWhere("project_members.user_id", userId)
+    .whereNot("projects.status", "deleted")
     .first<MemberJoinedRow>();
   return row ? mapMemberRowToDto(row) : null;
 }
@@ -131,7 +132,10 @@ function buildProjectMembersService(
     requesterId: string,
     projectId: string,
   ): Promise<boolean> {
-    const row = await db("projects").where({ id: projectId, created_by: requesterId }).first();
+    const row = await db("projects")
+      .where({ id: projectId, created_by: requesterId })
+      .whereNot("status", "deleted")
+      .first();
     return Boolean(row);
   }
 
@@ -140,10 +144,12 @@ function buildProjectMembersService(
     projectId: string,
   ): Promise<boolean> {
     const row = await db("project_members")
+      .join("projects", "projects.id", "project_members.project_id")
       .where({
         project_id: projectId,
         user_id: requesterId,
       })
+      .whereNot("projects.status", "deleted")
       .first();
     return Boolean(row);
   }
@@ -167,6 +173,7 @@ function buildProjectMembersService(
         "projects.created_by",
       )
       .where("project_members.project_id", params.projectId)
+      .whereNot("projects.status", "deleted")
       .orderBy("project_members.created_at", "asc");
     return rows.map((r: MemberJoinedRow) => mapMemberRowToDto(r));
   }

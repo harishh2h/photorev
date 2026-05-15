@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import PropTypes from 'prop-types'
 
 /**
- * @param {{ likedCount: number; likedWithNames: string; reviewProgressPercent: number; collaboratorMembers: { id: string; name: string; initial: string; roleLabel?: string }[]; showSettings?: boolean; onFinalize: () => void; onShare: () => void; onSettings: () => void }} props
+ * @param {{ likedCount: number; likedWithNames: string; reviewProgressPercent: number; collaboratorMembers: { id: string; name: string; initial: string; roleLabel?: string }[]; showSettings?: boolean; onFinalize: () => void; onShare: () => void; onSettings: () => void; onManageCollaborators?: () => void }} props
  * @returns {import('react').JSX.Element}
  */
 export default function ProjectViewSidebar({
@@ -14,6 +14,7 @@ export default function ProjectViewSidebar({
   onFinalize,
   onShare,
   onSettings,
+  onManageCollaborators,
 }) {
   const [isMembersOpen, setIsMembersOpen] = useState(false)
   const collaboratorCount = collaboratorMembers.length
@@ -71,31 +72,43 @@ export default function ProjectViewSidebar({
         </div>
       </div>
       <div className="flex flex-col gap-3">
-        <button
-          type="button"
-          className="flex min-h-11 w-full items-center gap-2 rounded-md border-[1.5px] border-base-300 bg-[#F4F9F6] px-3 py-2 text-left font-base text-sm font-semibold text-base-content transition-[border-color,background-color] duration-150 ease-out hover:border-accent-mid hover:bg-base-100 focus-visible:outline-none focus-visible:shadow-focus"
-          onClick={handleToggleMembers}
-          aria-expanded={isMembersOpen}
-          aria-controls="project-collaborators-list"
-          id="project-collaborators-trigger"
-        >
-          <span className="flex shrink-0 text-muted" aria-hidden>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          </span>
-          <span className="min-w-0 flex-1">{collaboratorCount} Collaborators</span>
-          <span
-            className={`flex shrink-0 text-muted transition-transform duration-[250ms] ease-out ${isMembersOpen ? 'rotate-180' : ''}`}
-            aria-hidden
+        <div className="flex items-stretch gap-2">
+          <button
+            type="button"
+            className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md border-[1.5px] border-base-300 bg-[#F4F9F6] px-3 py-2 text-left font-base text-sm font-semibold text-base-content transition-[border-color,background-color] duration-150 ease-out hover:border-accent-mid hover:bg-base-100 focus-visible:outline-none focus-visible:shadow-focus"
+            onClick={handleToggleMembers}
+            aria-expanded={isMembersOpen}
+            aria-controls="project-collaborators-list"
+            id="project-collaborators-trigger"
           >
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </span>
-        </button>
+            <span className="flex shrink-0 text-muted" aria-hidden>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </span>
+            <span className="min-w-0 flex-1">{collaboratorCount} Collaborators</span>
+            <span
+              className={`flex shrink-0 text-muted transition-transform duration-[250ms] ease-out ${isMembersOpen ? 'rotate-180' : ''}`}
+              aria-hidden
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </span>
+          </button>
+          {showSettings && typeof onManageCollaborators === 'function' ? (
+            <button
+              type="button"
+              className="btn btn-outline flex h-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md border-[1.5px] border-base-300 bg-base-100 px-0 font-base text-lg font-semibold text-accent transition-[border-color,background-color,transform] duration-150 ease-out hover:border-accent-mid hover:bg-[#EDF7F2] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
+              aria-label="Add or manage collaborators"
+              onClick={onManageCollaborators}
+            >
+              +
+            </button>
+          ) : null}
+        </div>
         {!isMembersOpen ? (
           <div className="flex flex-wrap items-center gap-0" aria-hidden>
             {previewCollaborators.map((c) => (
@@ -190,4 +203,5 @@ ProjectViewSidebar.propTypes = {
   onFinalize: PropTypes.func.isRequired,
   onShare: PropTypes.func.isRequired,
   onSettings: PropTypes.func.isRequired,
+  onManageCollaborators: PropTypes.func,
 }
