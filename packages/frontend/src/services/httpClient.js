@@ -5,6 +5,24 @@ export function getApiBaseUrl() {
   return (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 }
 
+/** @type {(() => void) | null} */
+let unauthorizedHandler = null
+
+/**
+ * Registers global handler invoked when authenticated API responds 401 (expired session, etc.).
+ * @param {(() => void) | null} fn
+ */
+export function setUnauthorizedHandler(fn) {
+  unauthorizedHandler = fn
+}
+
+/** Clears JWT session and redirects to login when registered handler is set */
+export function notifyUnauthorized() {
+  if (typeof unauthorizedHandler === 'function') {
+    unauthorizedHandler()
+  }
+}
+
 /**
  * @param {unknown} parsed
  * @returns {parsed is { error: boolean; message: string; data: unknown }}
@@ -21,11 +39,11 @@ export function isApiEnvelope(parsed) {
 
 /**
  * @param {string} path
- * @param {{ token?: string; method?: string; body?: unknown }} [options]
+ * @param {{ token?: string; method?: string; body?: unknown; skipUnauthorizedHandler?: boolean }} [options]
  * @returns {Promise<{ ok: boolean; status: number; error: boolean; message: string; data: unknown }>}
  */
 export async function apiFetch(path, options = {}) {
-  const { token, method = 'GET', body } = options
+  const { token, method = 'GET', body, skipUnauthorizedHandler } = options
   const base = getApiBaseUrl()
   const url = `${base}${path.startsWith('/') ? path : `/${path}`}`
   /** @type {Record<string, string>} */
@@ -41,6 +59,8 @@ export async function apiFetch(path, options = {}) {
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
+  const status = res.status
+  const unauthorized = status === 401
   /** @type {unknown} */
   let parsed = null
   const contentType = res.headers.get('content-type') || ''
@@ -55,20 +75,28 @@ export async function apiFetch(path, options = {}) {
     }
   }
   if (!isApiEnvelope(parsed)) {
-    return {
+    const out = {
       ok: false,
-      status: res.status,
+      status,
       error: true,
-      message: `Request failed (${res.status})`,
+      message: `Request failed (${status})`,
       data: null,
     }
+    if (unauthorized && !skipUnauthorizedHandler) {
+      notifyUnauthorized()
+    }
+    return out
   }
   const ok = res.ok && !parsed.error
-  return {
+  const out = {
     ok,
-    status: res.status,
+    status,
     error: parsed.error,
     message: parsed.message,
     data: parsed.data,
   }
+  if (unauthorized && !skipUnauthorizedHandler) {
+    notifyUnauthorized()
+  }
+  return out
 }

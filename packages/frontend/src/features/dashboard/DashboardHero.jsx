@@ -44,6 +44,7 @@ export default function DashboardHero({
                     token={authToken}
                     legacyImageUrl=""
                     placeholderClassName={featuredPh}
+                    contentVariant="preview"
                     alt=""
                   />
                 ) : useLegacyBanner ? (

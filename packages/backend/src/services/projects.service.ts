@@ -1,16 +1,38 @@
-import path from "path";
 import { randomUUID } from "crypto";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { Knex } from "knex";
-import { getStorageRoot } from "../utils/storage";
+import {
+  normalizeProjectRootPathForPersist,
+  projectRootPathForApi,
+} from "../utils/storage";
 import { applyPagination, buildPaginatedResult, PaginatedResult, PaginationParams } from "../utils/pagination";
+import {
+  type CollaboratorRole,
+  parseCollaboratorRole,
+} from "../utils/project-permissions";
+
+function isPersistableBannerUrl(value: unknown): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const trimmed = value.trim();
+  if (!trimmed.length) {
+    return false;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 export type ProjectStatus = "active" | "processing" | "completed";
 
 /**
  * JSON stored in `projects.metadata`.
  * `bannerPhotoId`: photo UUID; dashboard loads preview via `GET /photos/:id/content` (preview.* on disk).
- * `banner`: optional legacy absolute URL for cover image.
+ * `banner`: optional legacy cover image URL; only `http:` / `https:` allowed (validated on persist + stripped on API if invalid).
  */
 export type ProjectMetadata = Readonly<
   { banner?: string; bannerPhotoId?: string } & Record<string, unknown>
@@ -27,6 +49,16 @@ export interface ProjectRecord {
   readonly created_at: Date;
 }
 
+export interface ProjectViewerContextDto {
+  readonly isCreator: boolean;
+  readonly role: CollaboratorRole;
+  readonly owner: {
+    readonly id: string;
+    readonly name: string;
+    readonly email: string;
+  };
+}
+
 export interface ProjectDto {
   readonly id: string;
   readonly name: string;
@@ -36,6 +68,7 @@ export interface ProjectDto {
   readonly metadata: ProjectMetadata;
   readonly createdBy: string;
   readonly createdAt: string;
+  readonly viewerContext: ProjectViewerContextDto;
 }
 
 export interface ListProjectsFilters extends PaginationParams {
@@ -80,14 +113,24 @@ export type RandomCoverPhotoResult =
   | { readonly access: false }
   | { readonly access: true; readonly photoId: string | null };
 
+export type ProjectMutationDeniedReason = "not_found" | "forbidden";
+
+export type ProjectUpdateResult =
+  | { readonly ok: true; readonly project: ProjectDto }
+  | { readonly ok: false; readonly reason: ProjectMutationDeniedReason };
+
+export type ProjectArchiveDeleteResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: ProjectMutationDeniedReason };
+
 export interface ProjectsServiceMethods {
   listProjects: (filters: ListProjectsFilters, userId: string) => Promise<PaginatedResult<ProjectDto>>;
   createProject: (params: CreateProjectParams) => Promise<ProjectDto>;
   getProject: (params: GetProjectParams) => Promise<ProjectDto | null>;
   getRandomCoverPhotoId: (params: GetProjectParams) => Promise<RandomCoverPhotoResult>;
-  updateProject: (params: UpdateProjectParams) => Promise<ProjectDto | null>;
-  archiveProject: (params: ArchiveProjectParams) => Promise<boolean>;
-  deleteProject: (params: DeleteProjectParams) => Promise<boolean>;
+  updateProject: (params: UpdateProjectParams) => Promise<ProjectUpdateResult>;
+  archiveProject: (params: ArchiveProjectParams) => Promise<ProjectArchiveDeleteResult>;
+  deleteProject: (params: DeleteProjectParams) => Promise<ProjectArchiveDeleteResult>;
 }
 
 function parseProjectMetadata(value: unknown): ProjectMetadata {
@@ -111,16 +154,68 @@ function parseProjectMetadata(value: unknown): ProjectMetadata {
   return {};
 }
 
-function mapProjectRecordToDto(record: ProjectRecord): ProjectDto {
+function sanitizeMetadataForApi(meta: ProjectMetadata): ProjectMetadata {
+  const merged = { ...meta };
+  if ("banner" in merged && typeof (merged as { banner?: unknown }).banner !== "undefined") {
+    const bannerValue = merged.banner as unknown;
+    if (!isPersistableBannerUrl(bannerValue)) {
+      delete (merged as Record<string, unknown>).banner;
+    }
+  }
+  return merged;
+}
+
+function normalizeMetadataForStorage(meta: ProjectMetadata): ProjectMetadata {
+  const merged = { ...meta };
+  if ("banner" in merged) {
+    if (!isPersistableBannerUrl(merged.banner)) {
+      delete (merged as Record<string, unknown>).banner;
+    }
+  }
+  return merged;
+}
+
+type ProjectRowWithViewer = ProjectRecord & {
+  readonly viewer_role: string;
+  readonly owner_id: string;
+  readonly owner_name: string;
+  readonly owner_email: string;
+};
+
+function buildViewerContextDto(
+  row: ProjectRecord,
+  memberUserId: string,
+  viewerRoleRaw: string,
+  ownerId: string,
+  ownerName: string,
+  ownerEmail: string,
+): ProjectViewerContextDto {
+  return {
+    isCreator: row.created_by === memberUserId,
+    role: parseCollaboratorRole(viewerRoleRaw),
+    owner: {
+      id: ownerId,
+      name: ownerName,
+      email: ownerEmail,
+    },
+  };
+}
+
+function mapProjectRecordToDto(
+  record: ProjectRecord,
+  viewerContext: ProjectViewerContextDto,
+): ProjectDto {
+  const metadata = sanitizeMetadataForApi(parseProjectMetadata(record.metadata));
   return {
     id: record.id,
     name: record.name,
     status: record.status,
     isActive: record.is_active,
-    rootPath: record.root_path,
-    metadata: parseProjectMetadata(record.metadata),
+    rootPath: projectRootPathForApi(record.root_path, record.id),
+    metadata,
     createdBy: record.created_by,
     createdAt: record.created_at.toISOString(),
+    viewerContext,
   };
 }
 
@@ -130,18 +225,48 @@ function buildProjectsService(
 ): ProjectsServiceMethods {
   const db: Knex = fastify.db;
 
+  async function gateCreatorOnlyProjectMutation(
+    userId: string,
+    projectId: string,
+  ): Promise<ProjectMutationDeniedReason | null> {
+    const project = await db<ProjectRecord>("projects").where({ id: projectId }).first();
+    if (!project) {
+      return "not_found";
+    }
+    const member = await db("project_members")
+      .where({
+        project_id: projectId,
+        user_id: userId,
+      })
+      .first();
+    if (!member) {
+      return "not_found";
+    }
+    if (project.created_by !== userId) {
+      return "forbidden";
+    }
+    return null;
+  }
+
   async function listProjects(
     filters: ListProjectsFilters,
     userId: string,
   ): Promise<PaginatedResult<ProjectDto>> {
-    const baseQuery = db<ProjectRecord>("projects")
-      .select<ProjectRecord[]>("projects.*")
+    const baseQuery = db<ProjectRowWithViewer>("projects")
+      .select(
+        "projects.*",
+        "project_members.role as viewer_role",
+        "owner.id as owner_id",
+        "owner.name as owner_name",
+        "owner.email as owner_email",
+      )
       .join("project_members", function joinProjectMembers() {
         this.on("project_members.project_id", "projects.id").andOn(
           "project_members.user_id",
           db.raw("?", [userId]),
         );
-      });
+      })
+      .join({ owner: "users" }, "owner.id", "projects.created_by");
     if (typeof filters.status !== "undefined") {
       baseQuery.where("projects.status", filters.status);
     }
@@ -153,19 +278,19 @@ function buildProjectsService(
       .clearSelect()
       .count<{ count: string }[]>({ count: "*" });
     const total = Number(countResult[0]?.count ?? 0);
-    const rows = (await applyPagination(baseQuery, filters)) as ProjectRecord[];
-    const items = rows.map(mapProjectRecordToDto);
+    const rows = (await applyPagination(baseQuery, filters)) as ProjectRowWithViewer[];
+    const items = rows.map((row) => {
+      const ctx = buildViewerContextDto(row, userId, row.viewer_role, row.owner_id, row.owner_name, row.owner_email);
+      return mapProjectRecordToDto(row, ctx);
+    });
     return buildPaginatedResult(items, total, filters.page, filters.pageSize);
   }
 
   async function createProject(params: CreateProjectParams): Promise<ProjectDto> {
     const result = await db.transaction(async (trx: Knex.Transaction) => {
       const projectId = randomUUID();
-      const rootPath =
-        typeof params.rootPath === "string" && params.rootPath.length > 0
-          ? params.rootPath
-          : path.join(getStorageRoot(), "projects", projectId);
-      const metadataPayload = params.metadata ?? {};
+      const rootPath = normalizeProjectRootPathForPersist(params.rootPath, projectId);
+      const metadataPayload = normalizeMetadataForStorage(params.metadata ?? {});
       const insertedProjects = await trx<ProjectRecord>("projects")
         .insert(
           {
@@ -183,27 +308,55 @@ function buildProjectsService(
         project_id: project.id,
         user_id: params.userId,
         is_owner: true,
+        role: "contributor",
       });
       return project;
     });
-    return mapProjectRecordToDto(result);
+    const ownerRow = await db<{ name: string; email: string }>("users")
+      .select("name", "email")
+      .where("id", params.userId)
+      .first();
+    const viewerContext = buildViewerContextDto(
+      result,
+      params.userId,
+      "contributor",
+      params.userId,
+      ownerRow?.name ?? "",
+      ownerRow?.email ?? "",
+    );
+    return mapProjectRecordToDto(result, viewerContext);
   }
 
   async function getProject(params: GetProjectParams): Promise<ProjectDto | null> {
-    const row = await db<ProjectRecord>("projects")
-      .select<ProjectRecord[]>("projects.*")
+    const row = await db<ProjectRowWithViewer>("projects")
+      .select(
+        "projects.*",
+        "project_members.role as viewer_role",
+        "owner.id as owner_id",
+        "owner.name as owner_name",
+        "owner.email as owner_email",
+      )
       .join("project_members", function joinProjectMembers() {
         this.on("project_members.project_id", "projects.id").andOn(
           "project_members.user_id",
           db.raw("?", [params.userId]),
         );
       })
+      .join({ owner: "users" }, "owner.id", "projects.created_by")
       .where("projects.id", params.projectId)
       .first();
     if (!row) {
       return null;
     }
-    return mapProjectRecordToDto(row);
+    const viewerContext = buildViewerContextDto(
+      row,
+      params.userId,
+      row.viewer_role,
+      row.owner_id,
+      row.owner_name,
+      row.owner_email,
+    );
+    return mapProjectRecordToDto(row, viewerContext);
   }
 
   async function getRandomCoverPhotoId(params: GetProjectParams): Promise<RandomCoverPhotoResult> {
@@ -226,20 +379,17 @@ function buildProjectsService(
     return { access: true, photoId: row?.id ?? null };
   }
 
-  async function updateProject(params: UpdateProjectParams): Promise<ProjectDto | null> {
-    const isOwnerRow = await db("project_members")
-      .where({
-        project_id: params.projectId,
-        user_id: params.userId,
-        is_owner: true,
-      })
-      .first();
-    if (!isOwnerRow) {
-      return null;
+  async function updateProject(params: UpdateProjectParams): Promise<ProjectUpdateResult> {
+    const deny = await gateCreatorOnlyProjectMutation(params.userId, params.projectId);
+    if (deny === "not_found") {
+      return { ok: false, reason: "not_found" };
     }
-    const existing = await db<ProjectRecord>("projects").where("id", params.projectId).first();
+    if (deny === "forbidden") {
+      return { ok: false, reason: "forbidden" };
+    }
+    const existing = await db<ProjectRecord>("projects").where({ id: params.projectId }).first();
     if (!existing) {
-      return null;
+      return { ok: false, reason: "not_found" };
     }
     const patch: Partial<ProjectRecord> = {};
     if (typeof params.name !== "undefined") {
@@ -252,16 +402,23 @@ function buildProjectsService(
       patch.is_active = params.isActive;
     }
     if (typeof params.rootPath !== "undefined") {
-      patch.root_path = params.rootPath;
+      patch.root_path = normalizeProjectRootPathForPersist(params.rootPath, params.projectId);
     }
     if (typeof params.metadata !== "undefined") {
-      patch.metadata = {
+      patch.metadata = normalizeMetadataForStorage({
         ...parseProjectMetadata(existing.metadata),
         ...params.metadata,
-      };
+      });
     }
     if (Object.keys(patch).length === 0) {
-      return mapProjectRecordToDto(existing);
+      const got = await getProject({
+        userId: params.userId,
+        projectId: params.projectId,
+      });
+      if (!got) {
+        return { ok: false, reason: "not_found" };
+      }
+      return { ok: true, project: got };
     }
     const updatedRows = (await db<ProjectRecord>("projects")
       .where("id", params.projectId)
@@ -269,21 +426,25 @@ function buildProjectsService(
       .then((rows: ProjectRecord[]) => rows)) as ProjectRecord[];
     const updated = updatedRows[0];
     if (!updated) {
-      return null;
+      return { ok: false, reason: "not_found" };
     }
-    return mapProjectRecordToDto(updated);
+    const got = await getProject({
+      userId: params.userId,
+      projectId: params.projectId,
+    });
+    if (!got) {
+      return { ok: false, reason: "not_found" };
+    }
+    return { ok: true, project: got };
   }
 
-  async function archiveProject(params: ArchiveProjectParams): Promise<boolean> {
-    const isOwnerRow = await db("project_members")
-      .where({
-        project_id: params.projectId,
-        user_id: params.userId,
-        is_owner: true,
-      })
-      .first();
-    if (!isOwnerRow) {
-      return false;
+  async function archiveProject(params: ArchiveProjectParams): Promise<ProjectArchiveDeleteResult> {
+    const deny = await gateCreatorOnlyProjectMutation(params.userId, params.projectId);
+    if (deny === "not_found") {
+      return { ok: false, reason: "not_found" };
+    }
+    if (deny === "forbidden") {
+      return { ok: false, reason: "forbidden" };
     }
     const updatedCount = await db<ProjectRecord>("projects")
       .where("id", params.projectId)
@@ -291,24 +452,21 @@ function buildProjectsService(
         is_active: false,
         status: "completed",
       });
-    return updatedCount > 0;
+    return updatedCount > 0 ? { ok: true } : { ok: false, reason: "not_found" };
   }
 
-  async function deleteProject(params: DeleteProjectParams): Promise<boolean> {
-    const isOwnerRow = await db("project_members")
-      .where({
-        project_id: params.projectId,
-        user_id: params.userId,
-        is_owner: true,
-      })
-      .first();
-    if (!isOwnerRow) {
-      return false;
+  async function deleteProject(params: DeleteProjectParams): Promise<ProjectArchiveDeleteResult> {
+    const deny = await gateCreatorOnlyProjectMutation(params.userId, params.projectId);
+    if (deny === "not_found") {
+      return { ok: false, reason: "not_found" };
+    }
+    if (deny === "forbidden") {
+      return { ok: false, reason: "forbidden" };
     }
     const deletedCount = await db<ProjectRecord>("projects")
       .where("id", params.projectId)
       .delete();
-    return deletedCount > 0;
+    return deletedCount > 0 ? { ok: true } : { ok: false, reason: "not_found" };
   }
 
   return {

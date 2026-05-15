@@ -15,6 +15,8 @@ export default function LazyCoverProjectCard({
   status,
   subtitle,
   animationDelay = 0,
+  coverContentVariant = 'thumbnail',
+  ownershipBadge = '',
 }) {
   const hasExplicitPhoto =
     typeof explicitCoverPhotoId === 'string' &&
@@ -46,6 +48,8 @@ export default function LazyCoverProjectCard({
         authToken={authToken}
         coverImageUrl={effectiveCoverUrl}
         animationDelay={animationDelay}
+        coverContentVariant={coverContentVariant}
+        ownershipBadge={ownershipBadge}
       />
     </div>
   )
@@ -60,4 +64,6 @@ LazyCoverProjectCard.propTypes = {
   status: PropTypes.string.isRequired,
   subtitle: PropTypes.string.isRequired,
   animationDelay: PropTypes.number,
+  coverContentVariant: PropTypes.oneOf(['thumbnail', 'preview', 'original']),
+  ownershipBadge: PropTypes.string,
 }

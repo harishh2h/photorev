@@ -16,10 +16,12 @@ export default function AuthenticatedPhotoImage({
   placeholderClassName = '',
   imgClassName = defaultImgClass,
   alt = '',
+  contentVariant = 'thumbnail',
 }) {
   const { objectUrl, isLoading } = usePhotoContentBlobUrl(
     typeof photoId === 'string' && photoId.length > 0 ? photoId : null,
     typeof token === 'string' && token.length > 0 ? token : null,
+    contentVariant,
   )
   const legacy =
     typeof legacyImageUrl === 'string' && legacyImageUrl.length > 0 ? legacyImageUrl : ''
@@ -41,4 +43,5 @@ AuthenticatedPhotoImage.propTypes = {
   placeholderClassName: PropTypes.string,
   imgClassName: PropTypes.string,
   alt: PropTypes.string,
+  contentVariant: PropTypes.oneOf(['thumbnail', 'preview', 'original']),
 }

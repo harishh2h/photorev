@@ -6,6 +6,7 @@ import ProjectPhotoGrid from './ProjectPhotoGrid.jsx'
 import ProjectViewSidebar from './ProjectViewSidebar.jsx'
 import ProjectGridOverlays from './ProjectGridOverlays.jsx'
 import ProjectUploadStatusFloat from './ProjectUploadStatusFloat.jsx'
+import { CollaboratorsManageModal } from '@/features/project-collaborators/index.js'
 import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
 
 /**
@@ -15,6 +16,7 @@ import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
 export default function ProjectViewScreen({ data, token, projectId, onRefresh }) {
   const navigate = useNavigate()
   const [activeFilter, setActiveFilter] = useState('all')
+  const [collaboratorsOpen, setCollaboratorsOpen] = useState(false)
   const {
     fileInputRef,
     uploadConcurrency,
@@ -39,7 +41,11 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
   }, [activeFilter, data.photos])
   const handleFinalize = useCallback(() => {}, [])
   const handleShare = useCallback(() => {}, [])
-  const handleSettings = useCallback(() => {}, [])
+  const handleSettings = useCallback(() => {
+    if (data.isProjectCreator) {
+      setCollaboratorsOpen(true)
+    }
+  }, [data.isProjectCreator])
   const openPhotoViewer = useCallback(
     (photoId) => {
       navigate(`/projects/${projectId}/photos/${photoId}`, {
@@ -93,6 +99,7 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
               collaboratingLabel={data.collaboratingLabel}
               onAddPhotos={openFilePicker}
               isUploading={isUploading}
+              showAddPhotos={Boolean(data.canUploadPhotos)}
             />
           </div>
         </div>
@@ -101,11 +108,23 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
           likedWithNames={data.likedWithNames}
           reviewProgressPercent={data.reviewProgressPercent}
           collaboratorMembers={data.collaboratorMembers}
+          showSettings={Boolean(data.isProjectCreator)}
           onFinalize={handleFinalize}
           onShare={handleShare}
           onSettings={handleSettings}
         />
       </div>
+      <CollaboratorsManageModal
+        isOpen={collaboratorsOpen}
+        onClose={() => setCollaboratorsOpen(false)}
+        token={token}
+        projectId={projectId}
+        members={Array.isArray(data.collaboratorsRows) ? data.collaboratorsRows : []}
+        onSaved={() => {
+          setCollaboratorsOpen(false)
+          onRefresh()
+        }}
+      />
     </div>
   )
 }
@@ -125,6 +144,7 @@ const collaboratorMemberShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
   name: PropTypes.string.isRequired,
   initial: PropTypes.string.isRequired,
+  roleLabel: PropTypes.string,
 })
 
 ProjectViewScreen.propTypes = {
@@ -138,6 +158,11 @@ ProjectViewScreen.propTypes = {
     likedWithNames: PropTypes.string.isRequired,
     reviewProgressPercent: PropTypes.number.isRequired,
     collaboratorMembers: PropTypes.arrayOf(collaboratorMemberShape).isRequired,
+    collaboratorsRows: PropTypes.arrayOf(PropTypes.object),
+    viewerContext: PropTypes.object,
+    canReviewPhotos: PropTypes.bool,
+    canUploadPhotos: PropTypes.bool,
+    isProjectCreator: PropTypes.bool,
     filterCounts: PropTypes.shape({
       all: PropTypes.number.isRequired,
       liked: PropTypes.number.isRequired,

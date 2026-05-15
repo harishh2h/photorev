@@ -16,6 +16,7 @@ const jwtPlugin: FastifyPluginAsync = async (fastify) => {
       await request.jwtVerify();
     } catch (_err) {
       sendFailure(reply, 401, "Unauthorized", null);
+      return;
     }
   });
 };

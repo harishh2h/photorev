@@ -6,6 +6,10 @@ import {
   PaginatedResult,
   PaginationParams,
 } from "../utils/pagination";
+import {
+  canReviewPhotos,
+  loadProjectPermissionContext,
+} from "../utils/project-permissions";
 
 export interface PhotoReviewRecord {
   readonly id: string;
@@ -55,7 +59,7 @@ export interface PhotoReviewsServiceMethods {
   ) => Promise<PaginatedResult<PhotoReviewDto>>;
   listPhotoReviews: (
     params: ListPhotoReviewsParams,
-  ) => Promise<PaginatedResult<PhotoReviewDto>>;
+  ) => Promise<PaginatedResult<PhotoReviewDto> | null>;
 }
 
 function mapReviewRecordToDto(record: PhotoReviewRecord): PhotoReviewDto {
@@ -77,8 +81,9 @@ function buildPhotoReviewsService(
 ): PhotoReviewsServiceMethods {
   const db: Knex = fastify.db;
 
-  async function ensureUserCanAccessPhoto(userId: string, photoId: string): Promise<boolean> {
-    const row = await db("photos")
+  async function getAccessiblePhotoProjectId(userId: string, photoId: string): Promise<string | null> {
+    const row = await db<{ project_id: string }>("photos")
+      .select("photos.project_id")
       .join("project_members", function joinProjectMembers() {
         this.on("project_members.project_id", "photos.project_id").andOn(
           "project_members.user_id",
@@ -87,12 +92,16 @@ function buildPhotoReviewsService(
       })
       .where("photos.id", photoId)
       .first();
-    return Boolean(row);
+    return row?.project_id ?? null;
   }
 
   async function upsertReview(params: UpsertReviewParams): Promise<PhotoReviewDto | null> {
-    const canAccess = await ensureUserCanAccessPhoto(params.userId, params.photoId);
-    if (!canAccess) {
+    const projectId = await getAccessiblePhotoProjectId(params.userId, params.photoId);
+    if (!projectId) {
+      return null;
+    }
+    const permCtx = await loadProjectPermissionContext(db, params.userId, projectId);
+    if (!permCtx || !canReviewPhotos(permCtx)) {
       return null;
     }
     const now = new Date();
@@ -172,10 +181,14 @@ function buildPhotoReviewsService(
 
   async function listPhotoReviews(
     params: ListPhotoReviewsParams,
-  ): Promise<PaginatedResult<PhotoReviewDto>> {
-    const canAccess = await ensureUserCanAccessPhoto(params.userId, params.photoId);
-    if (!canAccess) {
+  ): Promise<PaginatedResult<PhotoReviewDto> | null> {
+    const projectId = await getAccessiblePhotoProjectId(params.userId, params.photoId);
+    if (!projectId) {
       return buildPaginatedResult([], 0, params.page, params.pageSize);
+    }
+    const permCtx = await loadProjectPermissionContext(db, params.userId, projectId);
+    if (!permCtx || !canReviewPhotos(permCtx)) {
+      return null;
     }
     const baseQuery = db<PhotoReviewRecord>("photo_reviews")
       .select<PhotoReviewRecord[]>("photo_reviews.*")

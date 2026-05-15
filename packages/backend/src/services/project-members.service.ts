@@ -1,10 +1,13 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { Knex } from "knex";
+import type { CollaboratorRole } from "../utils/project-permissions";
+import { parseCollaboratorRole } from "../utils/project-permissions";
 
 export interface ProjectMemberRecord {
   readonly project_id: string;
   readonly user_id: string;
   readonly is_owner: boolean;
+  readonly role: string;
   readonly created_at: Date;
 }
 
@@ -14,6 +17,8 @@ export interface ProjectMemberDto {
   readonly name: string;
   readonly email: string;
   readonly isOwner: boolean;
+  readonly role: CollaboratorRole;
+  readonly isCreator: boolean;
   readonly joinedAt: string;
 }
 
@@ -26,7 +31,12 @@ export interface AddMemberParams {
   readonly requesterId: string;
   readonly projectId: string;
   readonly userId: string;
-  readonly isOwner?: boolean;
+  readonly role: CollaboratorRole;
+}
+
+export interface AddMemberResult {
+  readonly member: ProjectMemberDto;
+  readonly created: boolean;
 }
 
 export interface RemoveMemberParams {
@@ -35,29 +45,80 @@ export interface RemoveMemberParams {
   readonly userId: string;
 }
 
-export interface UpdateMemberParams {
+export interface UpdateMemberRoleParams {
   readonly requesterId: string;
   readonly projectId: string;
   readonly userId: string;
-  readonly isOwner: boolean;
+  readonly role: CollaboratorRole;
 }
+
+export interface LookupMemberByEmailParams {
+  readonly requesterId: string;
+  readonly projectId: string;
+  readonly normalizedEmail: string;
+}
+
+export type LookupMemberByEmailResult =
+  | { readonly allowed: false }
+  | {
+      readonly allowed: true;
+      readonly user: { readonly id: string; readonly name: string; readonly email: string } | null;
+    };
 
 export interface ProjectMembersServiceMethods {
-  listMembers: (params: ListMembersParams) => Promise<ProjectMemberDto[]>;
-  addMember: (params: AddMemberParams) => Promise<ProjectMemberDto | null>;
+  listMembers: (params: ListMembersParams) => Promise<ProjectMemberDto[] | null>;
+  addMember: (params: AddMemberParams) => Promise<AddMemberResult | null>;
   removeMember: (params: RemoveMemberParams) => Promise<boolean>;
-  updateMember: (params: UpdateMemberParams) => Promise<ProjectMemberDto | null>;
+  updateMemberRole: (params: UpdateMemberRoleParams) => Promise<ProjectMemberDto | null>;
+  lookupUserByEmail: (params: LookupMemberByEmailParams) => Promise<LookupMemberByEmailResult>;
 }
 
-function mapMemberRowToDto(row: any): ProjectMemberDto {
+type MemberJoinedRow = {
+  project_id: string;
+  user_id: string;
+  is_owner: boolean;
+  role: string;
+  created_at: Date;
+  name: string;
+  email: string;
+  created_by: string;
+};
+
+function mapMemberRowToDto(row: MemberJoinedRow): ProjectMemberDto {
   return {
     projectId: row.project_id,
     userId: row.user_id,
     name: row.name,
     email: row.email,
     isOwner: row.is_owner,
+    role: parseCollaboratorRole(row.role),
+    isCreator: row.user_id === row.created_by,
     joinedAt: row.created_at.toISOString(),
   };
+}
+
+async function fetchMemberDto(
+  db: Knex,
+  projectId: string,
+  userId: string,
+): Promise<ProjectMemberDto | null> {
+  const row = await db("project_members")
+    .join("users", "users.id", "project_members.user_id")
+    .join("projects", "projects.id", "project_members.project_id")
+    .select(
+      "project_members.project_id",
+      "project_members.user_id",
+      "project_members.is_owner",
+      "project_members.role",
+      "project_members.created_at",
+      "users.name",
+      "users.email",
+      "projects.created_by",
+    )
+    .where("project_members.project_id", projectId)
+    .andWhere("project_members.user_id", userId)
+    .first<MemberJoinedRow>();
+  return row ? mapMemberRowToDto(row) : null;
 }
 
 function buildProjectMembersService(
@@ -66,25 +127,19 @@ function buildProjectMembersService(
 ): ProjectMembersServiceMethods {
   const db: Knex = fastify.db;
 
-  async function ensureRequesterIsOwner(
+  async function ensureRequesterIsProjectCreator(
     requesterId: string,
     projectId: string,
   ): Promise<boolean> {
-    const ownerRow = await db<ProjectMemberRecord>("project_members")
-      .where({
-        project_id: projectId,
-        user_id: requesterId,
-        is_owner: true,
-      })
-      .first();
-    return Boolean(ownerRow);
+    const row = await db("projects").where({ id: projectId, created_by: requesterId }).first();
+    return Boolean(row);
   }
 
   async function ensureRequesterIsMember(
     requesterId: string,
     projectId: string,
   ): Promise<boolean> {
-    const row = await db<ProjectMemberRecord>("project_members")
+    const row = await db("project_members")
       .where({
         project_id: projectId,
         user_id: requesterId,
@@ -93,30 +148,49 @@ function buildProjectMembersService(
     return Boolean(row);
   }
 
-  async function listMembers(params: ListMembersParams): Promise<ProjectMemberDto[]> {
+  async function listMembers(params: ListMembersParams): Promise<ProjectMemberDto[] | null> {
     const isMember = await ensureRequesterIsMember(params.requesterId, params.projectId);
     if (!isMember) {
-      return [];
+      return null;
     }
     const rows = await db("project_members")
       .join("users", "users.id", "project_members.user_id")
+      .join("projects", "projects.id", "project_members.project_id")
       .select(
         "project_members.project_id",
         "project_members.user_id",
         "project_members.is_owner",
+        "project_members.role",
         "project_members.created_at",
         "users.name",
         "users.email",
+        "projects.created_by",
       )
-      .where("project_members.project_id", params.projectId);
-    return rows.map(mapMemberRowToDto);
+      .where("project_members.project_id", params.projectId)
+      .orderBy("project_members.created_at", "asc");
+    return rows.map((r: MemberJoinedRow) => mapMemberRowToDto(r));
   }
 
-  async function addMember(params: AddMemberParams): Promise<ProjectMemberDto | null> {
-    const isOwner = await ensureRequesterIsOwner(params.requesterId, params.projectId);
-    if (!isOwner) {
+  async function addMember(params: AddMemberParams): Promise<AddMemberResult | null> {
+    const isCreator = await ensureRequesterIsProjectCreator(params.requesterId, params.projectId);
+    if (!isCreator) {
       return null;
     }
+    const project = await db<{ created_by: string }>("projects")
+      .select("created_by")
+      .where("id", params.projectId)
+      .first();
+    if (!project) {
+      return null;
+    }
+    if (params.userId === project.created_by) {
+      const existingCreator = await fetchMemberDto(db, params.projectId, params.userId);
+      if (!existingCreator) {
+        return null;
+      }
+      return { member: existingCreator, created: false };
+    }
+
     const existing = await db<ProjectMemberRecord>("project_members")
       .where({
         project_id: params.projectId,
@@ -124,73 +198,40 @@ function buildProjectMembersService(
       })
       .first();
     if (existing) {
-      const joined = await db("project_members")
-        .join("users", "users.id", "project_members.user_id")
-        .select(
-          "project_members.project_id",
-          "project_members.user_id",
-          "project_members.is_owner",
-          "project_members.created_at",
-          "users.name",
-          "users.email",
-        )
-        .where("project_members.project_id", params.projectId)
-        .andWhere("project_members.user_id", params.userId)
-        .first();
-      if (!joined) {
+      const dto = await fetchMemberDto(db, params.projectId, params.userId);
+      if (!dto) {
         return null;
       }
-      return mapMemberRowToDto(joined);
+      return { member: dto, created: false };
     }
-    const inserted = await db<ProjectMemberRecord>("project_members")
-      .insert(
-        {
-          project_id: params.projectId,
-          user_id: params.userId,
-          is_owner: Boolean(params.isOwner),
-        },
-        "*",
-      )
-      .then((rows: ProjectMemberRecord[]) => rows[0]);
-    const userRow = await db("users")
-      .select("name", "email")
-      .where("id", params.userId)
-      .first();
-    return {
-      projectId: inserted.project_id,
-      userId: inserted.user_id,
-      isOwner: inserted.is_owner,
-      joinedAt: inserted.created_at.toISOString(),
-      name: userRow?.name ?? "",
-      email: userRow?.email ?? "",
-    };
+
+    await db<ProjectMemberRecord>("project_members").insert({
+      project_id: params.projectId,
+      user_id: params.userId,
+      is_owner: false,
+      role: params.role,
+    });
+    const dto = await fetchMemberDto(db, params.projectId, params.userId);
+    if (!dto) {
+      return null;
+    }
+    return { member: dto, created: true };
   }
 
   async function removeMember(params: RemoveMemberParams): Promise<boolean> {
-    const isOwner = await ensureRequesterIsOwner(params.requesterId, params.projectId);
-    if (!isOwner) {
+    const isCreator = await ensureRequesterIsProjectCreator(params.requesterId, params.projectId);
+    if (!isCreator) {
       return false;
     }
-    const memberRow = await db<ProjectMemberRecord>("project_members")
-      .where({
-        project_id: params.projectId,
-        user_id: params.userId,
-      })
+    const project = await db<{ created_by: string }>("projects")
+      .select("created_by")
+      .where("id", params.projectId)
       .first();
-    if (!memberRow) {
+    if (!project) {
       return false;
     }
-    if (memberRow.is_owner) {
-      const ownersCountResult = await db<ProjectMemberRecord>("project_members")
-        .where({
-          project_id: params.projectId,
-          is_owner: true,
-        })
-        .count<{ count: string }[]>({ count: "*" });
-      const ownersCount = Number(ownersCountResult[0]?.count ?? 0);
-      if (ownersCount <= 1) {
-        return false;
-      }
+    if (params.userId === project.created_by) {
+      return false;
     }
     const deletedCount = await db<ProjectMemberRecord>("project_members")
       .where({
@@ -201,9 +242,21 @@ function buildProjectMembersService(
     return deletedCount > 0;
   }
 
-  async function updateMember(params: UpdateMemberParams): Promise<ProjectMemberDto | null> {
-    const isOwner = await ensureRequesterIsOwner(params.requesterId, params.projectId);
-    if (!isOwner) {
+  async function updateMemberRole(
+    params: UpdateMemberRoleParams,
+  ): Promise<ProjectMemberDto | null> {
+    const isCreator = await ensureRequesterIsProjectCreator(params.requesterId, params.projectId);
+    if (!isCreator) {
+      return null;
+    }
+    const project = await db<{ created_by: string }>("projects")
+      .select("created_by")
+      .where("id", params.projectId)
+      .first();
+    if (!project) {
+      return null;
+    }
+    if (params.userId === project.created_by) {
       return null;
     }
     const targetRow = await db<ProjectMemberRecord>("project_members")
@@ -215,55 +268,42 @@ function buildProjectMembersService(
     if (!targetRow) {
       return null;
     }
-    if (targetRow.is_owner && !params.isOwner) {
-      const ownersCountResult = await db<ProjectMemberRecord>("project_members")
-        .where({
-          project_id: params.projectId,
-          is_owner: true,
-        })
-        .count<{ count: string }[]>({ count: "*" });
-      const ownersCount = Number(ownersCountResult[0]?.count ?? 0);
-      if (ownersCount <= 1) {
-        return null;
-      }
-    }
     const updatedRows = await db<ProjectMemberRecord>("project_members")
       .where({
         project_id: params.projectId,
         user_id: params.userId,
       })
-      .update(
-        {
-          is_owner: params.isOwner,
-        },
-        "*",
-      )
+      .update({ role: params.role }, "*")
       .then((rows: ProjectMemberRecord[]) => rows);
     const updated = updatedRows[0];
     if (!updated) {
       return null;
     }
-    const userRow = await db("users")
-      .select("name", "email")
-      .where("id", updated.user_id)
+    return fetchMemberDto(db, params.projectId, params.userId);
+  }
+
+  async function lookupUserByEmail(params: LookupMemberByEmailParams): Promise<LookupMemberByEmailResult> {
+    const isCreator = await ensureRequesterIsProjectCreator(params.requesterId, params.projectId);
+    if (!isCreator) {
+      return { allowed: false };
+    }
+    const row = await db<{ id: string; name: string; email: string }>("users")
+      .select("id", "name", "email")
+      .where({ email: params.normalizedEmail })
       .first();
-    return {
-      projectId: updated.project_id,
-      userId: updated.user_id,
-      isOwner: updated.is_owner,
-      joinedAt: updated.created_at.toISOString(),
-      name: userRow?.name ?? "",
-      email: userRow?.email ?? "",
-    };
+    if (!row) {
+      return { allowed: true, user: null };
+    }
+    return { allowed: true, user: { id: row.id, name: row.name, email: row.email } };
   }
 
   return {
     listMembers,
     addMember,
     removeMember,
-    updateMember,
+    updateMemberRole,
+    lookupUserByEmail,
   };
 }
 
 export default buildProjectMembersService;
-

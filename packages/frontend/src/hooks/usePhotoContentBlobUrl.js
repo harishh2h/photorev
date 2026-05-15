@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
-import { getApiBaseUrl } from '@/services/httpClient.js'
+import { getApiBaseUrl, notifyUnauthorized } from '@/services/httpClient.js'
 
 /**
  * Fetches `/photos/:photoId/content` with Bearer auth and exposes a blob URL for <img src>.
  * Revokes the object URL on change or unmount.
  * @param {string | null | undefined} photoId
  * @param {string | null | undefined} token
+ * @param {'thumbnail' | 'preview' | 'original'} [variant]
  * @returns {{ objectUrl: string | null; isLoading: boolean }}
  */
-export function usePhotoContentBlobUrl(photoId, token) {
+export function usePhotoContentBlobUrl(photoId, token, variant = 'thumbnail') {
   const [objectUrl, setObjectUrl] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const urlRef = useRef(null)
@@ -25,11 +26,16 @@ export function usePhotoContentBlobUrl(photoId, token) {
     let cancelled = false
     setIsLoading(true)
     const base = getApiBaseUrl()
-    const url = `${base}/photos/${encodeURIComponent(photoId)}/content`
+    const qs = new URLSearchParams()
+    qs.set('variant', variant)
+    const url = `${base}/photos/${encodeURIComponent(photoId)}/content?${qs.toString()}`
     fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => {
+        if (!cancelled && res.status === 401) {
+          notifyUnauthorized()
+        }
         if (!res.ok || cancelled) {
           return null
         }
@@ -60,6 +66,6 @@ export function usePhotoContentBlobUrl(photoId, token) {
         urlRef.current = null
       }
     }
-  }, [photoId, token])
+  }, [photoId, token, variant])
   return { objectUrl, isLoading }
 }

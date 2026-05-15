@@ -6,9 +6,14 @@ import { formatShortDate } from '@/utils/formatDate.js'
 const STAGGER_MS = 80
 
 /**
- * @param {{ projects?: object[]; isLoading?: boolean; authToken?: string }} props
+ * @param {{ projects?: object[]; isLoading?: boolean; authToken?: string; coverContentVariant?: 'thumbnail' | 'preview' | 'original' }} props
  */
-export default function ProjectsSection({ projects = [], isLoading = false, authToken = '' }) {
+export default function ProjectsSection({
+  projects = [],
+  isLoading = false,
+  authToken = '',
+  coverContentVariant = 'thumbnail',
+}) {
   return (
     <section className="mb-8">
       <div className="mb-6 flex items-center justify-between">
@@ -46,6 +51,14 @@ export default function ProjectsSection({ projects = [], isLoading = false, auth
               authToken={authToken}
               explicitCoverImageUrl={typeof project.metadata?.banner === 'string' ? project.metadata.banner : ''}
               animationDelay={index * STAGGER_MS}
+              coverContentVariant={coverContentVariant}
+              ownershipBadge={
+                project.viewerContext?.isCreator === true
+                  ? 'Owned'
+                  : project.viewerContext?.isCreator === false
+                    ? 'Shared'
+                    : ''
+              }
             />
           </NavLink>
         ))}
@@ -65,8 +78,12 @@ ProjectsSection.propTypes = {
         banner: PropTypes.string,
         bannerPhotoId: PropTypes.string,
       }),
+      viewerContext: PropTypes.shape({
+        isCreator: PropTypes.bool,
+      }),
     })
   ),
   isLoading: PropTypes.bool,
   authToken: PropTypes.string,
+  coverContentVariant: PropTypes.oneOf(['thumbnail', 'preview', 'original']),
 }

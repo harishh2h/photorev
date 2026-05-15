@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { normalizeEmail } from '../utils/email';
 
 interface RegisterUserParams {
     readonly email: string;
@@ -35,11 +36,12 @@ function buildAuthService(fastify: FastifyInstance, _opts: FastifyPluginOptions)
     const service: AuthServiceMethods = {
         registerUser: async (params: RegisterUserParams): Promise<AuthResult<AuthUserDto>> => {
             try {
+                const emailNormalized = normalizeEmail(params.email);
                 const hashedPassword = await bcrypt.hash(params.password, 10);
                 const inserted = await fastify.db('users')
                     .insert(
                         {
-                            email: params.email,
+                            email: emailNormalized,
                             password_hash: hashedPassword,
                             name: params.name,
                             role: 'reviewer',
@@ -59,9 +61,10 @@ function buildAuthService(fastify: FastifyInstance, _opts: FastifyPluginOptions)
         },
         loginUser: async (params: LoginParams): Promise<AuthResult<AuthUserDto>> => {
             try {
+                const emailNormalized = normalizeEmail(params.email);
                 const user = await fastify
                     .db('users')
-                    .where({ email: params.email })
+                    .where({ email: emailNormalized })
                     .first<{ id: string; email: string; name: string; password_hash: string }>();
                 if (!user) {
                     return { success: false, data: null, message: 'Invalid email or password' };

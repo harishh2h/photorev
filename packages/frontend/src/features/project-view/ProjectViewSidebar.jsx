@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import PropTypes from 'prop-types'
 
 /**
- * @param {{ likedCount: number; likedWithNames: string; reviewProgressPercent: number; collaboratorMembers: { id: string; name: string; initial: string }[]; onFinalize: () => void; onShare: () => void; onSettings: () => void }} props
+ * @param {{ likedCount: number; likedWithNames: string; reviewProgressPercent: number; collaboratorMembers: { id: string; name: string; initial: string; roleLabel?: string }[]; showSettings?: boolean; onFinalize: () => void; onShare: () => void; onSettings: () => void }} props
  * @returns {import('react').JSX.Element}
  */
 export default function ProjectViewSidebar({
@@ -10,6 +10,7 @@ export default function ProjectViewSidebar({
   likedWithNames,
   reviewProgressPercent,
   collaboratorMembers,
+  showSettings = true,
   onFinalize,
   onShare,
   onSettings,
@@ -124,7 +125,14 @@ export default function ProjectViewSidebar({
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[1.5px] border-accent-mid bg-base-100 font-base text-xs font-semibold text-base-content">
                   {member.initial}
                 </span>
-                <span className="min-w-0 font-base text-sm text-base-content">{member.name}</span>
+                <div className="min-w-0 flex flex-col gap-0.5">
+                  <span className="font-base text-sm text-base-content">{member.name}</span>
+                  {member.roleLabel ? (
+                    <span className="inline-flex w-fit rounded-full bg-[#EDF7F2] px-2 py-0.5 font-base text-[0.6875rem] font-semibold uppercase tracking-[0.04em] text-accent">
+                      {member.roleLabel}
+                    </span>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
@@ -143,7 +151,7 @@ export default function ProjectViewSidebar({
             </svg>
           </span>
         </button>
-        <div className="grid grid-cols-2 gap-3">
+        <div className={`grid gap-3 ${showSettings ? 'grid-cols-2' : 'grid-cols-1'}`}>
           <button
             type="button"
             className="btn btn-outline min-h-11 rounded-full border-[1.5px] border-base-300 bg-base-100 font-base text-xs font-semibold uppercase tracking-[0.06em] text-base-content transition-[border-color,background-color,transform] duration-150 ease-out hover:border-accent-mid hover:bg-[#F4F9F6] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
@@ -151,13 +159,15 @@ export default function ProjectViewSidebar({
           >
             Share
           </button>
-          <button
-            type="button"
-            className="btn btn-outline min-h-11 rounded-full border-[1.5px] border-base-300 bg-base-100 font-base text-xs font-semibold uppercase tracking-[0.06em] text-base-content transition-[border-color,background-color,transform] duration-150 ease-out hover:border-accent-mid hover:bg-[#F4F9F6] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
-            onClick={onSettings}
-          >
-            Settings
-          </button>
+          {showSettings ? (
+            <button
+              type="button"
+              className="btn btn-outline min-h-11 rounded-full border-[1.5px] border-base-300 bg-base-100 font-base text-xs font-semibold uppercase tracking-[0.06em] text-base-content transition-[border-color,background-color,transform] duration-150 ease-out hover:border-accent-mid hover:bg-[#F4F9F6] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
+              onClick={onSettings}
+            >
+              Settings
+            </button>
+          ) : null}
         </div>
       </div>
     </aside>
@@ -173,8 +183,10 @@ ProjectViewSidebar.propTypes = {
       id: PropTypes.string.isRequired,
       name: PropTypes.string.isRequired,
       initial: PropTypes.string.isRequired,
+      roleLabel: PropTypes.string,
     })
   ).isRequired,
+  showSettings: PropTypes.bool,
   onFinalize: PropTypes.func.isRequired,
   onShare: PropTypes.func.isRequired,
   onSettings: PropTypes.func.isRequired,

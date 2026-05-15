@@ -34,6 +34,7 @@ export async function ensureAuthenticated(
   } catch (err) {
     request.log.warn({ err }, "Unauthorized");
     sendFailure(reply, 401, "Unauthorized", null);
+    return;
   }
 }
 

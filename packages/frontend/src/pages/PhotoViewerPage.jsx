@@ -60,6 +60,7 @@ export default function PhotoViewerPage() {
       token={token}
       onRefresh={refetch}
       collaboratorMembers={collaboratorMembers}
+      canReviewPhotos={data.canReviewPhotos !== false}
     />
   )
 }

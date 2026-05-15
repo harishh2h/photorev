@@ -1,4 +1,4 @@
-import { apiFetch, getApiBaseUrl, isApiEnvelope } from './httpClient.js'
+import { apiFetch, getApiBaseUrl, isApiEnvelope, notifyUnauthorized } from './httpClient.js'
 
 /**
  * @param {string} token
@@ -17,6 +17,9 @@ export async function uploadPhoto(token, projectId, file) {
     headers: { Authorization: `Bearer ${token}` },
     body: form,
   })
+  if (res.status === 401) {
+    notifyUnauthorized()
+  }
 
   /** @type {unknown} */
   let parsed = null
@@ -77,15 +80,26 @@ export async function listPhotos(token, params = {}) {
 }
 
 /**
+ * @typedef {'thumbnail' | 'preview' | 'original'} PhotoContentVariant
+ */
+
+/**
  * @param {string} token
  * @param {string} photoId
+ * @param {{ variant?: PhotoContentVariant }} [options]
  * @returns {Promise<Blob>}
  */
-export async function fetchPhotoContentBlob(token, photoId) {
+export async function fetchPhotoContentBlob(token, photoId, options = {}) {
+  const variant = options.variant ?? 'thumbnail'
   const base = getApiBaseUrl()
-  const res = await fetch(`${base}/photos/${photoId}/content`, {
+  const qs = new URLSearchParams()
+  qs.set('variant', variant)
+  const res = await fetch(`${base}/photos/${encodeURIComponent(photoId)}/content?${qs.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
+  if (res.status === 401) {
+    notifyUnauthorized()
+  }
   if (!res.ok) {
     const contentType = res.headers.get('content-type') || ''
     if (contentType.includes('application/json')) {

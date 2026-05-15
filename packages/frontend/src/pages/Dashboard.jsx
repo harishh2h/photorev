@@ -133,7 +133,12 @@ export default function Dashboard() {
           recentActivity={[]}
           onNewProjectClick={handleOpenAddProject}
         />
-        <ProjectsSection projects={projects} isLoading={isLoading} authToken={token || ''} />
+        <ProjectsSection
+          projects={projects}
+          isLoading={isLoading}
+          authToken={token || ''}
+          coverContentVariant="preview"
+        />
       </main>
       <AddProjectModal
         isOpen={isAddProjectOpen}

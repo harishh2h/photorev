@@ -23,9 +23,16 @@ MetaRow.propTypes = {
 }
 
 /**
- * @param {{ open: boolean; photoId: string; token: string; memberNameByUserId: Map<string, string>; onClose: () => void }} props
+ * @param {{ open: boolean; photoId: string; token: string; memberNameByUserId: Map<string, string>; canReviewPhotos?: boolean; onClose: () => void }} props
  */
-export default function PhotoViewerInfoPanel({ open, photoId, token, memberNameByUserId, onClose }) {
+export default function PhotoViewerInfoPanel({
+  open,
+  photoId,
+  token,
+  memberNameByUserId,
+  canReviewPhotos = true,
+  onClose,
+}) {
   const [panelTab, setPanelTab] = useState(TAB_EXIF)
   const [photoDetail, setPhotoDetail] = useState(null)
   const [reviews, setReviews] = useState([])
@@ -37,18 +44,32 @@ export default function PhotoViewerInfoPanel({ open, photoId, token, memberNameB
   }, [open, photoId])
 
   useEffect(() => {
+    if (!canReviewPhotos && panelTab === TAB_ACTIVITY) {
+      setPanelTab(TAB_EXIF)
+    }
+  }, [canReviewPhotos, panelTab])
+
+  useEffect(() => {
     if (!open || !photoId || !token) return undefined
     let cancelled = false
     setLoadErr(null)
     setLoading(true)
     const run = async () => {
       try {
-        const [detail, revs] = await Promise.all([
-          getPhoto(token, photoId),
+        const detail = await getPhoto(token, photoId)
+        if (!canReviewPhotos) {
+          if (!cancelled) {
+            setPhotoDetail(detail)
+            setReviews([])
+          }
+          return
+        }
+        const [detailResolved, revs] = await Promise.all([
+          Promise.resolve(detail),
           listAllPhotoReviewsForPhoto(token, photoId),
         ])
         if (!cancelled) {
-          setPhotoDetail(detail)
+          setPhotoDetail(detailResolved)
           setReviews(revs)
         }
       } catch (e) {
@@ -61,7 +82,7 @@ export default function PhotoViewerInfoPanel({ open, photoId, token, memberNameB
     return () => {
       cancelled = true
     }
-  }, [open, photoId, token])
+  }, [open, photoId, token, canReviewPhotos])
 
   if (!open) return null
 
@@ -95,34 +116,36 @@ export default function PhotoViewerInfoPanel({ open, photoId, token, memberNameB
               Close
             </button>
           </div>
-          <div className="mt-4 flex gap-2" role="tablist" aria-label="Detail sections">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={panelTab === TAB_EXIF}
-              className={`rounded-pill border-[1.5px] px-4 py-2 font-base text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                panelTab === TAB_EXIF
-                  ? 'border-accent bg-accent/15 text-accent'
-                  : 'border-white/20 text-white/55 hover:text-white/80'
-              }`}
-              onClick={() => setPanelTab(TAB_EXIF)}
-            >
-              File & meta
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={panelTab === TAB_ACTIVITY}
-              className={`rounded-pill border-[1.5px] px-4 py-2 font-base text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                panelTab === TAB_ACTIVITY
-                  ? 'border-accent bg-accent/15 text-accent'
-                  : 'border-white/20 text-white/55 hover:text-white/80'
-              }`}
-              onClick={() => setPanelTab(TAB_ACTIVITY)}
-            >
-              Activity
-            </button>
-          </div>
+          {canReviewPhotos ? (
+            <div className="mt-4 flex gap-2" role="tablist" aria-label="Detail sections">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={panelTab === TAB_EXIF}
+                className={`rounded-pill border-[1.5px] px-4 py-2 font-base text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  panelTab === TAB_EXIF
+                    ? 'border-accent bg-accent/15 text-accent'
+                    : 'border-white/20 text-white/55 hover:text-white/80'
+                }`}
+                onClick={() => setPanelTab(TAB_EXIF)}
+              >
+                File & meta
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={panelTab === TAB_ACTIVITY}
+                className={`rounded-pill border-[1.5px] px-4 py-2 font-base text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  panelTab === TAB_ACTIVITY
+                    ? 'border-accent bg-accent/15 text-accent'
+                    : 'border-white/20 text-white/55 hover:text-white/80'
+                }`}
+                onClick={() => setPanelTab(TAB_ACTIVITY)}
+              >
+                Activity
+              </button>
+            </div>
+          ) : null}
         </div>
         {loading ? (
           <div className="flex flex-1 items-center justify-center p-8">
@@ -214,5 +237,6 @@ PhotoViewerInfoPanel.propTypes = {
   photoId: PropTypes.string.isRequired,
   token: PropTypes.string.isRequired,
   memberNameByUserId: PropTypes.instanceOf(Map).isRequired,
+  canReviewPhotos: PropTypes.bool,
   onClose: PropTypes.func.isRequired,
 }

@@ -27,6 +27,17 @@ const photoIdParamsSchema = {
   },
 };
 
+const getPhotoContentSchema = {
+  params: photoIdParamsSchema.params,
+  querystring: {
+    type: "object",
+    properties: {
+      variant: { type: "string", enum: ["thumbnail", "thumb", "preview", "original", "full"] },
+    },
+    additionalProperties: false,
+  },
+};
+
 const updatePhotoSchema = {
   params: photoIdParamsSchema.params,
   body: {
@@ -52,7 +63,7 @@ async function photosRoutes(
   );
   fastify.get(
     "/:photoId/content",
-    { schema: photoIdParamsSchema, preHandler: ensureAuthenticated },
+    { schema: getPhotoContentSchema, preHandler: ensureAuthenticated },
     handler.streamPhotoContent,
   );
   fastify.get(

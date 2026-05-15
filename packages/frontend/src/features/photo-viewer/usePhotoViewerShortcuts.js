@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 
 /**
- * @param {{ detailOpen: boolean; setDetailOpen: (v: boolean) => void; onExit: () => void; goPrev: () => void; goNext: () => void; onLike: () => void; onReject: () => void; enabled: boolean }} opts
+ * @param {{ detailOpen: boolean; setDetailOpen: (v: boolean) => void; onExit: () => void; goPrev: () => void; goNext: () => void; onLike: () => void; onReject: () => void; enabled: boolean; canReview?: boolean }} opts
  */
 export function usePhotoViewerShortcuts({
   detailOpen,
@@ -12,6 +12,7 @@ export function usePhotoViewerShortcuts({
   onLike,
   onReject,
   enabled,
+  canReview = true,
 }) {
   useEffect(() => {
     if (!enabled) return undefined
@@ -45,6 +46,9 @@ export function usePhotoViewerShortcuts({
         e.preventDefault()
         return
       }
+      if (!canReview) {
+        return
+      }
       if (e.key === 'ArrowUp') {
         onLike()
         e.preventDefault()
@@ -57,5 +61,5 @@ export function usePhotoViewerShortcuts({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [detailOpen, enabled, goNext, goPrev, onExit, onLike, onReject, setDetailOpen])
+  }, [canReview, detailOpen, enabled, goNext, goPrev, onExit, onLike, onReject, setDetailOpen])
 }

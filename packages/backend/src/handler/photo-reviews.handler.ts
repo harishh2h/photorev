@@ -70,6 +70,10 @@ function buildPhotoReviewsHandler(
         pageSize: query.pageSize,
       };
       const result = await service.listPhotoReviews(params);
+      if (result === null) {
+        sendFailure(reply, 403, "Not allowed to view photo activity", null);
+        return;
+      }
       sendSuccess(reply, 200, result, "OK");
     },
   };

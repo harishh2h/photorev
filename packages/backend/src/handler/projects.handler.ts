@@ -9,6 +9,7 @@ import buildProjectsService, {
 } from "../services/projects.service";
 import { sendFailure, sendSuccess } from "../utils/api-response";
 import { getAuthenticatedUserId } from "../utils/auth";
+import { RootPathValidationError } from "../utils/storage";
 
 export interface ProjectsHandlerMethods {
   listProjects: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
@@ -47,7 +48,16 @@ function buildProjectsHandler(
         rootPath: body.rootPath,
         metadata: body.metadata,
       };
-      const created = await service.createProject(params);
+      let created;
+      try {
+        created = await service.createProject(params);
+      } catch (err: unknown) {
+        if (err instanceof RootPathValidationError) {
+          sendFailure(reply, 400, err.message, null);
+          return;
+        }
+        throw err;
+      }
       sendSuccess(reply, 201, created, "Project created");
     },
     getProject: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -95,12 +105,26 @@ function buildProjectsHandler(
         rootPath: body.rootPath,
         metadata: body.metadata,
       };
-      const updated = await service.updateProject(params);
-      if (!updated) {
-        sendFailure(reply, 403, "Not allowed to update this project", null);
+      let updated;
+      try {
+        updated = await service.updateProject(params);
+      } catch (err: unknown) {
+        if (err instanceof RootPathValidationError) {
+          sendFailure(reply, 400, err.message, null);
+          return;
+        }
+        throw err;
+      }
+      if (!updated.ok) {
+        const statusCode = updated.reason === "not_found" ? 404 : 403;
+        const msg =
+          updated.reason === "not_found"
+            ? "Project not found"
+            : "Not allowed to update this project";
+        sendFailure(reply, statusCode, msg, null);
         return;
       }
-      sendSuccess(reply, 200, updated, "Project updated");
+      sendSuccess(reply, 200, updated.project, "Project updated");
     },
     archiveProject: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
@@ -109,9 +133,14 @@ function buildProjectsHandler(
         userId,
         projectId: paramsRaw.projectId,
       };
-      const ok = await service.archiveProject(params);
-      if (!ok) {
-        sendFailure(reply, 403, "Not allowed to archive this project", null);
+      const outcome = await service.archiveProject(params);
+      if (!outcome.ok) {
+        const statusCode = outcome.reason === "not_found" ? 404 : 403;
+        const msg =
+          outcome.reason === "not_found"
+            ? "Project not found"
+            : "Not allowed to archive this project";
+        sendFailure(reply, statusCode, msg, null);
         return;
       }
       sendSuccess(reply, 200, null, "Project archived");
@@ -123,9 +152,14 @@ function buildProjectsHandler(
         userId,
         projectId: paramsRaw.projectId,
       };
-      const ok = await service.deleteProject(params);
-      if (!ok) {
-        sendFailure(reply, 403, "Not allowed to delete this project", null);
+      const outcome = await service.deleteProject(params);
+      if (!outcome.ok) {
+        const statusCode = outcome.reason === "not_found" ? 404 : 403;
+        const msg =
+          outcome.reason === "not_found"
+            ? "Project not found"
+            : "Not allowed to delete this project";
+        sendFailure(reply, statusCode, msg, null);
         return;
       }
       sendSuccess(reply, 200, null, "Project deleted");

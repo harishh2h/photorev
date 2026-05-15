@@ -5,6 +5,7 @@ import { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } f
 import buildPhotosService, {
   GetPhotoParams,
   ListPhotosFilters,
+  PhotoDto,
   UpdatePhotoMetadataParams,
 } from "../services/photos.service";
 import { sendFailure, sendSuccess } from "../utils/api-response";
@@ -36,6 +37,90 @@ function getMultipartField(
   if (!raw) return undefined;
   const item = Array.isArray(raw) ? raw[0] : raw;
   return item?.value != null ? String(item.value) : undefined;
+}
+
+type PhotoContentVariant = "thumbnail" | "preview" | "original";
+
+const THUMB_ON_DISK_FILENAME = "thumb.jpeg";
+
+/** No param → `"preview"` (legacy default for unknown clients). */
+function parsePhotoContentVariantParam(raw: unknown): PhotoContentVariant | "invalid" {
+  if (raw === undefined || raw === null || String(raw).trim() === "") {
+    return "preview";
+  }
+  const s = String(raw).trim().toLowerCase();
+  if (s === "thumbnail" || s === "thumb") {
+    return "thumbnail";
+  }
+  if (s === "preview") {
+    return "preview";
+  }
+  if (s === "original" || s === "full") {
+    return "original";
+  }
+  return "invalid";
+}
+
+async function readablePathOrNull(absolutePath: string): Promise<string | null> {
+  try {
+    await fs.promises.access(absolutePath);
+    return absolutePath;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve which file on disk to stream for `variant`, with sane fallbacks when some derivatives are missing.
+ */
+async function resolvePhotoStreamAbsolutePath(
+  storageRoot: string,
+  photo: PhotoDto,
+  variant: PhotoContentVariant,
+): Promise<string | null> {
+  const photoDir = path.join(storageRoot, "photos", photo.projectId, photo.id);
+  const thumbDiskPath = path.join(photoDir, THUMB_ON_DISK_FILENAME);
+  const joinRel = (rel: string | null | undefined): string | null =>
+    rel != null && String(rel).trim() !== "" ? path.join(storageRoot, String(rel)) : null;
+
+  const thumbDb = joinRel(photo.thumbnailPath);
+  const previewDb = joinRel(photo.previewPath);
+  const originalDb = joinRel(photo.originalPath);
+
+  const previewDisk = async (): Promise<string | null> => {
+    const found = await findPreviewFileAbsolute(photoDir);
+    if (!found) {
+      return null;
+    }
+    return readablePathOrNull(found);
+  };
+
+  async function pickFirst(paths: Array<string | null | (() => Promise<string | null>)>): Promise<string | null> {
+    for (const p of paths) {
+      let candidate: string | null;
+      if (typeof p === "function") {
+        candidate = await p();
+      } else {
+        candidate = p;
+      }
+      if (!candidate) {
+        continue;
+      }
+      const ok = await readablePathOrNull(candidate);
+      if (ok) {
+        return ok;
+      }
+    }
+    return null;
+  }
+
+  if (variant === "thumbnail") {
+    return pickFirst([thumbDiskPath, thumbDb, previewDisk, previewDb, originalDb]);
+  }
+  if (variant === "preview") {
+    return pickFirst([previewDisk, previewDb, thumbDiskPath, thumbDb, originalDb]);
+  }
+  return pickFirst([originalDb, previewDisk, previewDb, thumbDiskPath, thumbDb]);
 }
 
 export interface PhotosHandlerMethods {
@@ -89,6 +174,13 @@ function buildPhotosHandler(
     streamPhotoContent: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
       const paramsRaw = request.params as { photoId: string };
+      const variantRaw = (request.query as { variant?: unknown }).variant;
+      const parsedVariant = parsePhotoContentVariantParam(variantRaw);
+      if (parsedVariant === "invalid") {
+        sendFailure(reply, 400, "Invalid variant; use thumb, preview, original, or full", null);
+        return;
+      }
+      const variant: PhotoContentVariant = parsedVariant;
       const params: GetPhotoParams = {
         userId,
         photoId: paramsRaw.photoId,
@@ -99,29 +191,8 @@ function buildPhotosHandler(
         return;
       }
       const storageRoot = getStorageRoot();
-      const photoDir = path.join(storageRoot, "photos", photo.projectId, photo.id);
-      let absolutePath: string | null = null;
-      const diskPreview = await findPreviewFileAbsolute(photoDir);
-      if (diskPreview) {
-        try {
-          await fs.promises.access(diskPreview);
-          absolutePath = diskPreview;
-        } catch {
-          absolutePath = null;
-        }
-      }
+      const absolutePath = await resolvePhotoStreamAbsolutePath(storageRoot, photo, variant);
       if (!absolutePath) {
-        const relative =
-          photo.previewPath || photo.thumbnailPath || photo.originalPath;
-        if (!relative) {
-          sendFailure(reply, 404, "No file available", null);
-          return;
-        }
-        absolutePath = path.join(storageRoot, relative);
-      }
-      try {
-        await fs.promises.access(absolutePath);
-      } catch {
         sendFailure(reply, 404, "File not on disk", null);
         return;
       }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PropTypes from 'prop-types'
-import { useAuth } from './useAuth.js'
+import { useAuth } from './AuthContext.jsx'
 import { useToast } from '@/components/Toast/index.js'
 
 const BRAND_MONOGRAM = 'PR'

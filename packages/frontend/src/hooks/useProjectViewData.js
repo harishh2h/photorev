@@ -6,6 +6,14 @@ import { listProjectMembers } from '@/services/projectMemberService.js'
 
 const PENDING_POLL_MS = 2500
 
+function collaboratorRoleLabel(member) {
+  if (member != null && member.isCreator === true) return 'Owner'
+  const role = typeof member?.role === 'string' ? member.role : ''
+  if (role === 'viewer') return 'Viewer'
+  if (role === 'contributor') return 'Contributor'
+  return 'Reviewer'
+}
+
 /**
  * @param {string | undefined} projectId
  * @param {string | null} token
@@ -124,10 +132,18 @@ export function useProjectViewData(projectId, token, currentUser) {
         const totalPhotos = photos.length
         const reviewProgressPercent =
           totalPhotos > 0 ? Math.min(100, Math.round((votedPhotoIds.size / totalPhotos) * 100)) : 0
+        const vc = project.viewerContext
+        const canReviewPhotos =
+          vc == null ? true : Boolean(vc.isCreator === true || vc.role !== 'viewer')
+        const canUploadPhotos =
+          vc == null ? true : Boolean(vc.isCreator === true || vc.role === 'contributor')
+        const isProjectCreator = Boolean(vc?.isCreator)
+
         let collaboratorMembers = members.map((m) => ({
           id: m.userId,
           name: m.name || m.email || 'Member',
           initial: (m.name || m.email || '?').charAt(0).toUpperCase(),
+          roleLabel: collaboratorRoleLabel(m),
         }))
         if (collaboratorMembers.length === 0 && currentUser != null) {
           const label = currentUser.name || currentUser.email || 'You'
@@ -136,6 +152,7 @@ export function useProjectViewData(projectId, token, currentUser) {
               id: currentUser.id != null ? String(currentUser.id) : 'self',
               name: label,
               initial: label.charAt(0).toUpperCase(),
+              roleLabel: isProjectCreator ? 'Owner' : '',
             },
           ]
         }
@@ -152,6 +169,11 @@ export function useProjectViewData(projectId, token, currentUser) {
           likedWithNames,
           reviewProgressPercent,
           collaboratorMembers,
+          collaboratorsRows: members,
+          viewerContext: vc ?? null,
+          canReviewPhotos,
+          canUploadPhotos,
+          isProjectCreator,
           filterCounts: {
             all: totalPhotos,
             liked: likedCount,

@@ -8,7 +8,7 @@ const fallbackClass =
 const pendingShellClass = `${fallbackClass} flex items-center justify-center`
 
 /**
- * @param {{ photoId: string; token: string; alt: string; status?: 'pending' | 'ready' | 'failed'; className?: string }} props
+ * @param {{ photoId: string; token: string; alt: string; status?: 'pending' | 'ready' | 'failed'; className?: string; contentVariant?: 'thumbnail' | 'preview' | 'original' }} props
  * @returns {import('react').JSX.Element}
  */
 export default function ProjectPhotoImage({
@@ -17,6 +17,7 @@ export default function ProjectPhotoImage({
   alt,
   status = 'ready',
   className = '',
+  contentVariant = 'thumbnail',
 }) {
   const [objectUrl, setObjectUrl] = useState(null)
   const [hasError, setHasError] = useState(false)
@@ -32,7 +33,7 @@ export default function ProjectPhotoImage({
     let alive = true
     setHasError(false)
     setObjectUrl(null)
-    fetchPhotoContentBlob(token, photoId)
+    fetchPhotoContentBlob(token, photoId, { variant: contentVariant })
       .then((blob) => {
         url = URL.createObjectURL(blob)
         if (alive) setObjectUrl(url)
@@ -44,7 +45,7 @@ export default function ProjectPhotoImage({
       alive = false
       if (url) URL.revokeObjectURL(url)
     }
-  }, [photoId, token, shouldFetch])
+  }, [photoId, token, shouldFetch, contentVariant])
 
   if (status === 'pending') {
     return (
@@ -80,4 +81,5 @@ ProjectPhotoImage.propTypes = {
   alt: PropTypes.string.isRequired,
   status: PropTypes.oneOf(['pending', 'ready', 'failed']),
   className: PropTypes.string,
+  contentVariant: PropTypes.oneOf(['thumbnail', 'preview', 'original']),
 }

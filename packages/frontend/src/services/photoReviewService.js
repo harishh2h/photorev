@@ -30,11 +30,12 @@ export async function listAllPhotoReviewsForPhoto(token, photoId) {
     const search = new URLSearchParams()
     search.set('page', String(page))
     search.set('pageSize', '100')
-    const { ok, message, data } = await apiFetch(
+    const { ok, status, message, data } = await apiFetch(
       `/photo-reviews/photos/${photoId}/reviews?${search.toString()}`,
       { token }
     )
     if (!ok) {
+      if (status === 403) return []
       throw new Error(message)
     }
     const chunk = /** @type {{ items?: object[]; pageSize?: number }} */ (data)

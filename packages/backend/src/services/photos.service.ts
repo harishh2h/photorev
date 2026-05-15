@@ -6,7 +6,13 @@ import {
   PaginatedResult,
   PaginationParams,
 } from "../utils/pagination";
+import { mediaStoragePathForApi } from "../utils/storage";
 import { jobRunner } from "../workers";
+import {
+  canEditPhotoMetadata,
+  canUploadPhotos,
+  loadProjectPermissionContext,
+} from "../utils/project-permissions";
 
 export interface PhotoInsert {
   id?: string;
@@ -94,8 +100,9 @@ function mapPhotoRecordToDto(record: PhotoRecord): PhotoDto {
   return {
     id: record.id,
     projectId: record.project_id,
-    originalPath: record.original_path,
-    thumbnailPath: record.thumbnail_path,
+    originalPath: mediaStoragePathForApi(record.original_path) ?? "",
+    thumbnailPath:
+      record.thumbnail_path !== null ? mediaStoragePathForApi(record.thumbnail_path) : null,
     hash: record.hash,
     metadata: record.metadata,
     createdAt: record.created_at.toISOString(),
@@ -105,7 +112,8 @@ function mapPhotoRecordToDto(record: PhotoRecord): PhotoDto {
     status: record.status,
     width: record.width,
     height: record.height,
-    previewPath: record.preview_path,
+    previewPath:
+      record.preview_path !== null ? mediaStoragePathForApi(record.preview_path) : null,
   };
 }
 
@@ -186,12 +194,18 @@ function buildPhotosService(
     if (!memberRow) {
       return null;
     }
+    const permCtx = await loadProjectPermissionContext(db, params.userId, existing.project_id);
+    if (!permCtx || !canEditPhotoMetadata(permCtx)) {
+      return null;
+    }
     const patch: Partial<PhotoRecord> = {};
     if (typeof params.metadata !== "undefined") {
       patch.metadata = params.metadata as any;
     }
     if (typeof params.thumbnailPath !== "undefined") {
-      patch.thumbnail_path = params.thumbnailPath;
+      const t = params.thumbnailPath;
+      patch.thumbnail_path =
+        typeof t === "string" && t.trim().length > 0 ? mediaStoragePathForApi(t) ?? null : null;
     }
     if (Object.keys(patch).length === 0) {
       return mapPhotoRecordToDto(existing);
@@ -210,11 +224,8 @@ function buildPhotosService(
   async function canUploadToProject(
     params: CanUploadToProjectParams,
   ): Promise<boolean> {
-    const row = await db("project_members")
-      .where("project_members.user_id", params.userId)
-      .where("project_members.project_id", params.projectId)
-      .first();
-    return Boolean(row);
+    const ctx = await loadProjectPermissionContext(db, params.userId, params.projectId);
+    return Boolean(ctx && canUploadPhotos(ctx));
   }
 
   async function insertPhoto(photo: PhotoInsert): Promise<PhotoDto | null> {

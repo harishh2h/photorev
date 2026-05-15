@@ -5,6 +5,10 @@ import { getStorageRoot } from "../utils/storage";
 import type { ProcessingJobWorkerSuccess } from "./tasks/runProcessingJob";
 import { WorkerPool } from "./workerPool";
 
+function storageRelativeDbPath(outputAbsolute: string): string {
+  return path.relative(path.resolve(getStorageRoot()), outputAbsolute).split(path.sep).join("/");
+}
+
 type RunnerState = "idle" | "running" | "draining" | "stopped";
 
 export class JobRunner {
@@ -114,13 +118,13 @@ export class JobRunner {
       await db("photos")
         .where("id", job.photo_id)
         .update({
-          thumbnail_path: path.relative(getStorageRoot(), payload.outputPath),
+          thumbnail_path: storageRelativeDbPath(payload.outputPath),
         });
     } else if (payload.ok === true && job.job_type === "preview" && typeof payload.outputPath === "string") {
       await db("photos")
         .where("id", job.photo_id)
         .update({
-          preview_path: path.relative(getStorageRoot(), payload.outputPath),
+          preview_path: storageRelativeDbPath(payload.outputPath),
         });
     }
     await this.markDone(job.id);

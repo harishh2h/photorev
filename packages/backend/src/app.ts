@@ -1,5 +1,6 @@
 import Fastify, { FastifyError, FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { BuildOptions } from "./utils/types";
@@ -16,6 +17,7 @@ const CLIENT_ERROR_MESSAGES: Record<number, string> = {
   404: "Not found",
   409: "Conflict",
   422: "Invalid input",
+  429: "Too many requests",
 };
 
 function buildApp(opts: BuildOptions = {}): FastifyInstance {
@@ -54,6 +56,10 @@ function buildApp(opts: BuildOptions = {}): FastifyInstance {
     limits: {
       fileSize: 1024 * 1024 * 30, // 30MB
     },
+  });
+
+  app.register(rateLimit, {
+    global: false,
   });
 
   app.register(swagger, {
