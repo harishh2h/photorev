@@ -21,10 +21,13 @@ CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     status TEXT NOT NULL DEFAULT 'active'
-        CHECK (status IN ('active', 'processing', 'completed', 'deleted')),
+        CHECK (status IN ('active', 'processing', 'completed', 'finalized', 'deleted')),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     root_path TEXT NOT NULL, -- root path of the project
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    finalized_at TIMESTAMPTZ,
+    finalized_by UUID,
+    finalize_action TEXT,
     created_by UUID NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 
@@ -69,13 +72,18 @@ CREATE TABLE photos (
     mime_type TEXT,
     file_size BIGINT,
     status TEXT NOT NULL DEFAULT 'pending'
-        CHECK (status IN ('pending', 'ready', 'failed')),
+        CHECK (status IN ('pending', 'ready', 'failed', 'trashed', 'deleted')),
     width INTEGER,
     height INTEGER,
     preview_path TEXT,
     thumbnail_path TEXT,
     hash TEXT,
     metadata JSONB,
+    final_decision SMALLINT,
+    final_decided_by UUID,
+    final_decided_at TIMESTAMPTZ,
+    conflict_state TEXT,
+    trashed_at TIMESTAMPTZ,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_photo_project
@@ -103,7 +111,7 @@ CREATE TABLE processing_jobs (
         ON DELETE CASCADE,
 
     CONSTRAINT processing_jobs_job_type_check
-        CHECK (job_type IN ('thumbnail', 'preview', 'metadata')),
+        CHECK (job_type IN ('thumbnail', 'preview', 'metadata', 'hard_delete_photo', 'purge_trashed')),
 
     CONSTRAINT processing_jobs_status_check
         CHECK (status IN ('queued', 'processing', 'done', 'failed'))
@@ -153,3 +161,44 @@ CREATE INDEX idx_reviews_photo
 
 CREATE INDEX idx_reviews_photo_decision
     ON photo_reviews(photo_id, decision);
+
+CREATE INDEX idx_photos_project_final
+    ON photos(project_id, final_decision)
+    WHERE status = 'ready';
+
+CREATE INDEX idx_photos_trashed_due
+    ON photos(trashed_at)
+    WHERE status = 'trashed';
+
+-- =========================
+-- SHARE LINKS
+-- =========================
+CREATE TABLE share_links (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    password_hash TEXT,
+    description TEXT,
+    show_metadata BOOLEAN NOT NULL DEFAULT FALSE,
+    allow_download BOOLEAN NOT NULL DEFAULT TRUE,
+    expires_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ,
+    created_by UUID NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    view_count BIGINT NOT NULL DEFAULT 0,
+    last_viewed_at TIMESTAMPTZ,
+
+    CONSTRAINT fk_share_links_project
+        FOREIGN KEY (project_id)
+        REFERENCES projects(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_share_links_user
+        FOREIGN KEY (created_by)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX share_links_one_active_per_project
+    ON share_links(project_id)
+    WHERE revoked_at IS NULL;

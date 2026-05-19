@@ -8,7 +8,11 @@ import ProjectGridOverlays from './ProjectGridOverlays.jsx'
 import ProjectUploadStatusFloat from './ProjectUploadStatusFloat.jsx'
 import { CollaboratorsManageModal } from '@/features/project-collaborators/index.js'
 import { ProjectSettingsModal } from '@/features/project-settings/index.js'
+import { FinalizeReviewModal } from '@/features/finalize/index.js'
+import { ShareLinkModal } from '@/features/share/index.js'
 import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
+import { finalizeProject as finalizeProjectApi } from '@/services/projectService.js'
+import { useToast } from '@/components/Toast/index.js'
 
 /**
  * @param {{ data: object; token: string; projectId: string; onRefresh: () => void }} props
@@ -16,9 +20,12 @@ import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
  */
 export default function ProjectViewScreen({ data, token, projectId, onRefresh }) {
   const navigate = useNavigate()
+  const { show: showToast } = useToast()
   const [activeFilter, setActiveFilter] = useState('all')
   const [collaboratorsOpen, setCollaboratorsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [finalizeOpen, setFinalizeOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const {
     fileInputRef,
     uploadConcurrency,
@@ -36,13 +43,36 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
   } = useProjectPhotoUpload({ token, projectId, onAfterBatch: onRefresh })
 
   const filteredPhotos = useMemo(() => {
+    if (activeFilter === 'trashed') return data.trashedPhotos ?? []
     if (activeFilter === 'all') return data.photos
     if (activeFilter === 'liked') return data.photos.filter((p) => p.isLiked)
     if (activeFilter === 'rejected') return data.photos.filter((p) => p.isRejected)
-    return data.photos.filter((p) => p.hasConflict)
-  }, [activeFilter, data.photos])
-  const handleFinalize = useCallback(() => {}, [])
-  const handleShare = useCallback(() => {}, [])
+    if (activeFilter === 'conflicts') return data.photos.filter((p) => p.hasConflict)
+    return data.photos
+  }, [activeFilter, data.photos, data.trashedPhotos])
+  const handleFinalize = useCallback(() => {
+    if (data.isProjectCreator) {
+      setFinalizeOpen(true)
+    }
+  }, [data.isProjectCreator])
+  const handleShare = useCallback(() => {
+    setShareOpen(true)
+  }, [])
+  const handleFinalizeConfirm = useCallback(
+    async (action) => {
+      try {
+        await finalizeProjectApi(token, projectId, action)
+        setFinalizeOpen(false)
+        showToast('Project finalized', 'success')
+        onRefresh()
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Could not finalize'
+        showToast(msg, 'error')
+        throw err
+      }
+    },
+    [token, projectId, onRefresh, showToast]
+  )
   const handleSettings = useCallback(() => {
     if (data.isProjectCreator) {
       setSettingsOpen(true)
@@ -78,6 +108,7 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
         filterCounts={data.filterCounts}
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
+        isFinalized={Boolean(data.isFinalized)}
       />
       {showUploadPanel ? (
         <ProjectUploadStatusFloat
@@ -116,6 +147,10 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
           reviewProgressPercent={data.reviewProgressPercent}
           collaboratorMembers={data.collaboratorMembers}
           showSettings={Boolean(data.isProjectCreator)}
+          isFinalized={Boolean(data.isFinalized)}
+          canShare={Boolean(data.isProjectCreator)}
+          token={token}
+          projectId={projectId}
           onFinalize={handleFinalize}
           onShare={handleShare}
           onSettings={handleSettings}
@@ -147,6 +182,21 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
           onRefresh()
         }}
       />
+      <FinalizeReviewModal
+        isOpen={finalizeOpen}
+        onClose={() => setFinalizeOpen(false)}
+        onConfirm={handleFinalizeConfirm}
+        projectName={data.projectTitle}
+        pendingConflicts={data.filterCounts.conflicts ?? 0}
+        isFinalized={Boolean(data.isFinalized)}
+      />
+      <ShareLinkModal
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        token={token}
+        projectId={projectId}
+        projectName={data.projectTitle}
+      />
     </div>
   )
 }
@@ -154,10 +204,15 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
 const photoShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
   alt: PropTypes.string.isRequired,
-  status: PropTypes.oneOf(['pending', 'ready', 'failed']),
+  status: PropTypes.oneOf(['pending', 'ready', 'failed', 'trashed']),
   isLiked: PropTypes.bool.isRequired,
   isRejected: PropTypes.bool.isRequired,
   hasConflict: PropTypes.bool.isRequired,
+  conflictState: PropTypes.string,
+  finalDecision: PropTypes.number,
+  finalDecidedBy: PropTypes.string,
+  finalDecidedAt: PropTypes.string,
+  isTrashed: PropTypes.bool,
   selectionLabel: PropTypes.string,
   renamedTo: PropTypes.string,
 })
@@ -190,7 +245,12 @@ ProjectViewScreen.propTypes = {
       liked: PropTypes.number.isRequired,
       rejected: PropTypes.number.isRequired,
       conflicts: PropTypes.number.isRequired,
+      trashed: PropTypes.number,
     }).isRequired,
     photos: PropTypes.arrayOf(photoShape).isRequired,
+    trashedPhotos: PropTypes.arrayOf(photoShape),
+    isFinalized: PropTypes.bool,
+    finalizedAt: PropTypes.string,
+    projectStatus: PropTypes.string,
   }).isRequired,
 }

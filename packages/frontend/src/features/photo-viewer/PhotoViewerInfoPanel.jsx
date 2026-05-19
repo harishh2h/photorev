@@ -88,6 +88,12 @@ export default function PhotoViewerInfoPanel({
 
   const meta = photoDetail?.metadata && typeof photoDetail.metadata === 'object' ? photoDetail.metadata : {}
   const format = meta.format ?? null
+  const finalDecision = typeof photoDetail?.finalDecision === 'number' ? photoDetail.finalDecision : null
+  const conflictState = typeof photoDetail?.conflictState === 'string' ? photoDetail.conflictState : null
+  const decidedByName =
+    photoDetail?.finalDecidedBy != null && memberNameByUserId.has(photoDetail.finalDecidedBy)
+      ? memberNameByUserId.get(photoDetail.finalDecidedBy)
+      : null
 
   return (
     <>
@@ -155,6 +161,14 @@ export default function PhotoViewerInfoPanel({
           <p className="m-0 p-5 font-base text-sm text-error">{loadErr}</p>
         ) : panelTab === TAB_EXIF ? (
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-2">
+            {finalDecision !== null || conflictState ? (
+              <FinalDecisionBanner
+                finalDecision={finalDecision}
+                conflictState={conflictState}
+                decidedByName={decidedByName}
+                decidedAt={photoDetail?.finalDecidedAt}
+              />
+            ) : null}
             <MetaRow label="File name" value={photoDetail?.originalName} />
             <MetaRow label="Dimensions" value={formatDimensions(photoDetail?.width, photoDetail?.height)} />
             <MetaRow label="File size" value={formatBytes(photoDetail?.fileSize)} />
@@ -194,6 +208,48 @@ export default function PhotoViewerInfoPanel({
       </aside>
     </>
   )
+}
+
+function FinalDecisionBanner({ finalDecision, conflictState, decidedByName, decidedAt }) {
+  const isPending = conflictState === 'pending_owner'
+  const isResolvedOwner = conflictState === 'resolved_owner'
+  const isMajority = conflictState === 'resolved_majority'
+  const liked = finalDecision === 1
+  const rejected = finalDecision === -1
+  let toneClass = 'border-white/15 bg-white/[0.06] text-white/80'
+  let label = 'Awaiting decision'
+  if (isPending) {
+    toneClass = 'border-error/45 bg-error/15 text-error'
+    label = 'Owner decision needed'
+  } else if (liked) {
+    toneClass = 'border-accent/45 bg-accent/15 text-accent'
+    label = isResolvedOwner ? 'Owner chose: Liked' : isMajority ? 'Majority chose: Liked' : 'Liked'
+  } else if (rejected) {
+    toneClass = 'border-error/45 bg-error/15 text-error'
+    label = isResolvedOwner ? 'Owner chose: Rejected' : isMajority ? 'Majority chose: Rejected' : 'Rejected'
+  }
+  const subtitleParts = []
+  if (decidedByName) subtitleParts.push(`by ${decidedByName}`)
+  if (decidedAt) {
+    try {
+      subtitleParts.push(new Date(decidedAt).toLocaleString())
+    } catch {
+      // ignore
+    }
+  }
+  return (
+    <div className={`mb-4 rounded-md border-[1.5px] px-3 py-2 font-base text-xs ${toneClass}`}>
+      <span className="block text-sm font-semibold">{label}</span>
+      {subtitleParts.length > 0 ? <span className="mt-0.5 block text-white/60">{subtitleParts.join(' · ')}</span> : null}
+    </div>
+  )
+}
+
+FinalDecisionBanner.propTypes = {
+  finalDecision: PropTypes.number,
+  conflictState: PropTypes.string,
+  decidedByName: PropTypes.string,
+  decidedAt: PropTypes.string,
 }
 
 function formatDimensions(w, h) {

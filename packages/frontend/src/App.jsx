@@ -8,12 +8,14 @@ import UploadsPage from '@/pages/UploadsPage.jsx'
 import ProfilePage from '@/pages/ProfilePage.jsx'
 import ProjectViewPage from '@/pages/ProjectViewPage.jsx'
 import PhotoViewerPage from '@/pages/PhotoViewerPage.jsx'
+import PublicSharePage from '@/pages/PublicSharePage.jsx'
 
 export default function App() {
   return (
     <ToastProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/s/:token" element={<PublicSharePage />} />
         <Route
           path="/"
           element={

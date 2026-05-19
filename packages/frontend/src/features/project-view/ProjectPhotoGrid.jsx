@@ -57,6 +57,27 @@ export default function ProjectPhotoGrid({ photos, token, onOpenPhoto }) {
                     </svg>
                   </span>
                 ) : null}
+                {photo.conflictState === 'pending_owner' ? (
+                  <span
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-error/95 text-primary-content shadow-card"
+                    aria-label="Conflict — owner decision needed"
+                    title="Owner decision needed"
+                  >
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                      <path d="M12 4v8M12 16h.01" />
+                    </svg>
+                  </span>
+                ) : photo.conflictState === 'resolved_owner' ? (
+                  <span
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-primary-content shadow-card"
+                    aria-label="Resolved by owner"
+                    title="Resolved by owner"
+                  >
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.8" aria-hidden>
+                      <path d="M5 12l5 5L20 7" />
+                    </svg>
+                  </span>
+                ) : null}
               </div>
             </button>
             {photo.selectionLabel ? (
@@ -83,9 +104,10 @@ ProjectPhotoGrid.propTypes = {
     PropTypes.shape({
       id: PropTypes.string.isRequired,
       alt: PropTypes.string.isRequired,
-      status: PropTypes.oneOf(['pending', 'ready', 'failed']),
+      status: PropTypes.oneOf(['pending', 'ready', 'failed', 'trashed']),
       isLiked: PropTypes.bool.isRequired,
       isRejected: PropTypes.bool.isRequired,
+      conflictState: PropTypes.string,
       selectionLabel: PropTypes.string,
     })
   ).isRequired,

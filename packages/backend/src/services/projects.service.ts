@@ -28,7 +28,12 @@ function isPersistableBannerUrl(value: unknown): boolean {
   }
 }
 
-export type ProjectStatus = "active" | "processing" | "completed" | "deleted";
+export type ProjectStatus =
+  | "active"
+  | "processing"
+  | "completed"
+  | "finalized"
+  | "deleted";
 
 /**
  * JSON stored in `projects.metadata`.
@@ -48,6 +53,9 @@ export interface ProjectRecord {
   metadata: ProjectMetadata;
   readonly created_by: string;
   readonly created_at: Date;
+  finalized_at: Date | null;
+  finalized_by: string | null;
+  finalize_action: string | null;
 }
 
 export interface ProjectViewerContextDto {
@@ -69,6 +77,9 @@ export interface ProjectDto {
   readonly metadata: ProjectMetadata;
   readonly createdBy: string;
   readonly createdAt: string;
+  readonly finalizedAt: string | null;
+  readonly finalizedBy: string | null;
+  readonly finalizeAction: string | null;
   readonly viewerContext: ProjectViewerContextDto;
 }
 
@@ -216,6 +227,9 @@ function mapProjectRecordToDto(
     metadata,
     createdBy: record.created_by,
     createdAt: record.created_at.toISOString(),
+    finalizedAt: record.finalized_at ? record.finalized_at.toISOString() : null,
+    finalizedBy: record.finalized_by,
+    finalizeAction: record.finalize_action,
     viewerContext,
   };
 }

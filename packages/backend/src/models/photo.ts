@@ -1,6 +1,12 @@
 export const PHOTOS_TABLE = 'photos'
 
-export type PhotoStatus = 'pending' | 'ready' | 'failed'
+export type PhotoStatus = 'pending' | 'ready' | 'failed' | 'trashed' | 'deleted'
+
+export type ConflictState =
+  | 'none'
+  | 'pending_owner'
+  | 'resolved_owner'
+  | 'resolved_majority'
 
 export interface Photo {
   id: string
@@ -17,6 +23,11 @@ export interface Photo {
   width: number | null
   height: number | null
   preview_path: string | null
+  final_decision: number | null
+  final_decided_by: string | null
+  final_decided_at: Date | null
+  conflict_state: ConflictState | null
+  trashed_at: Date | null
 }
 
 export interface PhotoInsert {

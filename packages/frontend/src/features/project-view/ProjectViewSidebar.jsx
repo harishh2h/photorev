@@ -1,8 +1,19 @@
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import PropTypes from 'prop-types'
+import { getActiveShareLink } from '@/services/shareLinkService.js'
+
+function formatExpiry(expiresAt) {
+  if (!expiresAt) return 'Never expires'
+  const ms = new Date(expiresAt).getTime() - Date.now()
+  if (ms <= 0) return 'Expired'
+  const days = Math.round(ms / (24 * 60 * 60 * 1000))
+  if (days >= 1) return `Expires in ${days}d`
+  const hrs = Math.round(ms / (60 * 60 * 1000))
+  return `Expires in ${hrs}h`
+}
 
 /**
- * @param {{ likedCount: number; likedWithNames: string; reviewProgressPercent: number; collaboratorMembers: { id: string; name: string; initial: string; roleLabel?: string }[]; showSettings?: boolean; onFinalize: () => void; onShare: () => void; onSettings: () => void; onManageCollaborators?: () => void }} props
+ * @param {{ likedCount: number; likedWithNames: string; reviewProgressPercent: number; collaboratorMembers: { id: string; name: string; initial: string; roleLabel?: string }[]; showSettings?: boolean; isFinalized?: boolean; canShare?: boolean; token: string; projectId: string; onFinalize: () => void; onShare: () => void; onSettings: () => void; onManageCollaborators?: () => void }} props
  * @returns {import('react').JSX.Element}
  */
 export default function ProjectViewSidebar({
@@ -11,11 +22,35 @@ export default function ProjectViewSidebar({
   reviewProgressPercent,
   collaboratorMembers,
   showSettings = true,
+  isFinalized = false,
+  canShare = false,
+  token,
+  projectId,
   onFinalize,
   onShare,
   onSettings,
   onManageCollaborators,
 }) {
+  const [activeLink, setActiveLink] = useState(null)
+  useEffect(() => {
+    if (!canShare || !isFinalized) {
+      setActiveLink(null)
+      return undefined
+    }
+    let cancelled = false
+    const run = async () => {
+      try {
+        const link = await getActiveShareLink(token, projectId)
+        if (!cancelled) setActiveLink(link)
+      } catch {
+        if (!cancelled) setActiveLink(null)
+      }
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [canShare, isFinalized, token, projectId])
   const [isMembersOpen, setIsMembersOpen] = useState(false)
   const collaboratorCount = collaboratorMembers.length
   const previewCollaborators = collaboratorMembers.slice(0, 4)
@@ -152,12 +187,40 @@ export default function ProjectViewSidebar({
         ) : null}
       </div>
       <div className="mt-auto flex flex-col gap-3">
+        {canShare && isFinalized && activeLink ? (
+          <div className="relative rounded-md border-[1.5px] border-accent/40 bg-[#EDF7F2] px-4 py-3 shadow-floating">
+            <div className="flex items-center gap-2">
+              <span className="flex text-accent" aria-hidden>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1" />
+                  <path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" />
+                </svg>
+              </span>
+              <span className="font-base text-xs font-semibold uppercase tracking-[0.06em] text-accent">
+                Share link live
+              </span>
+            </div>
+            <p className="m-0 mt-1 font-base text-xs leading-snug text-muted">
+              {formatExpiry(activeLink.expiresAt)} · {activeLink.viewCount} view{activeLink.viewCount === 1 ? '' : 's'}
+            </p>
+            <button
+              type="button"
+              onClick={onShare}
+              className="mt-2 inline-flex items-center gap-1 font-base text-xs font-semibold text-base-content hover:text-accent focus-visible:outline-none focus-visible:shadow-focus"
+            >
+              Manage
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </button>
+          </div>
+        ) : null}
         <button
           type="button"
-          className="group btn btn-primary flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 px-6 font-base text-sm font-semibold uppercase tracking-[0.04em] text-primary-content transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
+          className="group btn btn-primary flex min-h-12 w-full items-center justify-center gap-2 rounded-full border-0 px-6 font-base text-sm font-semibold uppercase tracking-[0.04em] text-primary-content transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-55"
           onClick={onFinalize}
         >
-          Finalize review
+          {isFinalized ? 'Re-finalize review' : 'Finalize review'}
           <span className="flex transition-transform duration-150 ease-out group-hover:-translate-y-0.5" aria-hidden>
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 19V5M5 12l7-7 7 7" />
@@ -167,7 +230,9 @@ export default function ProjectViewSidebar({
         <div className={`grid gap-3 ${showSettings ? 'grid-cols-2' : 'grid-cols-1'}`}>
           <button
             type="button"
-            className="btn btn-outline min-h-11 rounded-full border-[1.5px] border-base-300 bg-base-100 font-base text-xs font-semibold uppercase tracking-[0.06em] text-base-content transition-[border-color,background-color,transform] duration-150 ease-out hover:border-accent-mid hover:bg-[#F4F9F6] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
+            disabled={canShare && !isFinalized}
+            title={canShare && !isFinalized ? 'Finalize the project before sharing' : undefined}
+            className="btn btn-outline min-h-11 rounded-full border-[1.5px] border-base-300 bg-base-100 font-base text-xs font-semibold uppercase tracking-[0.06em] text-base-content transition-[border-color,background-color,transform] duration-150 ease-out hover:border-accent-mid hover:bg-[#F4F9F6] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-55"
             onClick={onShare}
           >
             Share
@@ -200,6 +265,10 @@ ProjectViewSidebar.propTypes = {
     })
   ).isRequired,
   showSettings: PropTypes.bool,
+  isFinalized: PropTypes.bool,
+  canShare: PropTypes.bool,
+  token: PropTypes.string.isRequired,
+  projectId: PropTypes.string.isRequired,
   onFinalize: PropTypes.func.isRequired,
   onShare: PropTypes.func.isRequired,
   onSettings: PropTypes.func.isRequired,

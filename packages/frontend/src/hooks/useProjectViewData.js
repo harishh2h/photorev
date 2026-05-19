@@ -112,24 +112,40 @@ export function useProjectViewData(projectId, token, currentUser) {
           const dec = decisionByPhoto.get(p.id)
           const renamedTo = reviewExtrasByPhoto.get(p.id)?.renamedTo ?? null
           const rawStatus = typeof p.status === 'string' ? p.status : 'pending'
-          const status = rawStatus === 'ready' || rawStatus === 'failed' ? rawStatus : 'pending'
+          const status =
+            rawStatus === 'ready' ||
+            rawStatus === 'failed' ||
+            rawStatus === 'trashed'
+              ? rawStatus
+              : 'pending'
+          const conflictState = typeof p.conflictState === 'string' ? p.conflictState : null
+          const finalDecision =
+            typeof p.finalDecision === 'number' ? p.finalDecision : null
           return {
             id: p.id,
             alt: typeof p.originalName === 'string' ? p.originalName : 'Photo',
             status,
             isLiked: dec === 1,
             isRejected: dec === -1,
-            hasConflict: false,
+            hasConflict: conflictState === 'pending_owner',
+            conflictState,
+            finalDecision,
+            finalDecidedBy: typeof p.finalDecidedBy === 'string' ? p.finalDecidedBy : null,
+            finalDecidedAt: typeof p.finalDecidedAt === 'string' ? p.finalDecidedAt : null,
+            isTrashed: status === 'trashed',
             selectionLabel: renamedTo ? renamedTo : null,
             renamedTo,
           }
         })
-        const likedCount = photos.filter((p) => p.isLiked).length
-        const rejectedCount = photos.filter((p) => p.isRejected).length
+        const visiblePhotos = photos.filter((p) => p.status !== 'trashed')
+        const trashedPhotos = photos.filter((p) => p.status === 'trashed')
+        const likedCount = visiblePhotos.filter((p) => p.isLiked).length
+        const rejectedCount = visiblePhotos.filter((p) => p.isRejected).length
+        const conflictCount = visiblePhotos.filter((p) => p.hasConflict).length
         const votedPhotoIds = new Set(
           reviewItems.filter((r) => r.decision !== null && r.decision !== undefined).map((r) => r.photoId)
         )
-        const totalPhotos = photos.length
+        const totalPhotos = visiblePhotos.length
         const reviewProgressPercent =
           totalPhotos > 0 ? Math.min(100, Math.round((votedPhotoIds.size / totalPhotos) * 100)) : 0
         const vc = project.viewerContext
@@ -164,6 +180,9 @@ export function useProjectViewData(projectId, token, currentUser) {
         const others = Math.max(0, collaboratorMembers.length - 1)
         const viewData = {
           projectTitle: typeof project.name === 'string' ? project.name : 'Project',
+          projectStatus: typeof project.status === 'string' ? project.status : 'active',
+          isFinalized: project.status === 'finalized',
+          finalizedAt: typeof project.finalizedAt === 'string' ? project.finalizedAt : null,
           collaboratingLabel: others > 0 ? `REVIEWING WITH ${others} OTHER${others === 1 ? '' : 'S'}` : 'SOLO REVIEW',
           likedCount,
           likedWithNames,
@@ -178,9 +197,11 @@ export function useProjectViewData(projectId, token, currentUser) {
             all: totalPhotos,
             liked: likedCount,
             rejected: rejectedCount,
-            conflicts: 0,
+            conflicts: conflictCount,
+            trashed: trashedPhotos.length,
           },
-          photos,
+          photos: visiblePhotos,
+          trashedPhotos,
         }
         setData(viewData)
       } catch (err) {

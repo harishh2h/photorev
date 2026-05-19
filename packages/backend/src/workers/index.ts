@@ -2,11 +2,28 @@ import { db } from "../db";
 import { JobRunner } from "./jobRunner";
 import { WorkerPool } from "./workerPool";
 
+const PURGE_TICK_MS = 60 * 60 * 1000;
+
 // 1. create pool — spawns 4 worker threads immediately
 export const pool = new WorkerPool(4);
 
 // 2. create runner — wires to pool
 export const jobRunner = new JobRunner(pool);
+
+async function schedulePurgeTick(): Promise<void> {
+  try {
+    const existing = await db("processing_jobs")
+      .where({ job_type: "purge_trashed" })
+      .whereIn("status", ["queued", "processing"])
+      .first();
+    if (!existing) {
+      await db("processing_jobs").insert({ photo_id: null, job_type: "purge_trashed" });
+      jobRunner.notify();
+    }
+  } catch (err) {
+    console.error("[scheduler] purge tick failed", err);
+  }
+}
 
 // 3. this is called from main.ts after DB is confirmed ready
 export async function initJobSystem() {
@@ -31,6 +48,12 @@ export async function initJobSystem() {
     console.log(`[boot] ${pendingCount} queued jobs found, starting runner`);
     jobRunner.notify();
   }
+
+  void schedulePurgeTick();
+  const purgeInterval = setInterval(() => {
+    void schedulePurgeTick();
+  }, PURGE_TICK_MS);
+  purgeInterval.unref?.();
 
   // wire shutdown
   process.on("SIGTERM", async () => {

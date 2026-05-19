@@ -41,6 +41,11 @@ export interface PhotoRecord {
   readonly width: number | null;
   readonly height: number | null;
   readonly preview_path: string | null;
+  readonly final_decision: number | null;
+  readonly final_decided_by: string | null;
+  readonly final_decided_at: Date | null;
+  readonly conflict_state: string | null;
+  readonly trashed_at: Date | null;
 }
 
 export interface PhotoDto {
@@ -58,6 +63,11 @@ export interface PhotoDto {
   readonly width: number | null;
   readonly height: number | null;
   readonly previewPath: string | null;
+  readonly finalDecision: number | null;
+  readonly finalDecidedBy: string | null;
+  readonly finalDecidedAt: string | null;
+  readonly conflictState: string | null;
+  readonly trashedAt: string | null;
 }
 
 export interface ListPhotosFilters extends PaginationParams {
@@ -114,6 +124,11 @@ function mapPhotoRecordToDto(record: PhotoRecord): PhotoDto {
     height: record.height,
     previewPath:
       record.preview_path !== null ? mediaStoragePathForApi(record.preview_path) : null,
+    finalDecision: record.final_decision,
+    finalDecidedBy: record.final_decided_by,
+    finalDecidedAt: record.final_decided_at ? record.final_decided_at.toISOString() : null,
+    conflictState: record.conflict_state,
+    trashedAt: record.trashed_at ? record.trashed_at.toISOString() : null,
   };
 }
 
@@ -131,6 +146,7 @@ function buildPhotosService(
       .select<PhotoRecord[]>("photos.*")
       .join("projects", "projects.id", "photos.project_id")
       .whereNot("projects.status", "deleted")
+      .whereNot("photos.status", "deleted")
       .join("project_members", function joinProjectMembers() {
         this.on("project_members.project_id", "photos.project_id").andOn(
           "project_members.user_id",
@@ -166,6 +182,7 @@ function buildPhotosService(
       .select<PhotoRecord[]>("photos.*")
       .join("projects", "projects.id", "photos.project_id")
       .whereNot("projects.status", "deleted")
+      .whereNot("photos.status", "deleted")
       .join("project_members", function joinProjectMembers() {
         this.on("project_members.project_id", "photos.project_id").andOn(
           "project_members.user_id",

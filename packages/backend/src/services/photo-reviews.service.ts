@@ -95,6 +95,83 @@ function buildPhotoReviewsService(
     return row?.project_id ?? null;
   }
 
+  async function recomputePhotoFinal(
+    trx: Knex.Transaction,
+    photoId: string,
+    projectId: string,
+  ): Promise<void> {
+    const ownerRow = await trx("project_members")
+      .select<{ user_id: string }[]>("user_id")
+      .where("project_id", projectId)
+      .andWhere("is_owner", true)
+      .first();
+    const ownerId = ownerRow?.user_id ?? null;
+    const reviews = await trx<{ user_id: string; decision: number | null }>("photo_reviews")
+      .select("user_id", "decision")
+      .where("photo_id", photoId);
+
+    let likedCount = 0;
+    let rejectedCount = 0;
+    let ownerDecision: number | null = null;
+    reviews.forEach((r) => {
+      if (r.user_id === ownerId && r.decision !== null) {
+        ownerDecision = r.decision;
+      }
+      if (r.decision === 1) likedCount += 1;
+      else if (r.decision === -1) rejectedCount += 1;
+    });
+    const hasOpposing = likedCount > 0 && rejectedCount > 0;
+
+    let finalDecision: number | null;
+    let finalDecidedBy: string | null = null;
+    let conflictState: "none" | "pending_owner" | "resolved_owner" | "resolved_majority";
+
+    if (ownerDecision !== null) {
+      finalDecision = ownerDecision;
+      finalDecidedBy = ownerId;
+      conflictState = hasOpposing ? "resolved_owner" : "none";
+    } else if (!hasOpposing) {
+      if (likedCount > 0) {
+        finalDecision = 1;
+        conflictState = "none";
+      } else if (rejectedCount > 0) {
+        finalDecision = -1;
+        conflictState = "none";
+      } else {
+        finalDecision = null;
+        conflictState = "none";
+      }
+    } else if (likedCount > rejectedCount) {
+      finalDecision = 1;
+      conflictState = "resolved_majority";
+    } else if (rejectedCount > likedCount) {
+      finalDecision = -1;
+      conflictState = "resolved_majority";
+    } else {
+      finalDecision = null;
+      conflictState = "pending_owner";
+    }
+
+    const now = new Date();
+    const patch: Record<string, unknown> = {
+      final_decision: finalDecision,
+      final_decided_by: finalDecidedBy,
+      final_decided_at: finalDecision === null ? null : now,
+      conflict_state: conflictState,
+    };
+
+    const current = await trx<{ status: string }>("photos")
+      .select("status")
+      .where("id", photoId)
+      .first();
+    if (finalDecision === 1 && current?.status === "trashed") {
+      patch.status = "ready";
+      patch.trashed_at = null;
+    }
+
+    await trx("photos").where("id", photoId).update(patch);
+  }
+
   async function upsertReview(params: UpsertReviewParams): Promise<PhotoReviewDto | null> {
     const projectId = await getAccessiblePhotoProjectId(params.userId, params.photoId);
     if (!projectId) {
@@ -105,43 +182,44 @@ function buildPhotoReviewsService(
       return null;
     }
     const now = new Date();
-    const baseUpdate: Partial<PhotoReviewRecord> = {
+    const merge: Record<string, unknown> = {
       seen: params.seen ?? true,
       seen_at: now,
-    } as any;
+    };
     if (typeof params.renamedTo !== "undefined") {
-      (baseUpdate as any).renamed_to = params.renamedTo;
+      merge.renamed_to = params.renamedTo;
     }
     if (typeof params.decision !== "undefined") {
-      (baseUpdate as any).decision = params.decision;
-      (baseUpdate as any).voted_at = params.decision === null ? null : now;
+      merge.decision = params.decision;
+      merge.voted_at = params.decision === null ? null : now;
     }
-    const insertedRows = await db<PhotoReviewRecord>("photo_reviews")
-      .insert(
-        {
-          photo_id: params.photoId,
-          user_id: params.userId,
-          seen: baseUpdate.seen ?? true,
-          decision:
-            typeof (baseUpdate as any).decision === "undefined"
-              ? null
-              : (baseUpdate as any).decision,
-          renamed_to:
-            typeof (baseUpdate as any).renamed_to === "undefined"
-              ? null
-              : (baseUpdate as any).renamed_to,
-          seen_at: now,
-          voted_at:
-            typeof (baseUpdate as any).voted_at === "undefined"
-              ? null
-              : (baseUpdate as any).voted_at,
-        },
-        "*",
-      )
-      .onConflict(["photo_id", "user_id"])
-      .merge(baseUpdate as any)
-      .then((rows: PhotoReviewRecord[]) => rows);
-    const review = insertedRows[0];
+    const review = await db.transaction(async (trx: Knex.Transaction) => {
+      const rows = await trx<PhotoReviewRecord>("photo_reviews")
+        .insert(
+          {
+            photo_id: params.photoId,
+            user_id: params.userId,
+            seen: (merge.seen as boolean | undefined) ?? true,
+            decision:
+              typeof merge.decision === "undefined" ? null : (merge.decision as number | null),
+            renamed_to:
+              typeof merge.renamed_to === "undefined" ? null : (merge.renamed_to as string | null),
+            seen_at: now,
+            voted_at:
+              typeof merge.voted_at === "undefined" ? null : (merge.voted_at as Date | null),
+          },
+          "*",
+        )
+        .onConflict(["photo_id", "user_id"])
+        .merge(merge)
+        .then((r: PhotoReviewRecord[]) => r);
+      const inserted = rows[0];
+      if (!inserted) {
+        return null;
+      }
+      await recomputePhotoFinal(trx, params.photoId, projectId);
+      return inserted;
+    });
     if (!review) {
       return null;
     }

@@ -4,6 +4,8 @@ import projectMembersRoutes from "./project-members.routes";
 import photosRoutes from "./photos.routes";
 import photoReviewsRoutes from "./photo-reviews.routes";
 import projectsRoutes from "./projects.routes";
+import shareLinksRoutes from "./share-links.routes";
+import publicShareRoutes from "./public-share.routes";
 import { sendSuccess } from "../utils/api-response";
 
 async function routes(fastify: FastifyInstance, opts: FastifyPluginOptions): Promise<void> {
@@ -15,6 +17,8 @@ async function routes(fastify: FastifyInstance, opts: FastifyPluginOptions): Pro
   fastify.register(projectMembersRoutes);
   fastify.register(photosRoutes, { prefix: "/photos" });
   fastify.register(photoReviewsRoutes, { prefix: "/photo-reviews" });
+  fastify.register(shareLinksRoutes);
+  fastify.register(publicShareRoutes, { prefix: "/public" });
 }
 
 export default routes;

@@ -10,7 +10,7 @@ const listProjectsSchema = {
       pageSize: { type: "integer", minimum: 1, maximum: 100 },
       status: {
         type: "string",
-        enum: ["active", "processing", "completed"],
+        enum: ["active", "processing", "completed", "finalized"],
       },
       isActive: {
         type: "boolean",
@@ -57,7 +57,7 @@ const updateProjectSchema = {
       name: { type: "string", minLength: 1, maxLength: 255 },
       status: {
         type: "string",
-        enum: ["active", "processing", "completed"],
+        enum: ["active", "processing", "completed", "finalized"],
       },
       isActive: { type: "boolean" },
       rootPath: { type: "string", minLength: 1 },
@@ -73,6 +73,28 @@ const singleProjectParamsSchema = {
     required: ["projectId"],
     properties: {
       projectId: { type: "string", format: "uuid" },
+    },
+    additionalProperties: false,
+  },
+};
+
+const finalizeProjectSchema = {
+  params: {
+    type: "object",
+    required: ["projectId"],
+    properties: {
+      projectId: { type: "string", format: "uuid" },
+    },
+    additionalProperties: false,
+  },
+  body: {
+    type: "object",
+    required: ["action"],
+    properties: {
+      action: {
+        type: "string",
+        enum: ["keep_all", "soft_delete_rejected", "hard_delete_rejected"],
+      },
     },
     additionalProperties: false,
   },
@@ -113,6 +135,11 @@ async function projectsRoutes(
     "/:projectId/archive",
     { schema: singleProjectParamsSchema, preHandler: ensureAuthenticated },
     handler.archiveProject,
+  );
+  fastify.post(
+    "/:projectId/finalize",
+    { schema: finalizeProjectSchema, preHandler: ensureAuthenticated },
+    handler.finalizeProject,
   );
   fastify.delete(
     "/:projectId",

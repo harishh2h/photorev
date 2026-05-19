@@ -1,9 +1,13 @@
+import fs from "node:fs";
 import path from "node:path";
 import { db } from "../db";
 import type { ProcessingJobWithOriginalPath } from "../models/processing-job";
 import { getStorageRoot } from "../utils/storage";
 import type { ProcessingJobWorkerSuccess } from "./tasks/runProcessingJob";
 import { WorkerPool } from "./workerPool";
+
+const TRASH_TTL_DAYS = 15;
+const PURGE_BATCH_SIZE = 1;
 
 function storageRelativeDbPath(outputAbsolute: string): string {
   return path.relative(path.resolve(getStorageRoot()), outputAbsolute).split(path.sep).join("/");
@@ -46,6 +50,10 @@ export class JobRunner {
         this.state = "idle";
         return;
       }
+      if (job.job_type === "hard_delete_photo" || job.job_type === "purge_trashed") {
+        await this.handleMaintenanceJob(job);
+        continue;
+      }
       this.pool.submit({ ...job } as Record<string, unknown>, (workerResult, error) => {
         void (async (): Promise<void> => {
           if (error) {
@@ -64,6 +72,64 @@ export class JobRunner {
     }
   }
 
+  private async handleMaintenanceJob(job: ProcessingJobWithOriginalPath): Promise<void> {
+    try {
+      if (job.job_type === "hard_delete_photo") {
+        await this.runHardDeletePhoto(job);
+      } else if (job.job_type === "purge_trashed") {
+        await this.runPurgeTrashed(job);
+      }
+      await this.markDone(job.id);
+    } catch (err) {
+      await this.handleFailure(job, err instanceof Error ? err : new Error(String(err)));
+    }
+    if (this.state === "idle") {
+      this.notify();
+    } else if (this.state === "running") {
+      // continue draining loop
+    } else if (this.state === "draining" && this.pool.activeCount === 0) {
+      this.state = "stopped";
+    }
+  }
+
+  private async runHardDeletePhoto(job: ProcessingJobWithOriginalPath): Promise<void> {
+    if (!job.photo_id || !job.project_id) {
+      return;
+    }
+    const storageRoot = getStorageRoot();
+    const dir = path.join(storageRoot, "photos", job.project_id, job.photo_id);
+    await fs.promises.rm(dir, { recursive: true, force: true });
+    await db("photos").where("id", job.photo_id).update({
+      status: "deleted",
+      original_path: "",
+      original_name: null,
+      thumbnail_path: null,
+      preview_path: null,
+      trashed_at: null,
+    });
+  }
+
+  private async runPurgeTrashed(_job: ProcessingJobWithOriginalPath): Promise<void> {
+    const cutoff = new Date(Date.now() - TRASH_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const rows = await db<{ id: string }>("photos")
+      .select("id")
+      .where("status", "trashed")
+      .andWhere("trashed_at", "<", cutoff)
+      .orderBy("trashed_at", "asc")
+      .limit(PURGE_BATCH_SIZE);
+    if (rows.length === 0) return;
+    await db("processing_jobs").insert(
+      rows.map((r) => ({ photo_id: r.id, job_type: "hard_delete_photo" })),
+    );
+    const remaining = await db("photos")
+      .where("status", "trashed")
+      .andWhere("trashed_at", "<", cutoff)
+      .count<{ count: string }[]>({ count: "*" });
+    if (Number(remaining[0]?.count ?? 0) > rows.length) {
+      await db("processing_jobs").insert({ photo_id: null, job_type: "purge_trashed" });
+    }
+  }
+
   private async claimNextJob(): Promise<ProcessingJobWithOriginalPath | null> {
     const result = await db.raw(`
       WITH next_job AS (
@@ -77,9 +143,11 @@ export class JobRunner {
       UPDATE processing_jobs AS pj
       SET status = 'processing',
           started_at = NOW()
-      FROM next_job, photos AS p
+      FROM next_job
+      LEFT JOIN photos AS p ON p.id = (
+        SELECT photo_id FROM processing_jobs WHERE id = next_job.id
+      )
       WHERE pj.id = next_job.id
-        AND p.id = pj.photo_id
       RETURNING
         pj.id,
         pj.photo_id,
@@ -92,7 +160,10 @@ export class JobRunner {
         pj.queued_at,
         pj.started_at,
         pj.completed_at,
-        p.original_path AS original_path
+        p.original_path AS original_path,
+        p.project_id AS project_id,
+        p.thumbnail_path AS thumbnail_path,
+        p.preview_path AS preview_path
     `);
     const row = result.rows[0] as ProcessingJobWithOriginalPath | undefined;
     return row ?? null;
@@ -106,29 +177,42 @@ export class JobRunner {
     workerResult: unknown,
   ): Promise<void> {
     const payload = workerResult as ProcessingJobWorkerSuccess;
-    if (payload.ok === true && job.job_type === "metadata" && payload.photoMetadata) {
+    const photoId = job.photo_id;
+    if (photoId && payload.ok === true && job.job_type === "metadata" && payload.photoMetadata) {
       await db("photos")
-        .where("id", job.photo_id)
+        .where("id", photoId)
         .update({
           metadata: payload.photoMetadata.metadata,
           width: payload.photoMetadata.width,
           height: payload.photoMetadata.height,
         });
-    } else if (payload.ok === true && job.job_type === "thumbnail" && typeof payload.outputPath === "string") {
+    } else if (
+      photoId &&
+      payload.ok === true &&
+      job.job_type === "thumbnail" &&
+      typeof payload.outputPath === "string"
+    ) {
       await db("photos")
-        .where("id", job.photo_id)
+        .where("id", photoId)
         .update({
           thumbnail_path: storageRelativeDbPath(payload.outputPath),
         });
-    } else if (payload.ok === true && job.job_type === "preview" && typeof payload.outputPath === "string") {
+    } else if (
+      photoId &&
+      payload.ok === true &&
+      job.job_type === "preview" &&
+      typeof payload.outputPath === "string"
+    ) {
       await db("photos")
-        .where("id", job.photo_id)
+        .where("id", photoId)
         .update({
           preview_path: storageRelativeDbPath(payload.outputPath),
         });
     }
     await this.markDone(job.id);
-    await this.syncPhotoProcessingStatus(job.photo_id);
+    if (photoId) {
+      await this.syncPhotoProcessingStatus(photoId);
+    }
   }
 
   private async markDone(jobId: string): Promise<void> {
@@ -154,7 +238,9 @@ export class JobRunner {
           status: "failed",
           error_message: error.message,
         });
-      await this.syncPhotoProcessingStatus(job.photo_id);
+      if (job.photo_id) {
+        await this.syncPhotoProcessingStatus(job.photo_id);
+      }
     }
   }
 
