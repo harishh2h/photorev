@@ -1,38 +1,47 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import PropTypes from 'prop-types'
 import { getPhoto } from '@/services/photoService.js'
 import { listAllPhotoReviewsForPhoto } from '@/services/photoReviewService.js'
 import { formatExifDate } from '@/features/photo-viewer/formatExifDate.js'
+import PhotoDetailsList from '@/features/photo-viewer/PhotoDetailsList.jsx'
+import { buildPhotoDetailSections } from '@/features/photo-viewer/photoDetailSections.js'
 
 const TAB_EXIF = 'exif'
 const TAB_ACTIVITY = 'activity'
 
-function MetaRow({ label, value }) {
-  if (value == null || value === '') return null
-  return (
-    <div className="flex flex-col gap-0.5 border-b border-white/[0.08] py-3 last:border-b-0">
-      <span className="font-base text-xs font-medium text-white/45">{label}</span>
-      <span className="break-all font-mono text-sm text-white/88">{String(value)}</span>
-    </div>
-  )
-}
-
-MetaRow.propTypes = {
-  label: PropTypes.string.isRequired,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-}
+const staticPhotoShape = PropTypes.shape({
+  originalName: PropTypes.string,
+  width: PropTypes.number,
+  height: PropTypes.number,
+  fileSize: PropTypes.number,
+  metadata: PropTypes.any,
+  finalDecision: PropTypes.number,
+  conflictState: PropTypes.string,
+  finalDecidedBy: PropTypes.string,
+  finalDecidedAt: PropTypes.string,
+})
 
 /**
- * @param {{ open: boolean; photoId: string; token: string; memberNameByUserId: Map<string, string>; canReviewPhotos?: boolean; onClose: () => void }} props
+ * @param {{
+ *   open: boolean;
+ *   onClose: () => void;
+ *   photo?: object;
+ *   photoId?: string;
+ *   token?: string;
+ *   memberNameByUserId?: Map<string, string>;
+ *   canReviewPhotos?: boolean;
+ * }} props
  */
 export default function PhotoViewerInfoPanel({
   open,
+  onClose,
+  photo: staticPhoto,
   photoId,
   token,
-  memberNameByUserId,
+  memberNameByUserId = new Map(),
   canReviewPhotos = true,
-  onClose,
 }) {
+  const isStatic = staticPhoto != null
   const [panelTab, setPanelTab] = useState(TAB_EXIF)
   const [photoDetail, setPhotoDetail] = useState(null)
   const [reviews, setReviews] = useState([])
@@ -41,7 +50,7 @@ export default function PhotoViewerInfoPanel({
 
   useEffect(() => {
     if (open) setPanelTab(TAB_EXIF)
-  }, [open, photoId])
+  }, [open, photoId, staticPhoto])
 
   useEffect(() => {
     if (!canReviewPhotos && panelTab === TAB_ACTIVITY) {
@@ -50,7 +59,8 @@ export default function PhotoViewerInfoPanel({
   }, [canReviewPhotos, panelTab])
 
   useEffect(() => {
-    if (!open || !photoId || !token) return undefined
+    if (!open || isStatic) return undefined
+    if (!photoId || !token) return undefined
     let cancelled = false
     setLoadErr(null)
     setLoading(true)
@@ -82,18 +92,33 @@ export default function PhotoViewerInfoPanel({
     return () => {
       cancelled = true
     }
-  }, [open, photoId, token, canReviewPhotos])
+  }, [open, photoId, token, canReviewPhotos, isStatic])
+
+  const resolvedPhoto = isStatic ? staticPhoto : photoDetail
+  const detailSections = useMemo(
+    () => (resolvedPhoto ? buildPhotoDetailSections(resolvedPhoto) : []),
+    [resolvedPhoto]
+  )
 
   if (!open) return null
 
-  const meta = photoDetail?.metadata && typeof photoDetail.metadata === 'object' ? photoDetail.metadata : {}
-  const format = meta.format ?? null
-  const finalDecision = typeof photoDetail?.finalDecision === 'number' ? photoDetail.finalDecision : null
-  const conflictState = typeof photoDetail?.conflictState === 'string' ? photoDetail.conflictState : null
+  const finalDecision = typeof resolvedPhoto?.finalDecision === 'number' ? resolvedPhoto.finalDecision : null
+  const conflictState = typeof resolvedPhoto?.conflictState === 'string' ? resolvedPhoto.conflictState : null
   const decidedByName =
-    photoDetail?.finalDecidedBy != null && memberNameByUserId.has(photoDetail.finalDecidedBy)
-      ? memberNameByUserId.get(photoDetail.finalDecidedBy)
+    resolvedPhoto?.finalDecidedBy != null && memberNameByUserId.has(resolvedPhoto.finalDecidedBy)
+      ? memberNameByUserId.get(resolvedPhoto.finalDecidedBy)
       : null
+
+  const showActivityTab = canReviewPhotos && !isStatic
+  const decisionBanner =
+    finalDecision !== null || conflictState ? (
+      <FinalDecisionBanner
+        finalDecision={finalDecision}
+        conflictState={conflictState}
+        decidedByName={decidedByName}
+        decidedAt={resolvedPhoto?.finalDecidedAt}
+      />
+    ) : null
 
   return (
     <>
@@ -122,7 +147,7 @@ export default function PhotoViewerInfoPanel({
               Close
             </button>
           </div>
-          {canReviewPhotos ? (
+          {showActivityTab ? (
             <div className="mt-4 flex gap-2" role="tablist" aria-label="Detail sections">
               <button
                 type="button"
@@ -135,7 +160,7 @@ export default function PhotoViewerInfoPanel({
                 }`}
                 onClick={() => setPanelTab(TAB_EXIF)}
               >
-                File & meta
+                Details
               </button>
               <button
                 type="button"
@@ -153,34 +178,18 @@ export default function PhotoViewerInfoPanel({
             </div>
           ) : null}
         </div>
-        {loading ? (
+        {!isStatic && loading ? (
           <div className="flex flex-1 items-center justify-center p-8">
             <span className="loading loading-spinner loading-md text-accent" aria-label="Loading" />
           </div>
-        ) : loadErr ? (
+        ) : !isStatic && loadErr ? (
           <p className="m-0 p-5 font-base text-sm text-error">{loadErr}</p>
         ) : panelTab === TAB_EXIF ? (
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-2">
-            {finalDecision !== null || conflictState ? (
-              <FinalDecisionBanner
-                finalDecision={finalDecision}
-                conflictState={conflictState}
-                decidedByName={decidedByName}
-                decidedAt={photoDetail?.finalDecidedAt}
-              />
-            ) : null}
-            <MetaRow label="File name" value={photoDetail?.originalName} />
-            <MetaRow label="Dimensions" value={formatDimensions(photoDetail?.width, photoDetail?.height)} />
-            <MetaRow label="File size" value={formatBytes(photoDetail?.fileSize)} />
-            <MetaRow label="MIME type" value={photoDetail?.mimeType} />
-            <MetaRow label="Created" value={formatExifDate(photoDetail?.createdAt)} />
-            <MetaRow label="Format" value={format} />
-            <MetaRow label="Color space" value={meta.space} />
-            <MetaRow label="Orientation" value={meta.orientation} />
-            <MetaRow label="Density (DPI)" value={formatDensity(meta.density)} />
-            <MetaRow label="Channels" value={meta.channels} />
-            <MetaRow label="Has alpha" value={meta.hasAlpha != null ? String(meta.hasAlpha) : null} />
-          </div>
+          <PhotoDetailsList
+            sections={detailSections}
+            className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-2"
+            banner={decisionBanner}
+          />
         ) : (
           <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0 px-5 pb-8 pt-2">
             {reviews.length === 0 ? (
@@ -252,28 +261,6 @@ FinalDecisionBanner.propTypes = {
   decidedAt: PropTypes.string,
 }
 
-function formatDimensions(w, h) {
-  if (typeof w !== 'number' || typeof h !== 'number') return null
-  return `${w} × ${h} px`
-}
-
-function formatBytes(n) {
-  if (typeof n !== 'number' || n < 0) return null
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function formatDensity(d) {
-  if (d == null) return null
-  if (typeof d === 'number') return String(d)
-  if (typeof d === 'object' && d !== null && 'x' in d) {
-    const o = /** @type {{ x?: number; y?: number }} */ (d)
-    if (typeof o.x === 'number' && typeof o.y === 'number') return `${o.x} × ${o.y}`
-  }
-  return JSON.stringify(d)
-}
-
 function shortId(id) {
   if (typeof id !== 'string' || id.length < 9) return id
   return `…${id.slice(-8)}`
@@ -290,9 +277,10 @@ function describeReview(r) {
 
 PhotoViewerInfoPanel.propTypes = {
   open: PropTypes.bool.isRequired,
-  photoId: PropTypes.string.isRequired,
-  token: PropTypes.string.isRequired,
-  memberNameByUserId: PropTypes.instanceOf(Map).isRequired,
-  canReviewPhotos: PropTypes.bool,
   onClose: PropTypes.func.isRequired,
+  photo: staticPhotoShape,
+  photoId: PropTypes.string,
+  token: PropTypes.string,
+  memberNameByUserId: PropTypes.instanceOf(Map),
+  canReviewPhotos: PropTypes.bool,
 }

@@ -333,19 +333,19 @@ function ActiveLinkPanel({ link, copied, onCopy, onRevoke, revoking, onReplace }
   const url = buildShareUrl(link.token)
   return (
     <div className="flex flex-col gap-5">
-      <div className="rounded-card border-[1.5px] border-accent/40 bg-accent/[0.06] p-4">
-        <p className="m-0 font-base text-xs font-semibold uppercase tracking-[0.08em] text-accent">Share URL</p>
+      <div className="rounded-card border-[1.5px] border-base-300 bg-base-100 p-4">
+        <p className="m-0 font-base text-xs font-semibold uppercase tracking-[0.08em] text-muted">Share URL</p>
         <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-center">
           <input
             readOnly
             value={url}
-            className="input input-bordered w-full min-h-11 rounded-full border-[1.5px] border-accent/40 bg-base-100 px-4 py-3 font-mono text-sm text-base-content focus:outline-none"
+            className="input input-bordered w-full min-h-11 rounded-full border-[1.5px] border-base-300 bg-base-100 px-4 py-3 font-mono text-sm text-base-content focus:outline-none"
             onFocus={(e) => e.currentTarget.select()}
           />
           <button
             type="button"
             onClick={onCopy}
-            className="btn btn-primary min-h-11 shrink-0 rounded-full border-0 px-5 font-base text-sm font-semibold text-primary-content transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
+            className="btn btn-outline min-h-11 shrink-0 rounded-full border-[1.5px] border-base-300 bg-base-100 px-5 font-base text-sm font-semibold text-base-content transition-[background-color,border-color,transform] duration-150 ease-out hover:border-accent-mid hover:bg-base-200 active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
           >
             {copied ? 'Copied!' : 'Copy link'}
           </button>

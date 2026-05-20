@@ -1,9 +1,13 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import PropTypes from 'prop-types'
 import {
   buildPublicDownloadUrl,
   buildPublicPhotoUrl,
 } from '@/services/publicShareService.js'
+import PhotoViewerInfoPanel from '@/features/photo-viewer/PhotoViewerInfoPanel.jsx'
+
+const lightboxIconBtnClass =
+  'flex h-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-pill border-[1.5px] border-white/15 bg-white/[0.04] text-white/55 transition-[color,background-color,border-color] duration-150 hover:border-white/25 hover:bg-white/[0.08] hover:text-white/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent'
 
 /**
  * @param {{ token: string; unlockToken: string | null; photos: Array<{ id: string; originalName: string | null; width: number | null; height: number | null; fileSize: number | null; metadata: unknown }>; index: number; onClose: () => void; onChange: (next: number) => void; allowDownload: boolean; showMetadata: boolean }} props
@@ -18,6 +22,7 @@ export default function PublicShareLightbox({
   allowDownload,
   showMetadata,
 }) {
+  const [detailOpen, setDetailOpen] = useState(false)
   const total = photos.length
   const current = photos[index]
   const goPrev = useCallback(() => {
@@ -28,82 +33,111 @@ export default function PublicShareLightbox({
   }, [index, total, onChange])
 
   useEffect(() => {
+    setDetailOpen(false)
+  }, [index])
+
+  useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose()
-      else if (e.key === 'ArrowLeft') goPrev()
-      else if (e.key === 'ArrowRight') goNext()
+      if (e.key === 'Escape') {
+        if (detailOpen) {
+          setDetailOpen(false)
+          return
+        }
+        onClose()
+      } else if (!detailOpen && e.key === 'ArrowLeft') goPrev()
+      else if (!detailOpen && e.key === 'ArrowRight') goNext()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose, goPrev, goNext])
+  }, [onClose, goPrev, goNext, detailOpen])
 
   if (!current) return null
 
+  const detailPhoto = {
+    originalName: current.originalName,
+    width: current.width,
+    height: current.height,
+    fileSize: current.fileSize,
+    metadata: current.metadata,
+  }
+
   return (
-    <div className="fixed inset-0 z-[300] flex flex-col bg-black pt-[env(safe-area-inset-top)]">
-      <div className="flex items-center justify-between px-4 py-3 md:px-6">
+    <div className="fixed inset-0 z-[300] flex flex-col bg-black pt-[env(safe-area-inset-top)]" role="presentation">
+      <div className="absolute left-2 top-[max(0.5rem,env(safe-area-inset-top))] z-10 md:left-4">
         <button
           type="button"
           onClick={onClose}
-          className="flex h-11 min-w-[44px] items-center gap-2 rounded-pill border-[1.5px] border-white/15 bg-white/[0.04] px-3 text-white/70 transition-[color,background-color,border-color] duration-150 hover:border-white/30 hover:text-white"
+          className={lightboxIconBtnClass}
           aria-label="Close fullscreen"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M6 6l12 12M18 6L6 18" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
           </svg>
         </button>
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 top-[max(0.5rem,env(safe-area-inset-top))] z-10 flex justify-center px-16 pt-3">
         <span className="font-base text-xs text-white/55">
           {index + 1} / {total}
         </span>
+      </div>
+
+      <div className="absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] z-10 flex items-center gap-2 md:right-4">
+        {showMetadata ? (
+          <button
+            type="button"
+            onClick={() => setDetailOpen(true)}
+            className={lightboxIconBtnClass}
+            aria-label="Photo details"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M12 10v6M11 8.5h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        ) : null}
         {allowDownload ? (
           <a
             href={buildPublicDownloadUrl(token, current.id, unlockToken)}
             download={current.originalName || `photo-${current.id}.jpg`}
-            className="inline-flex h-11 min-w-[44px] items-center gap-2 rounded-pill border-[1.5px] border-accent/55 bg-accent/15 px-4 font-base text-sm font-semibold text-accent transition-[background-color,border-color] duration-150 hover:bg-accent/25"
+            className={lightboxIconBtnClass}
+            aria-label="Download photo"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M12 4v12M6 12l6 6 6-6M5 21h14" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M12 4v12M6 12l6 6 6-6M5 21h14" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Download
           </a>
-        ) : (
-          <span className="h-11 w-11" aria-hidden />
-        )}
+        ) : null}
       </div>
-      <div className="flex min-h-0 flex-1 items-center justify-center px-3 pb-6 sm:px-6">
+
+      <div className="flex min-h-0 flex-1 items-center justify-center px-3 pb-24 pt-16 sm:px-6">
         <img
           src={buildPublicPhotoUrl(token, current.id, 'preview', unlockToken)}
           alt={current.originalName || 'Shared photo'}
-          className="max-h-[calc(100dvh-10rem)] w-auto max-w-full object-contain"
+          className="max-h-[min(calc(100dvh-10rem),calc(100vh-10rem))] w-auto max-w-full object-contain"
         />
       </div>
-      {showMetadata && current.metadata && typeof current.metadata === 'object' ? (
-        <div className="border-t border-white/[0.08] px-5 py-3 font-base text-xs text-white/55">
-          <pre className="m-0 max-h-32 overflow-auto whitespace-pre-wrap break-all">
-            {JSON.stringify(current.metadata, null, 2)}
-          </pre>
-        </div>
-      ) : null}
-      <div className="flex items-center justify-between px-4 pb-6 pt-2 md:px-6">
+
+      <div className="flex items-center justify-between px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2 md:px-6">
         <button
           type="button"
           onClick={goPrev}
           disabled={index <= 0}
-          className="inline-flex h-12 min-w-[48px] items-center justify-center rounded-pill border-[1.5px] border-white/15 bg-white/[0.04] text-white/70 transition-[opacity,color,background-color] duration-150 hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-12 min-w-[48px] items-center justify-center rounded-pill border-[1.5px] border-white/15 bg-white/[0.04] text-white/70 transition-[opacity,color,background-color,border-color] duration-150 hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Previous photo"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <path d="M15 6L9 12l6 6" />
           </svg>
         </button>
-        <span className="truncate font-base text-xs text-white/55">
+        <span className="truncate px-2 font-base text-xs text-white/55">
           {current.originalName || 'Photo'}
         </span>
         <button
           type="button"
           onClick={goNext}
           disabled={index >= total - 1}
-          className="inline-flex h-12 min-w-[48px] items-center justify-center rounded-pill border-[1.5px] border-white/15 bg-white/[0.04] text-white/70 transition-[opacity,color,background-color] duration-150 hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-12 min-w-[48px] items-center justify-center rounded-pill border-[1.5px] border-white/15 bg-white/[0.04] text-white/70 transition-[opacity,color,background-color,border-color] duration-150 hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Next photo"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -111,6 +145,15 @@ export default function PublicShareLightbox({
           </svg>
         </button>
       </div>
+
+      {showMetadata ? (
+        <PhotoViewerInfoPanel
+          open={detailOpen}
+          photo={detailPhoto}
+          onClose={() => setDetailOpen(false)}
+          canReviewPhotos={false}
+        />
+      ) : null}
     </div>
   )
 }

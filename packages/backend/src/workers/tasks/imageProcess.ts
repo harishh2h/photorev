@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp, { type Metadata } from "sharp";
+import { extractPhotoExif } from "./exifExtract";
 
 const THUMBNAIL_MAX_PX = 320;
 const PREVIEW_MAX_PX = 1920;
@@ -104,7 +105,13 @@ export class ImageProcessor {
     width: number | null;
     height: number | null;
   }> {
-    const meta = await this.readMetadata(photoDir);
-    return ImageProcessor.metadataToRow(meta);
+    const input = await this.resolveOriginalPath(photoDir);
+    const meta = await sharp(input).metadata();
+    const row = ImageProcessor.metadataToRow(meta);
+    const exif = await extractPhotoExif(input);
+    if (exif) {
+      row.metadata.exif = exif;
+    }
+    return row;
   }
 }
