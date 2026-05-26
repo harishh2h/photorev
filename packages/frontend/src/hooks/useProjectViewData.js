@@ -3,6 +3,7 @@ import { getProject } from '@/services/projectService.js'
 import { listPhotos } from '@/services/photoService.js'
 import { listMyPhotoReviews } from '@/services/photoReviewService.js'
 import { listProjectMembers } from '@/services/projectMemberService.js'
+import { countByFilter, hasTeamConflict, needsOwnerDecision } from '@/utils/projectReviewFilters.js'
 
 const PENDING_POLL_MS = 2500
 
@@ -121,13 +122,26 @@ export function useProjectViewData(projectId, token, currentUser) {
           const conflictState = typeof p.conflictState === 'string' ? p.conflictState : null
           const finalDecision =
             typeof p.finalDecision === 'number' ? p.finalDecision : null
+          const myDecision = typeof dec === 'number' ? dec : null
+          const myIsLiked = myDecision === 1
+          const myIsRejected = myDecision === -1
+          const myIsUnreviewed = myDecision === null
+          const teamIsLiked = finalDecision === 1
+          const teamIsRejected = finalDecision === -1
           return {
             id: p.id,
             alt: typeof p.originalName === 'string' ? p.originalName : 'Photo',
             status,
-            isLiked: dec === 1,
-            isRejected: dec === -1,
-            hasConflict: conflictState === 'pending_owner',
+            myDecision,
+            myIsLiked,
+            myIsRejected,
+            myIsUnreviewed,
+            teamIsLiked,
+            teamIsRejected,
+            isLiked: myIsLiked,
+            isRejected: myIsRejected,
+            hasConflict: hasTeamConflict(conflictState),
+            needsOwnerDecision: needsOwnerDecision(conflictState),
             conflictState,
             finalDecision,
             finalDecidedBy: typeof p.finalDecidedBy === 'string' ? p.finalDecidedBy : null,
@@ -139,9 +153,7 @@ export function useProjectViewData(projectId, token, currentUser) {
         })
         const visiblePhotos = photos.filter((p) => p.status !== 'trashed')
         const trashedPhotos = photos.filter((p) => p.status === 'trashed')
-        const likedCount = visiblePhotos.filter((p) => p.isLiked).length
-        const rejectedCount = visiblePhotos.filter((p) => p.isRejected).length
-        const conflictCount = visiblePhotos.filter((p) => p.hasConflict).length
+        const counts = countByFilter(visiblePhotos, trashedPhotos)
         const votedPhotoIds = new Set(
           reviewItems.filter((r) => r.decision !== null && r.decision !== undefined).map((r) => r.photoId)
         )
@@ -172,11 +184,6 @@ export function useProjectViewData(projectId, token, currentUser) {
             },
           ]
         }
-        const nameParts = collaboratorMembers
-          .slice(0, 2)
-          .map((m) => m.name)
-          .filter(Boolean)
-        const likedWithNames = nameParts.length > 0 ? nameParts.join(' and ') : 'your team'
         const others = Math.max(0, collaboratorMembers.length - 1)
         const viewData = {
           projectTitle: typeof project.name === 'string' ? project.name : 'Project',
@@ -184,9 +191,22 @@ export function useProjectViewData(projectId, token, currentUser) {
           isFinalized: project.status === 'finalized',
           finalizedAt: typeof project.finalizedAt === 'string' ? project.finalizedAt : null,
           collaboratingLabel: others > 0 ? `REVIEWING WITH ${others} OTHER${others === 1 ? '' : 'S'}` : 'SOLO REVIEW',
-          likedCount,
-          likedWithNames,
           reviewProgressPercent,
+          sidebarStats: {
+            mine: {
+              liked: counts.mine.liked,
+              rejected: counts.mine.rejected,
+              progressPercent: reviewProgressPercent,
+            },
+            team: {
+              liked: counts.team.liked,
+              rejected: counts.team.rejected,
+              pendingConflicts: counts.pendingConflicts,
+            },
+            viewer: {
+              selected: counts.viewerSelected,
+            },
+          },
           collaboratorMembers,
           collaboratorsRows: members,
           viewerContext: vc ?? null,
@@ -194,11 +214,11 @@ export function useProjectViewData(projectId, token, currentUser) {
           canUploadPhotos,
           isProjectCreator,
           filterCounts: {
-            all: totalPhotos,
-            liked: likedCount,
-            rejected: rejectedCount,
-            conflicts: conflictCount,
-            trashed: trashedPhotos.length,
+            mine: counts.mine,
+            team: counts.team,
+            conflicts: counts.conflicts,
+            pendingConflicts: counts.pendingConflicts,
+            trashed: counts.trashed,
           },
           photos: visiblePhotos,
           trashedPhotos,

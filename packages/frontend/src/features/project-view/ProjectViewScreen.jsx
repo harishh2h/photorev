@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PropTypes from 'prop-types'
 import ProjectViewToolbar from './ProjectViewToolbar.jsx'
@@ -13,6 +13,7 @@ import { ShareLinkModal } from '@/features/share/index.js'
 import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
 import { finalizeProject as finalizeProjectApi } from '@/services/projectService.js'
 import { useToast } from '@/components/Toast/index.js'
+import { filterPhotos, REVIEW_SCOPE, PHOTO_FILTER } from '@/utils/projectReviewFilters.js'
 
 /**
  * @param {{ data: object; token: string; projectId: string; onRefresh: () => void }} props
@@ -21,11 +22,21 @@ import { useToast } from '@/components/Toast/index.js'
 export default function ProjectViewScreen({ data, token, projectId, onRefresh }) {
   const navigate = useNavigate()
   const { show: showToast } = useToast()
-  const [activeFilter, setActiveFilter] = useState('all')
+  const canReviewPhotos = data.canReviewPhotos !== false
+  const [reviewScope, setReviewScope] = useState(
+    data.isProjectCreator ? REVIEW_SCOPE.TEAM : REVIEW_SCOPE.MINE
+  )
+  const [activeFilter, setActiveFilter] = useState(PHOTO_FILTER.ALL)
   const [collaboratorsOpen, setCollaboratorsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [finalizeOpen, setFinalizeOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+
+  useEffect(() => {
+    setReviewScope(data.isProjectCreator ? REVIEW_SCOPE.TEAM : REVIEW_SCOPE.MINE)
+    setActiveFilter(PHOTO_FILTER.ALL)
+  }, [projectId, data.isProjectCreator])
+
   const {
     fileInputRef,
     uploadConcurrency,
@@ -43,13 +54,20 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
   } = useProjectPhotoUpload({ token, projectId, onAfterBatch: onRefresh })
 
   const filteredPhotos = useMemo(() => {
-    if (activeFilter === 'trashed') return data.trashedPhotos ?? []
-    if (activeFilter === 'all') return data.photos
-    if (activeFilter === 'liked') return data.photos.filter((p) => p.isLiked)
-    if (activeFilter === 'rejected') return data.photos.filter((p) => p.isRejected)
-    if (activeFilter === 'conflicts') return data.photos.filter((p) => p.hasConflict)
-    return data.photos
-  }, [activeFilter, data.photos, data.trashedPhotos])
+    if (!canReviewPhotos) {
+      return data.photos.filter((p) => p.teamIsLiked)
+    }
+    return filterPhotos(data.photos, data.trashedPhotos ?? [], {
+      scope: reviewScope,
+      filter: activeFilter,
+    })
+  }, [canReviewPhotos, activeFilter, reviewScope, data.photos, data.trashedPhotos])
+
+  const handleReviewScopeChange = useCallback((scope) => {
+    setReviewScope(scope)
+    setActiveFilter(PHOTO_FILTER.ALL)
+  }, [])
+
   const handleFinalize = useCallback(() => {
     if (data.isProjectCreator) {
       setFinalizeOpen(true)
@@ -91,6 +109,11 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
     },
     [navigate, projectId, filteredPhotos]
   )
+
+  const emptyMessage = canReviewPhotos
+    ? 'No photos match this filter.'
+    : 'No selected photos yet.'
+
   return (
     <div className="lg:pr-[min(300px,100vw)]">
       <input
@@ -105,6 +128,9 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
       />
       <ProjectViewToolbar
         projectTitle={data.projectTitle}
+        canReviewPhotos={canReviewPhotos}
+        reviewScope={reviewScope}
+        onReviewScopeChange={handleReviewScopeChange}
         filterCounts={data.filterCounts}
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
@@ -123,32 +149,41 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
           onRetryFailed={retryFailedUploads}
         />
       ) : null}
-      <div className="flex flex-col gap-6 pb-28 pt-4 lg:block lg:pb-32">
+      <div className={`flex flex-col gap-6 pb-28 pt-4 lg:block ${canReviewPhotos ? 'lg:pb-32' : 'lg:pb-10'}`}>
         <div className="min-w-0">
           <div className="relative pb-8 lg:pb-10">
             {filteredPhotos.length > 0 ? (
-              <ProjectPhotoGrid photos={filteredPhotos} token={token} onOpenPhoto={openPhotoViewer} />
+              <ProjectPhotoGrid
+                photos={filteredPhotos}
+                token={token}
+                onOpenPhoto={openPhotoViewer}
+                reviewScope={reviewScope}
+                canReviewPhotos={canReviewPhotos}
+              />
             ) : (
               <p className="m-0 rounded-card border-[1.5px] border-dashed border-base-300 bg-base-100 px-4 py-10 text-center font-base text-base text-muted">
-                No photos match this filter.
+                {emptyMessage}
               </p>
             )}
-            <ProjectGridOverlays
-              collaboratingLabel={data.collaboratingLabel}
-              onAddPhotos={openFilePicker}
-              isUploading={isUploading}
-              showAddPhotos={Boolean(data.canUploadPhotos)}
-            />
+            {canReviewPhotos ? (
+              <ProjectGridOverlays
+                collaboratingLabel={data.collaboratingLabel}
+                onAddPhotos={openFilePicker}
+                isUploading={isUploading}
+                showAddPhotos={Boolean(data.canUploadPhotos)}
+              />
+            ) : null}
           </div>
         </div>
         <ProjectViewSidebar
-          likedCount={data.likedCount}
-          likedWithNames={data.likedWithNames}
-          reviewProgressPercent={data.reviewProgressPercent}
+          sidebarStats={data.sidebarStats}
+          reviewScope={reviewScope}
+          canReviewPhotos={canReviewPhotos}
           collaboratorMembers={data.collaboratorMembers}
           showSettings={Boolean(data.isProjectCreator)}
           isFinalized={Boolean(data.isFinalized)}
           canShare={Boolean(data.isProjectCreator)}
+          isProjectCreator={Boolean(data.isProjectCreator)}
           token={token}
           projectId={projectId}
           onFinalize={handleFinalize}
@@ -187,7 +222,7 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
         onClose={() => setFinalizeOpen(false)}
         onConfirm={handleFinalizeConfirm}
         projectName={data.projectTitle}
-        pendingConflicts={data.filterCounts.conflicts ?? 0}
+        pendingConflicts={data.filterCounts.pendingConflicts ?? 0}
         isFinalized={Boolean(data.isFinalized)}
       />
       <ShareLinkModal
@@ -205,16 +240,15 @@ const photoShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
   alt: PropTypes.string.isRequired,
   status: PropTypes.oneOf(['pending', 'ready', 'failed', 'trashed']),
-  isLiked: PropTypes.bool.isRequired,
-  isRejected: PropTypes.bool.isRequired,
-  hasConflict: PropTypes.bool.isRequired,
+  myIsLiked: PropTypes.bool,
+  myIsRejected: PropTypes.bool,
+  teamIsLiked: PropTypes.bool,
+  teamIsRejected: PropTypes.bool,
+  hasConflict: PropTypes.bool,
   conflictState: PropTypes.string,
   finalDecision: PropTypes.number,
-  finalDecidedBy: PropTypes.string,
-  finalDecidedAt: PropTypes.string,
   isTrashed: PropTypes.bool,
   selectionLabel: PropTypes.string,
-  renamedTo: PropTypes.string,
 })
 
 const collaboratorMemberShape = PropTypes.shape({
@@ -231,9 +265,12 @@ ProjectViewScreen.propTypes = {
   data: PropTypes.shape({
     projectTitle: PropTypes.string.isRequired,
     collaboratingLabel: PropTypes.string.isRequired,
-    likedCount: PropTypes.number.isRequired,
-    likedWithNames: PropTypes.string.isRequired,
-    reviewProgressPercent: PropTypes.number.isRequired,
+    sidebarStats: PropTypes.shape({
+      mine: PropTypes.object.isRequired,
+      team: PropTypes.object.isRequired,
+      viewer: PropTypes.object.isRequired,
+    }).isRequired,
+    reviewProgressPercent: PropTypes.number,
     collaboratorMembers: PropTypes.arrayOf(collaboratorMemberShape).isRequired,
     collaboratorsRows: PropTypes.arrayOf(PropTypes.object),
     viewerContext: PropTypes.object,
@@ -241,10 +278,10 @@ ProjectViewScreen.propTypes = {
     canUploadPhotos: PropTypes.bool,
     isProjectCreator: PropTypes.bool,
     filterCounts: PropTypes.shape({
-      all: PropTypes.number.isRequired,
-      liked: PropTypes.number.isRequired,
-      rejected: PropTypes.number.isRequired,
+      mine: PropTypes.object.isRequired,
+      team: PropTypes.object.isRequired,
       conflicts: PropTypes.number.isRequired,
+      pendingConflicts: PropTypes.number.isRequired,
       trashed: PropTypes.number,
     }).isRequired,
     photos: PropTypes.arrayOf(photoShape).isRequired,

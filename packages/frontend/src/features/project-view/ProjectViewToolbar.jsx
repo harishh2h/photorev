@@ -1,28 +1,42 @@
 import PropTypes from 'prop-types'
-
-const BASE_FILTER_ITEMS = [
-  { id: 'all', label: 'All' },
-  { id: 'liked', label: 'Liked' },
-  { id: 'rejected', label: 'Rejected' },
-  { id: 'conflicts', label: 'Conflicts' },
-]
+import {
+  REVIEW_SCOPE,
+  PHOTO_FILTER,
+  filterItemsForScope,
+  countForFilter,
+} from '@/utils/projectReviewFilters.js'
 
 /**
- * @param {{ projectTitle: string; filterCounts: Record<string, number>; activeFilter: string; onFilterChange: (id: string) => void; isFinalized?: boolean }} props
+ * @param {{
+ *   projectTitle: string;
+ *   canReviewPhotos?: boolean;
+ *   reviewScope?: string;
+ *   onReviewScopeChange?: (scope: string) => void;
+ *   filterCounts: object;
+ *   activeFilter: string;
+ *   onFilterChange: (id: string) => void;
+ *   isFinalized?: boolean;
+ * }} props
  * @returns {import('react').JSX.Element}
  */
 export default function ProjectViewToolbar({
   projectTitle,
+  canReviewPhotos = true,
+  reviewScope = REVIEW_SCOPE.MINE,
+  onReviewScopeChange,
   filterCounts,
   activeFilter,
   onFilterChange,
   isFinalized = false,
 }) {
-  const filterItems = [...BASE_FILTER_ITEMS]
+  const scopeCounts = reviewScope === REVIEW_SCOPE.TEAM ? filterCounts.team : filterCounts.mine
+  const filterItems = filterItemsForScope(reviewScope, canReviewPhotos)
   const trashedCount = filterCounts.trashed ?? 0
-  if (trashedCount > 0) {
-    filterItems.push({ id: 'trashed', label: 'Trash' })
+  if (canReviewPhotos && trashedCount > 0) {
+    filterItems.push({ id: PHOTO_FILTER.TRASHED, label: 'Trash' })
   }
+  const globalCounts = { conflicts: filterCounts.conflicts ?? 0, trashed: trashedCount }
+
   return (
     <div className="flex flex-col items-start gap-4 border-b-[1.5px] border-base-300 py-4 pb-6 md:flex-row md:items-center md:justify-between md:gap-6">
       <div className="flex min-w-0 max-w-full flex-1 flex-col gap-1">
@@ -38,44 +52,87 @@ export default function ProjectViewToolbar({
           </span>
         ) : null}
       </div>
-      <div
-        className="flex w-full max-w-full items-center gap-1 overflow-x-auto scroll-smooth rounded-full border-[1.5px] border-base-300 bg-base-200/60 p-1 [scrollbar-width:none] md:ml-auto md:w-auto md:flex-initial md:flex-none [&::-webkit-scrollbar]:hidden"
-        role="tablist"
-        aria-label="Photo filters"
-      >
-        {filterItems.map((item) => {
-          const count = filterCounts[item.id] ?? 0
-          const isActive = activeFilter === item.id
-          return (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              className={`inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border-[1.5px] px-4 font-base text-sm font-medium transition-[background-color,color,border-color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:shadow-focus ${
-                isActive
-                  ? 'border-base-300 bg-base-100 text-base-content shadow-card'
-                  : 'cursor-pointer border-transparent bg-transparent text-muted hover:text-base-content'
-              }`}
-              onClick={() => onFilterChange(item.id)}
-            >
-              <span>{item.label}</span>
-              <span className="font-semibold text-accent">{count}</span>
-            </button>
-          )
-        })}
-      </div>
+      {canReviewPhotos ? (
+        <div className="flex w-full max-w-full flex-col items-stretch gap-3 md:ml-auto md:w-auto md:items-end">
+          <div
+            className="flex w-full items-center gap-1 rounded-full border-[1.5px] border-base-300 bg-base-200/60 p-1 md:w-auto"
+            role="group"
+            aria-label="Review scope"
+          >
+            {[
+              { id: REVIEW_SCOPE.MINE, label: 'My Review' },
+              { id: REVIEW_SCOPE.TEAM, label: 'Team Review' },
+            ].map((item) => {
+              const isActive = reviewScope === item.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={isActive}
+                  className={`inline-flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-full border-[1.5px] px-4 font-base text-sm font-medium transition-[background-color,color,border-color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:shadow-focus md:flex-initial ${
+                    isActive
+                      ? 'border-base-300 bg-base-100 text-base-content shadow-card'
+                      : 'cursor-pointer border-transparent bg-transparent text-muted hover:text-base-content'
+                  }`}
+                  onClick={() => onReviewScopeChange?.(item.id)}
+                >
+                  {item.label}
+                </button>
+              )
+            })}
+          </div>
+          <div
+            className="flex w-full max-w-full items-center gap-1 overflow-x-auto scroll-smooth rounded-full border-[1.5px] border-base-300 bg-base-200/60 p-1 [scrollbar-width:none] md:w-auto md:flex-none [&::-webkit-scrollbar]:hidden"
+            role="tablist"
+            aria-label="Photo filters"
+          >
+            {filterItems.map((item) => {
+              const count = countForFilter(scopeCounts, item.id, globalCounts)
+              const isActive = activeFilter === item.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={`inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border-[1.5px] px-4 font-base text-sm font-medium transition-[background-color,color,border-color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:shadow-focus ${
+                    isActive
+                      ? 'border-base-300 bg-base-100 text-base-content shadow-card'
+                      : 'cursor-pointer border-transparent bg-transparent text-muted hover:text-base-content'
+                  }`}
+                  onClick={() => onFilterChange(item.id)}
+                >
+                  <span>{item.label}</span>
+                  <span className="font-semibold text-accent">{count}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
 
 ProjectViewToolbar.propTypes = {
   projectTitle: PropTypes.string.isRequired,
+  canReviewPhotos: PropTypes.bool,
+  reviewScope: PropTypes.oneOf([REVIEW_SCOPE.MINE, REVIEW_SCOPE.TEAM]),
+  onReviewScopeChange: PropTypes.func,
   filterCounts: PropTypes.shape({
-    all: PropTypes.number.isRequired,
-    liked: PropTypes.number.isRequired,
-    rejected: PropTypes.number.isRequired,
+    mine: PropTypes.shape({
+      all: PropTypes.number.isRequired,
+      liked: PropTypes.number.isRequired,
+      rejected: PropTypes.number.isRequired,
+      unreviewed: PropTypes.number.isRequired,
+    }).isRequired,
+    team: PropTypes.shape({
+      all: PropTypes.number.isRequired,
+      liked: PropTypes.number.isRequired,
+      rejected: PropTypes.number.isRequired,
+    }).isRequired,
     conflicts: PropTypes.number.isRequired,
+    pendingConflicts: PropTypes.number.isRequired,
     trashed: PropTypes.number,
   }).isRequired,
   activeFilter: PropTypes.string.isRequired,
