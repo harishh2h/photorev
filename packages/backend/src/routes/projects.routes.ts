@@ -100,6 +100,29 @@ const finalizeProjectSchema = {
   },
 };
 
+const pendingStatusSchema = {
+  params: singleProjectParamsSchema.params,
+  querystring: {
+    type: "object",
+    properties: {
+      ids: { type: "string", maxLength: 8192 },
+    },
+    additionalProperties: false,
+  },
+};
+
+const projectGridSchema = {
+  params: singleProjectParamsSchema.params,
+  querystring: {
+    type: "object",
+    properties: {
+      page: { type: "integer", minimum: 1 },
+      pageSize: { type: "integer", minimum: 1, maximum: 100 },
+    },
+    additionalProperties: false,
+  },
+};
+
 async function projectsRoutes(
   fastify: FastifyInstance,
   opts: FastifyPluginOptions,
@@ -120,6 +143,16 @@ async function projectsRoutes(
     "/:projectId/cover-photo",
     { schema: singleProjectParamsSchema, preHandler: ensureAuthenticated },
     handler.getRandomCoverPhoto,
+  );
+  fastify.get(
+    "/:projectId/grid",
+    { schema: projectGridSchema, preHandler: ensureAuthenticated },
+    handler.getProjectGrid,
+  );
+  fastify.get(
+    "/:projectId/photos/pending-status",
+    { schema: pendingStatusSchema, preHandler: ensureAuthenticated },
+    handler.getPendingPhotoStatuses,
   );
   fastify.get(
     "/:projectId",

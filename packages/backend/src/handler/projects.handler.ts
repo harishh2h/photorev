@@ -10,6 +10,7 @@ import buildProjectsService, {
 import buildFinalizationService, {
   FinalizeAction,
 } from "../services/finalization.service";
+import buildProjectGridService from "../services/project-grid.service";
 import { sendFailure, sendSuccess } from "../utils/api-response";
 import { getAuthenticatedUserId } from "../utils/auth";
 import { RootPathValidationError } from "../utils/storage";
@@ -23,6 +24,8 @@ export interface ProjectsHandlerMethods {
   archiveProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   deleteProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   finalizeProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  getProjectGrid: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  getPendingPhotoStatuses: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 }
 
 function buildProjectsHandler(
@@ -31,6 +34,7 @@ function buildProjectsHandler(
 ): ProjectsHandlerMethods {
   const service = buildProjectsService(fastify, _opts);
   const finalizationService = buildFinalizationService(fastify, _opts);
+  const gridService = buildProjectGridService(fastify, _opts);
 
   const handler: ProjectsHandlerMethods = {
     listProjects: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -213,6 +217,39 @@ function buildProjectsHandler(
         return;
       }
       sendSuccess(reply, 200, null, "Project removed");
+    },
+    getProjectGrid: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const userId = getAuthenticatedUserId(request);
+      const params = request.params as { projectId: string };
+      const query = request.query as { page?: number; pageSize?: number };
+      const result = await gridService.getProjectGrid(userId, params.projectId, {
+        page: query.page,
+        pageSize: query.pageSize,
+      });
+      if (!result) {
+        sendFailure(reply, 404, "Project not found", null);
+        return;
+      }
+      sendSuccess(reply, 200, result, "OK");
+    },
+    getPendingPhotoStatuses: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const userId = getAuthenticatedUserId(request);
+      const params = request.params as { projectId: string };
+      const query = request.query as { ids?: string };
+      const photoIds =
+        typeof query.ids === "string"
+          ? query.ids.split(",").map((id) => id.trim()).filter(Boolean)
+          : [];
+      const result = await gridService.getPendingPhotoStatuses(
+        userId,
+        params.projectId,
+        photoIds,
+      );
+      if (result === null) {
+        sendFailure(reply, 404, "Project not found", null);
+        return;
+      }
+      sendSuccess(reply, 200, { items: result }, "OK");
     },
   };
 

@@ -10,6 +10,11 @@ import buildPhotosService, {
 } from "../services/photos.service";
 import { sendFailure, sendSuccess } from "../utils/api-response";
 import { getAuthenticatedUserId } from "../utils/auth";
+import {
+  cacheControlForVariant,
+  signPhotoContentUrl,
+  type PhotoContentVariant as SignedPhotoContentVariant,
+} from "../utils/content-signature";
 import { getStorageRoot, findPreviewFileAbsolute, streamFileToDisk, removeUploadDir } from "../utils/storage";
 
 function getMimeTypeForImagePath(filePath: string): string {
@@ -126,6 +131,7 @@ async function resolvePhotoStreamAbsolutePath(
 export interface PhotosHandlerMethods {
   listPhotos: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   getPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  getPhotoContentUrl: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   streamPhotoContent: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   updatePhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   uploadPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
@@ -171,6 +177,39 @@ function buildPhotosHandler(
       }
       sendSuccess(reply, 200, found, "OK");
     },
+    getPhotoContentUrl: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const userId = getAuthenticatedUserId(request);
+      const paramsRaw = request.params as { photoId: string };
+      const variantRaw = (request.query as { variant?: unknown }).variant;
+      const parsedVariant = parsePhotoContentVariantParam(variantRaw);
+      if (parsedVariant === "invalid") {
+        sendFailure(reply, 400, "Invalid variant; use thumb, preview, original, or full", null);
+        return;
+      }
+      const variant = parsedVariant as SignedPhotoContentVariant;
+      const params: GetPhotoParams = {
+        userId,
+        photoId: paramsRaw.photoId,
+      };
+      const photo = await service.getPhoto(params);
+      if (!photo) {
+        sendFailure(reply, 404, "Photo not found", null);
+        return;
+      }
+      const { sig, exp } = signPhotoContentUrl({
+        photoId: paramsRaw.photoId,
+        variant,
+        userId,
+      });
+      const qs = new URLSearchParams({
+        variant,
+        uid: userId,
+        sig,
+        exp: String(exp),
+      });
+      const url = `/photos/${encodeURIComponent(paramsRaw.photoId)}/content?${qs.toString()}`;
+      sendSuccess(reply, 200, { url }, "OK");
+    },
     streamPhotoContent: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
       const paramsRaw = request.params as { photoId: string };
@@ -197,6 +236,7 @@ function buildPhotosHandler(
         return;
       }
       const mimeType = getMimeTypeForImagePath(absolutePath) || photo.mimeType || "image/jpeg";
+      reply.header("Cache-Control", cacheControlForVariant(variant as SignedPhotoContentVariant));
       reply.type(mimeType);
       return reply.send(fs.createReadStream(absolutePath));
     },

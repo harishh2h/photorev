@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp, { type Metadata } from "sharp";
+import { encode } from "blurhash";
 import { extractPhotoExif } from "./exifExtract";
 
 const THUMBNAIL_MAX_PX = 320;
@@ -28,7 +29,7 @@ export class ImageProcessor {
   /**
    * Writes `thumb.jpeg` (JPEG, max edge THUMBNAIL_MAX_PX, `fit: inside`).
    */
-  async generateThumbnail(photoDir: string): Promise<string> {
+  async generateThumbnail(photoDir: string): Promise<{ outputPath: string; blurhash: string | null }> {
     const input = await this.resolveOriginalPath(photoDir);
     const output = path.join(photoDir, THUMB_FILENAME);
     await sharp(input)
@@ -39,7 +40,20 @@ export class ImageProcessor {
       })
       .jpeg({ quality: 82, mozjpeg: true })
       .toFile(output);
-    return output;
+
+    let blurhash: string | null = null;
+    try {
+      const { data, info } = await sharp(output)
+        .resize(32, 32, { fit: "inside", withoutEnlargement: true })
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      blurhash = encode(new Uint8ClampedArray(data), info.width, info.height, 4, 3);
+    } catch {
+      blurhash = null;
+    }
+
+    return { outputPath: output, blurhash };
   }
 
   /**

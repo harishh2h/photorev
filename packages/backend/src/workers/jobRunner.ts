@@ -192,11 +192,13 @@ export class JobRunner {
       job.job_type === "thumbnail" &&
       typeof payload.outputPath === "string"
     ) {
-      await db("photos")
-        .where("id", photoId)
-        .update({
-          thumbnail_path: storageRelativeDbPath(payload.outputPath),
-        });
+      const patch: Record<string, unknown> = {
+        thumbnail_path: storageRelativeDbPath(payload.outputPath),
+      };
+      if (typeof payload.blurhash === "string" && payload.blurhash.length > 0) {
+        patch.blurhash = payload.blurhash;
+      }
+      await db("photos").where("id", photoId).update(patch);
     } else if (
       photoId &&
       payload.ok === true &&

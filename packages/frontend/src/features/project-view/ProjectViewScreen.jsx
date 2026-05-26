@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import PropTypes from 'prop-types'
 import ProjectViewToolbar from './ProjectViewToolbar.jsx'
 import ProjectPhotoGrid from './ProjectPhotoGrid.jsx'
+import VirtualProjectPhotoGrid from './VirtualProjectPhotoGrid.jsx'
 import ProjectViewSidebar from './ProjectViewSidebar.jsx'
 import ProjectGridOverlays from './ProjectGridOverlays.jsx'
 import ProjectUploadStatusFloat from './ProjectUploadStatusFloat.jsx'
@@ -14,12 +15,21 @@ import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
 import { finalizeProject as finalizeProjectApi } from '@/services/projectService.js'
 import { useToast } from '@/components/Toast/index.js'
 import { filterPhotos, REVIEW_SCOPE, PHOTO_FILTER } from '@/utils/projectReviewFilters.js'
+import { isPhotoVirtualGridEnabled } from '@/utils/photoContentUrl.js'
 
 /**
- * @param {{ data: object; token: string; projectId: string; onRefresh: () => void }} props
+ * @param {{ data: object; token: string; projectId: string; onRefresh: () => void; onLoadMorePhotos?: () => void; hasMorePhotos?: boolean; isLoadingMore?: boolean }} props
  * @returns {import('react').JSX.Element}
  */
-export default function ProjectViewScreen({ data, token, projectId, onRefresh }) {
+export default function ProjectViewScreen({
+  data,
+  token,
+  projectId,
+  onRefresh,
+  onLoadMorePhotos,
+  hasMorePhotos = false,
+  isLoadingMore = false,
+}) {
   const navigate = useNavigate()
   const { show: showToast } = useToast()
   const canReviewPhotos = data.canReviewPhotos !== false
@@ -113,6 +123,15 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
   const emptyMessage = canReviewPhotos
     ? 'No photos match this filter.'
     : 'No selected photos yet.'
+  const useVirtualGrid = isPhotoVirtualGridEnabled()
+
+  const gridProps = {
+    photos: filteredPhotos,
+    token,
+    onOpenPhoto: openPhotoViewer,
+    reviewScope,
+    canReviewPhotos,
+  }
 
   return (
     <div className="lg:pr-[min(300px,100vw)]">
@@ -153,13 +172,16 @@ export default function ProjectViewScreen({ data, token, projectId, onRefresh })
         <div className="min-w-0">
           <div className="relative pb-8 lg:pb-10">
             {filteredPhotos.length > 0 ? (
-              <ProjectPhotoGrid
-                photos={filteredPhotos}
-                token={token}
-                onOpenPhoto={openPhotoViewer}
-                reviewScope={reviewScope}
-                canReviewPhotos={canReviewPhotos}
-              />
+              useVirtualGrid ? (
+                <VirtualProjectPhotoGrid
+                  {...gridProps}
+                  onLoadMore={onLoadMorePhotos}
+                  hasMore={hasMorePhotos}
+                  isLoadingMore={isLoadingMore}
+                />
+              ) : (
+                <ProjectPhotoGrid {...gridProps} />
+              )
             ) : (
               <p className="m-0 rounded-card border-[1.5px] border-dashed border-base-300 bg-base-100 px-4 py-10 text-center font-base text-base text-muted">
                 {emptyMessage}
@@ -262,6 +284,9 @@ ProjectViewScreen.propTypes = {
   token: PropTypes.string.isRequired,
   projectId: PropTypes.string.isRequired,
   onRefresh: PropTypes.func.isRequired,
+  onLoadMorePhotos: PropTypes.func,
+  hasMorePhotos: PropTypes.bool,
+  isLoadingMore: PropTypes.bool,
   data: PropTypes.shape({
     projectTitle: PropTypes.string.isRequired,
     collaboratingLabel: PropTypes.string.isRequired,

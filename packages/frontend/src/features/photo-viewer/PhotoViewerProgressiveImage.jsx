@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { fetchPhotoContentBlob } from '@/services/photoService.js'
+import {
+  buildAuthenticatedPhotoUrl,
+  isPhotoSignedUrlsEnabled,
+  peekAuthenticatedPhotoUrl,
+} from '@/utils/photoContentUrl.js'
+import {
+  acquirePhotoContentUrl,
+  peekPhotoContentUrl,
+  releasePhotoContentUrl,
+  storePhotoContentUrl,
+} from '@/utils/photoContentCache.js'
 
 const ORIGINAL_UPGRADE_MS = 5000
 
@@ -16,10 +27,36 @@ function revokeIfSet(urlRef) {
   }
 }
 
+async function resolvePreviewUrl(token, photoId, signedEnabled) {
+  if (signedEnabled) {
+    return (
+      peekAuthenticatedPhotoUrl(photoId, 'preview') ||
+      peekAuthenticatedPhotoUrl(photoId, 'thumbnail') ||
+      (await buildAuthenticatedPhotoUrl(token, photoId, 'preview'))
+    )
+  }
+  const cached = peekPhotoContentUrl(photoId, 'preview')
+  if (cached) {
+    acquirePhotoContentUrl(photoId, 'preview')
+    return cached
+  }
+  const blob = await fetchPhotoContentBlob(token, photoId, { variant: 'preview' })
+  const url = URL.createObjectURL(blob)
+  storePhotoContentUrl(photoId, 'preview', url)
+  acquirePhotoContentUrl(photoId, 'preview')
+  return url
+}
+
+async function resolveOriginalUrl(token, photoId, signedEnabled) {
+  if (signedEnabled) {
+    return buildAuthenticatedPhotoUrl(token, photoId, 'original')
+  }
+  const blob = await fetchPhotoContentBlob(token, photoId, { variant: 'original' })
+  return URL.createObjectURL(blob)
+}
+
 /**
  * Fullscreen viewer: preview first, upgrade to original after delay or on zoom / multi-touch / double-click.
- *
- * @param {{ photoId: string; token: string; alt: string; status?: 'pending' | 'ready' | 'failed'; className?: string }} props
  */
 export default function PhotoViewerProgressiveImage({
   photoId,
@@ -37,6 +74,7 @@ export default function PhotoViewerProgressiveImage({
   const originalDoneRef = useRef(false)
   const fetchingOriginalRef = useRef(false)
   const upgradeFnRef = useRef(async () => {})
+  const signedEnabled = isPhotoSignedUrlsEnabled()
 
   const clearIdleTimer = useCallback(() => {
     if (idleTimerRef.current != null) {
@@ -54,7 +92,9 @@ export default function PhotoViewerProgressiveImage({
 
   useEffect(() => {
     clearIdleTimer()
-    revokeIfSet(previewUrlRef)
+    if (!signedEnabled) {
+      revokeIfSet(previewUrlRef)
+    }
     revokeIfSet(originalUrlRef)
     originalDoneRef.current = false
     fetchingOriginalRef.current = false
@@ -72,26 +112,17 @@ export default function PhotoViewerProgressiveImage({
       fetchingOriginalRef.current = true
       clearIdleTimer()
       try {
-        const blob = await fetchPhotoContentBlob(token, photoId, { variant: 'original' })
+        const next = await resolveOriginalUrl(token, photoId, signedEnabled)
         if (cancelledForPhotoRef.current) {
+          if (!signedEnabled && next.startsWith('blob:')) URL.revokeObjectURL(next)
           return
         }
-        const next = URL.createObjectURL(blob)
-        if (cancelledForPhotoRef.current) {
-          URL.revokeObjectURL(next)
-          return
+        if (!signedEnabled) {
+          revokeIfSet(originalUrlRef)
+          originalUrlRef.current = next
         }
-        revokeIfSet(originalUrlRef)
-        originalUrlRef.current = next
         originalDoneRef.current = true
-        const img = new window.Image()
-        img.onload = () => {
-          if (!cancelledForPhotoRef.current) setDisplayUrl(next)
-        }
-        img.onerror = () => {
-          if (!cancelledForPhotoRef.current) setDisplayUrl(next)
-        }
-        img.src = next
+        setDisplayUrl(next)
       } catch {
         /* keep preview */
       } finally {
@@ -105,11 +136,11 @@ export default function PhotoViewerProgressiveImage({
 
     void (async () => {
       try {
-        const blob = await fetchPhotoContentBlob(token, photoId, { variant: 'preview' })
+        const url = await resolvePreviewUrl(token, photoId, signedEnabled)
         if (cancelledForPhotoRef.current) return
-        revokeIfSet(previewUrlRef)
-        const url = URL.createObjectURL(blob)
-        previewUrlRef.current = url
+        if (!signedEnabled) {
+          previewUrlRef.current = url
+        }
         setDisplayUrl(url)
         idleTimerRef.current = window.setTimeout(() => {
           void upgradeToOriginal()
@@ -121,10 +152,13 @@ export default function PhotoViewerProgressiveImage({
 
     return () => {
       clearIdleTimer()
-      revokeIfSet(previewUrlRef)
+      if (!signedEnabled) {
+        revokeIfSet(previewUrlRef)
+        releasePhotoContentUrl(photoId, 'preview')
+      }
       revokeIfSet(originalUrlRef)
     }
-  }, [photoId, token, status, clearIdleTimer])
+  }, [photoId, token, status, clearIdleTimer, signedEnabled])
 
   const scheduleOriginalFromInteraction = useCallback(() => {
     void upgradeFnRef.current()

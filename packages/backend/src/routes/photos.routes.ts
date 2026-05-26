@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import buildPhotosHandler from "../handler/photos.handler";
-import { ensureAuthenticated } from "../utils/auth";
+import { ensureAuthenticated, ensurePhotoContentAccess } from "../utils/auth";
 
 const listPhotosSchema = {
   querystring: {
@@ -28,6 +28,20 @@ const photoIdParamsSchema = {
 };
 
 const getPhotoContentSchema = {
+  params: photoIdParamsSchema.params,
+  querystring: {
+    type: "object",
+    properties: {
+      variant: { type: "string", enum: ["thumbnail", "thumb", "preview", "original", "full"] },
+      uid: { type: "string", format: "uuid" },
+      sig: { type: "string", maxLength: 128 },
+      exp: { type: "integer", minimum: 1 },
+    },
+    additionalProperties: false,
+  },
+};
+
+const getPhotoContentUrlSchema = {
   params: photoIdParamsSchema.params,
   querystring: {
     type: "object",
@@ -62,8 +76,17 @@ async function photosRoutes(
     handler.listPhotos,
   );
   fastify.get(
+    "/:photoId/content-url",
+    { schema: getPhotoContentUrlSchema, preHandler: ensureAuthenticated },
+    handler.getPhotoContentUrl,
+  );
+  fastify.get(
     "/:photoId/content",
-    { schema: getPhotoContentSchema, preHandler: ensureAuthenticated },
+    {
+      schema: getPhotoContentSchema,
+      preHandler: ensurePhotoContentAccess,
+      config: { rateLimit: { max: 240, timeWindow: "1 minute" } },
+    },
     handler.streamPhotoContent,
   );
   fastify.get(

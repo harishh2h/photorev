@@ -35,6 +35,9 @@ importers:
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
+      blurhash:
+        specifier: ^2.0.5
+        version: 2.0.5
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
@@ -96,6 +99,12 @@ importers:
 
   packages/frontend:
     dependencies:
+      '@tanstack/react-virtual':
+        specifier: ^3.13.26
+        version: 3.13.26(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      blurhash:
+        specifier: ^2.0.5
+        version: 2.0.5
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -1140,6 +1149,15 @@ packages:
   '@sinonjs/fake-timers@13.0.5':
     resolution: {integrity: sha512-36/hTbH2uaWuGVERyC6da9YwGWnzUZXuPro/F2LfsdOsLnCojz/iSH8MxUt/FD2S5XBSVPhmArFUXcpCQ2Hkiw==}
 
+  '@tanstack/react-virtual@3.13.26':
+    resolution: {integrity: sha512-DosdgjOxCLahkn0o+ilmZYwEjo1glfMGuRT/j3PQ18yr5XqA8N/BCaL9IJ3B5TRl+nnzyK2IOFgAILwzN3a9xQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@tanstack/virtual-core@3.16.0':
+    resolution: {integrity: sha512-Er2N7q3WOiH6y2JLxsxNX+u2/sLqSsL0bxFgDjuiPiA7vKhZRm+IzcS17vRee3GNXr64UsesA5CAp9yTiIYw9A==}
+
   '@tsconfig/node10@1.0.12':
     resolution: {integrity: sha512-UCYBaeFvM11aU2y3YPZ//O5Rhj+xKyzy7mvcIoAjASbigy8mHMryP5cK7dgjlz2hWxh1g5pLw084E0a/wlUSFQ==}
 
@@ -1445,6 +1463,9 @@ packages:
   binary-extensions@2.3.0:
     resolution: {integrity: sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==}
     engines: {node: '>=8'}
+
+  blurhash@2.0.5:
+    resolution: {integrity: sha512-cRygWd7kGBQO3VEhPiTgq4Wc43ctsM+o46urrmPOiuAe+07fzlSB9OJVdpgDL0jPqXUVQ9ht7aq7kxOeJHRK+w==}
 
   bn.js@4.12.3:
     resolution: {integrity: sha512-fGTi3gxV/23FTYdAoUtLYp6qySe2KE3teyZitipKNRuVYcBkoP/bB3guXN/XVKUe9mxCHXnc9C4ocyz8OmgN0g==}
@@ -3980,6 +4001,14 @@ snapshots:
     dependencies:
       '@sinonjs/commons': 3.0.1
 
+  '@tanstack/react-virtual@3.13.26(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@tanstack/virtual-core': 3.16.0
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+
+  '@tanstack/virtual-core@3.16.0': {}
+
   '@tsconfig/node10@1.0.12': {}
 
   '@tsconfig/node12@1.0.11': {}
@@ -4268,6 +4297,8 @@ snapshots:
       node-gyp-build: 4.8.4
 
   binary-extensions@2.3.0: {}
+
+  blurhash@2.0.5: {}
 
   bn.js@4.12.3: {}
 

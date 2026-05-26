@@ -9,7 +9,8 @@ export default function ProjectViewPage() {
   const { user, token, logout } = useAuth()
   const navigate = useNavigate()
   const displayName = user?.name || 'User'
-  const { data, isLoading, error, refetch } = useProjectViewData(projectId, token, user)
+  const { data, isLoading, error, refetch, loadMorePhotos, hasMorePhotos, isLoadingMore } =
+    useProjectViewData(projectId, token, user)
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
@@ -27,7 +28,15 @@ export default function ProjectViewPage() {
           </p>
         ) : null}
         {!error && data != null && token && projectId ? (
-          <ProjectViewScreen data={data} token={token} projectId={projectId} onRefresh={refetch} />
+          <ProjectViewScreen
+            data={data}
+            token={token}
+            projectId={projectId}
+            onRefresh={refetch}
+            onLoadMorePhotos={loadMorePhotos}
+            hasMorePhotos={hasMorePhotos}
+            isLoadingMore={isLoadingMore}
+          />
         ) : null}
         {!isLoading && !error && data == null && token ? (
           <p className="mb-4 font-base text-sm text-muted">No data for this project.</p>

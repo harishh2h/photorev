@@ -96,6 +96,7 @@ export async function fetchPhotoContentBlob(token, photoId, options = {}) {
   qs.set('variant', variant)
   const res = await fetch(`${base}/photos/${encodeURIComponent(photoId)}/content?${qs.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
+    signal: options.signal,
   })
   if (res.status === 401) {
     notifyUnauthorized()

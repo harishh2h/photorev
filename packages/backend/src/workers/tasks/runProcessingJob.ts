@@ -17,6 +17,7 @@ export type ProcessingJobWorkerSuccess = {
   readonly jobType: ProcessingJobType;
   readonly photoId: string;
   readonly outputPath?: string;
+  readonly blurhash?: string | null;
   readonly photoMetadata?: {
     readonly metadata: Record<string, unknown>;
     readonly width: number | null;
@@ -35,8 +36,14 @@ export async function runProcessingJob(
   const photoDir = resolvePhotoDirFromOriginalPath(originalPathRelative);
   const processor = new ImageProcessor();
   if (jobType === "thumbnail") {
-    const absolute = await processor.generateThumbnail(photoDir);
-    return { ok: true, jobType, photoId, outputPath: absolute };
+    const result = await processor.generateThumbnail(photoDir);
+    return {
+      ok: true,
+      jobType,
+      photoId,
+      outputPath: result.outputPath,
+      blurhash: result.blurhash,
+    };
   }
   if (jobType === "preview") {
     const absolute = await processor.generatePreview(photoDir);
