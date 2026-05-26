@@ -22,7 +22,7 @@ export default function ProjectPhotoGrid({
   canReviewPhotos = true,
 }) {
   return (
-    <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 min-[480px]:grid-cols-2 md:grid-cols-3 md:gap-5 lg:grid-cols-4">
+    <ul className="m-0 grid list-none grid-cols-2 gap-1 p-0 md:grid-cols-3 md:gap-2 lg:grid-cols-4">
       {photos.map((photo, index) => (
         <ProjectPhotoTile
           key={photo.id}

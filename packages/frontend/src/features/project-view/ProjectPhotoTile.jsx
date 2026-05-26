@@ -68,7 +68,7 @@ function ProjectPhotoTile({
       style={{ animationDelay }}
     >
       <article
-        className={`group relative overflow-hidden rounded-card border-[1.5px] bg-base-100 text-left shadow-card transition-[transform,box-shadow] duration-[380ms] ease-out hover:-translate-y-1 hover:shadow-card-hover ${
+        className={`group relative overflow-hidden rounded-sm border-[1.5px] bg-base-100 text-left shadow-card transition-[transform,box-shadow] duration-[380ms] ease-out hover:-translate-y-1 hover:shadow-card-hover ${
           dimRejected ? 'border-muted/55' : 'border-base-300'
         }`}
       >

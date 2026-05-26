@@ -4,22 +4,24 @@ import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import ProjectPhotoTile from './ProjectPhotoTile.jsx'
 import { REVIEW_SCOPE } from '@/utils/projectReviewFilters.js'
 
-const GAP_PX = 16
-const GAP_MD_PX = 20
+const GAP_PX = 4
+const GAP_MD_PX = 8
 const STAGGER_CAP_MS = 700
 const STAGGER_STEP_MS = 70
 const STAGGER_MAX_INDEX = 50
 
+function getColumnCount(width) {
+  if (width >= 1024) return 4
+  if (width >= 768) return 3
+  return 2
+}
+
 function useColumnCount() {
-  const [cols, setCols] = useState(1)
+  const [cols, setCols] = useState(() =>
+    typeof window !== 'undefined' ? getColumnCount(window.innerWidth) : 2,
+  )
   useEffect(() => {
-    const update = () => {
-      const w = window.innerWidth
-      if (w >= 1024) setCols(4)
-      else if (w >= 768) setCols(3)
-      else if (w >= 480) setCols(2)
-      else setCols(1)
-    }
+    const update = () => setCols(getColumnCount(window.innerWidth))
     update()
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
@@ -52,20 +54,32 @@ export default function VirtualProjectPhotoGrid({
   const [listWidth, setListWidth] = useState(0)
   const [scrollMargin, setScrollMargin] = useState(0)
 
+  const syncListLayout = useCallback(() => {
+    const el = listRef.current
+    if (!el) return
+    setListWidth(el.clientWidth)
+    setScrollMargin(el.offsetTop)
+  }, [])
+
   useEffect(() => {
     const el = listRef.current
     if (!el) return undefined
-    const ro = new ResizeObserver((entries) => {
-      setListWidth(entries[0]?.contentRect.width ?? 0)
+    const ro = new ResizeObserver(() => {
+      syncListLayout()
     })
     ro.observe(el)
-    setListWidth(el.clientWidth)
-    setScrollMargin(el.offsetTop)
-    return () => ro.disconnect()
-  }, [])
+    syncListLayout()
+    window.addEventListener('resize', syncListLayout)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', syncListLayout)
+    }
+  }, [syncListLayout])
 
-  const itemWidth = listWidth > 0 ? (listWidth - gap * (columnCount - 1)) / columnCount : 0
-  const rowHeight = itemWidth > 0 ? itemWidth * (4 / 3) : 280
+  const effectiveListWidth =
+    listWidth > 0 ? listWidth : typeof window !== 'undefined' ? Math.max(window.innerWidth - 32, 280) : 343
+  const itemWidth = (effectiveListWidth - gap * (columnCount - 1)) / columnCount
+  const rowHeight = itemWidth * (4 / 3)
 
   const virtualizer = useWindowVirtualizer({
     count: rowCount,
@@ -75,6 +89,10 @@ export default function VirtualProjectPhotoGrid({
   })
 
   const virtualItems = virtualizer.getVirtualItems()
+
+  useEffect(() => {
+    virtualizer.measure()
+  }, [virtualizer, rowHeight, gap, columnCount, rowCount, scrollMargin])
 
   const handleLoadMore = useCallback(() => {
     if (hasMore && !isLoadingMore && typeof onLoadMore === 'function') {

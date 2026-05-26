@@ -2,7 +2,25 @@
  * @returns {string}
  */
 export function getApiBaseUrl() {
-  return (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+  let base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
+  // Dev on LAN: phone opens Mac IP:5173 — API must use same host, not localhost
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    if (!base) {
+      return `${window.location.protocol}//${window.location.hostname}:3000`
+    }
+    try {
+      const url = new URL(base)
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+        url.hostname = window.location.hostname
+        return url.origin
+      }
+    } catch {
+      // keep configured base
+    }
+  }
+
+  return base
 }
 
 /** @type {(() => void) | null} */
