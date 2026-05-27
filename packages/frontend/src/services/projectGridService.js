@@ -36,6 +36,6 @@ export async function fetchPendingPhotoStatuses(token, projectId, photoIds) {
   if (!ok) {
     throw new Error(message)
   }
-  const items = /** @type {{ items?: Array<{ id: string; status: string }> }} */ (data)?.items
+  const items = /** @type {{ items?: Array<{ id: string; status: string; width?: number | null; height?: number | null; blurhash?: string | null }> }} */ (data)?.items
   return Array.isArray(items) ? items : []
 }

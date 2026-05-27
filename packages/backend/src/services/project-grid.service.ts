@@ -6,6 +6,7 @@ import {
   PaginationParams,
 } from "../utils/pagination";
 import { loadProjectPermissionContext } from "../utils/project-permissions";
+import { getDisplayDimensionsFromMetadata } from "../utils/photo-display-dimensions";
 
 export interface ProjectGridItemDto {
   readonly id: string;
@@ -17,6 +18,14 @@ export interface ProjectGridItemDto {
   readonly renamedTo: string | null;
   readonly teamDecision: number | null;
   readonly conflictState: string | null;
+  readonly blurhash: string | null;
+}
+
+export interface PendingPhotoStatusDto {
+  readonly id: string;
+  readonly status: string;
+  readonly width: number | null;
+  readonly height: number | null;
   readonly blurhash: string | null;
 }
 
@@ -48,6 +57,7 @@ interface PhotoGridRow {
   readonly status: string;
   readonly width: number | null;
   readonly height: number | null;
+  readonly metadata: unknown;
   readonly final_decision: number | null;
   readonly conflict_state: string | null;
   readonly blurhash: string | null;
@@ -58,12 +68,13 @@ interface PhotoGridRow {
 const CONFLICT_STATES = new Set(["pending_owner", "resolved_owner", "resolved_majority"]);
 
 function mapGridRow(row: PhotoGridRow): ProjectGridItemDto {
+  const { width, height } = getDisplayDimensionsFromMetadata(row.width, row.height, row.metadata);
   return {
     id: row.id,
     originalName: row.original_name,
     status: row.status,
-    width: row.width,
-    height: row.height,
+    width,
+    height,
     myDecision: row.my_decision,
     renamedTo: row.renamed_to,
     teamDecision: row.final_decision,
@@ -107,7 +118,7 @@ export interface ProjectGridServiceMethods {
     userId: string,
     projectId: string,
     photoIds: readonly string[],
-  ) => Promise<Array<{ readonly id: string; readonly status: string }> | null>;
+  ) => Promise<PendingPhotoStatusDto[] | null>;
 }
 
 function buildProjectGridService(
@@ -131,6 +142,7 @@ function buildProjectGridService(
         "photos.status",
         "photos.width",
         "photos.height",
+        "photos.metadata",
         "photos.final_decision",
         "photos.conflict_state",
         "photos.blurhash",
@@ -176,7 +188,7 @@ function buildProjectGridService(
     userId: string,
     projectId: string,
     photoIds: readonly string[],
-  ): Promise<Array<{ readonly id: string; readonly status: string }> | null> {
+  ): Promise<PendingPhotoStatusDto[] | null> {
     if (photoIds.length === 0) {
       return [];
     }
@@ -185,12 +197,35 @@ function buildProjectGridService(
       return null;
     }
     const uniqueIds = [...new Set(photoIds)].slice(0, 200);
-    const rows = await db<{ id: string; status: string }>("photos")
-      .select("photos.id", "photos.status")
+    const rows = await db<{
+      id: string;
+      status: string;
+      width: number | null;
+      height: number | null;
+      metadata: unknown;
+      blurhash: string | null;
+    }>("photos")
+      .select(
+        "photos.id",
+        "photos.status",
+        "photos.width",
+        "photos.height",
+        "photos.metadata",
+        "photos.blurhash",
+      )
       .where("photos.project_id", projectId)
       .whereIn("photos.id", uniqueIds)
       .whereNot("photos.status", "deleted");
-    return rows.map((r) => ({ id: r.id, status: r.status }));
+    return rows.map((row) => {
+      const { width, height } = getDisplayDimensionsFromMetadata(row.width, row.height, row.metadata);
+      return {
+        id: row.id,
+        status: row.status,
+        width,
+        height,
+        blurhash: row.blurhash,
+      };
+    });
   }
 
   return { getProjectGrid, getPendingPhotoStatuses };

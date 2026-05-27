@@ -304,22 +304,42 @@ export function useProjectViewData(projectId, token, currentUser) {
         const updates = await fetchPendingPhotoStatuses(token, projectId, pendingPhotoIds)
         if (cancelled || updates.length === 0) return
 
-        const statusById = new Map(updates.map((row) => [row.id, row.status]))
+        const updateById = new Map(updates.map((row) => [row.id, row]))
         let changed = false
         allPhotosRef.current = allPhotosRef.current.map((photo) => {
-          const nextStatus = statusById.get(photo.id)
-          if (!nextStatus || nextStatus === photo.status) {
+          const update = updateById.get(photo.id)
+          if (!update) {
             return photo
           }
-          changed = true
-          const normalized =
-            nextStatus === 'ready' || nextStatus === 'failed' || nextStatus === 'trashed'
-              ? nextStatus
+
+          const nextStatus =
+            update.status === 'ready' || update.status === 'failed' || update.status === 'trashed'
+              ? update.status
               : 'pending'
+          const nextWidth =
+            typeof update.width === 'number' && update.width > 0 ? update.width : photo.width
+          const nextHeight =
+            typeof update.height === 'number' && update.height > 0 ? update.height : photo.height
+          const nextBlurhash =
+            typeof update.blurhash === 'string' ? update.blurhash : photo.blurhash
+
+          if (
+            nextStatus === photo.status &&
+            nextWidth === photo.width &&
+            nextHeight === photo.height &&
+            nextBlurhash === photo.blurhash
+          ) {
+            return photo
+          }
+
+          changed = true
           return {
             ...photo,
-            status: normalized,
-            isTrashed: normalized === 'trashed',
+            status: nextStatus,
+            width: nextWidth,
+            height: nextHeight,
+            blurhash: nextBlurhash,
+            isTrashed: nextStatus === 'trashed',
           }
         })
 

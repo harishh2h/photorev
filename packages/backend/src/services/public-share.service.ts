@@ -8,6 +8,7 @@ import {
   getStorageRoot,
   mediaStoragePathForApi,
 } from "../utils/storage";
+import { getDisplayDimensionsFromMetadata } from "../utils/photo-display-dimensions";
 
 export type PublicVariant = "thumb" | "preview" | "original";
 
@@ -99,15 +100,18 @@ function buildPublicShareService(
         expiresAt: link.expires_at ? link.expires_at.toISOString() : null,
         finalizedAt: project.finalized_at ? project.finalized_at.toISOString() : null,
       },
-      photos: photos.map((p) => ({
-        id: p.id,
-        originalName: p.original_name,
-        width: p.width,
-        height: p.height,
-        fileSize: p.file_size,
-        mimeType: p.mime_type,
-        metadata: link.show_metadata ? p.metadata : null,
-      })),
+      photos: photos.map((p) => {
+        const { width, height } = getDisplayDimensionsFromMetadata(p.width, p.height, p.metadata);
+        return {
+          id: p.id,
+          originalName: p.original_name,
+          width,
+          height,
+          fileSize: p.file_size,
+          mimeType: p.mime_type,
+          metadata: link.show_metadata ? p.metadata : null,
+        };
+      }),
     };
   }
 

@@ -2,9 +2,9 @@ import { useMemo, useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PropTypes from 'prop-types'
 import ProjectViewToolbar from './ProjectViewToolbar.jsx'
-import ProjectPhotoGrid from './ProjectPhotoGrid.jsx'
-import VirtualProjectPhotoGrid from './VirtualProjectPhotoGrid.jsx'
+import ProjectPhotoTile from './ProjectPhotoTile.jsx'
 import ProjectViewSidebar from './ProjectViewSidebar.jsx'
+import { JustifiedPhotoGrid } from '@/components/photo-grid/index.js'
 import ProjectGridOverlays from './ProjectGridOverlays.jsx'
 import ProjectUploadStatusFloat from './ProjectUploadStatusFloat.jsx'
 import { CollaboratorsManageModal } from '@/features/project-collaborators/index.js'
@@ -125,14 +125,6 @@ export default function ProjectViewScreen({
     : 'No selected photos yet.'
   const useVirtualGrid = isPhotoVirtualGridEnabled()
 
-  const gridProps = {
-    photos: filteredPhotos,
-    token,
-    onOpenPhoto: openPhotoViewer,
-    reviewScope,
-    canReviewPhotos,
-  }
-
   return (
     <div className="lg:pr-[min(300px,100vw)]">
       <input
@@ -171,17 +163,32 @@ export default function ProjectViewScreen({
       <div className={`flex flex-col gap-6 pb-28 pt-4 lg:block ${canReviewPhotos ? 'lg:pb-32' : 'lg:pb-10'}`}>
         <div className="min-w-0">
           <div className="relative pb-8 lg:pb-10">
+            {canReviewPhotos && data.collaboratingLabel !== 'SOLO REVIEW' ? (
+              <p className="pointer-events-none mb-4 flex w-fit max-w-full items-center gap-2 rounded-full border-[1.5px] border-base-300 bg-base-100 px-5 py-2 font-base text-xs font-semibold uppercase tracking-[0.06em] text-muted shadow-card">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+                {data.collaboratingLabel}
+              </p>
+            ) : null}
             {filteredPhotos.length > 0 ? (
-              useVirtualGrid ? (
-                <VirtualProjectPhotoGrid
-                  {...gridProps}
-                  onLoadMore={onLoadMorePhotos}
-                  hasMore={hasMorePhotos}
-                  isLoadingMore={isLoadingMore}
-                />
-              ) : (
-                <ProjectPhotoGrid {...gridProps} />
-              )
+              <JustifiedPhotoGrid
+                photos={filteredPhotos}
+                virtualized={useVirtualGrid}
+                onLoadMore={onLoadMorePhotos}
+                hasMore={hasMorePhotos}
+                isLoadingMore={isLoadingMore}
+                renderTile={({ photo, position, animationDelay }) => (
+                  <ProjectPhotoTile
+                    as="div"
+                    photo={photo}
+                    token={token}
+                    onOpenPhoto={openPhotoViewer}
+                    reviewScope={reviewScope}
+                    canReviewPhotos={canReviewPhotos}
+                    layoutSlot={position}
+                    animationDelay={animationDelay}
+                  />
+                )}
+              />
             ) : (
               <p className="m-0 rounded-card border-[1.5px] border-dashed border-base-300 bg-base-100 px-4 py-10 text-center font-base text-base text-muted">
                 {emptyMessage}
@@ -189,7 +196,6 @@ export default function ProjectViewScreen({
             )}
             {canReviewPhotos ? (
               <ProjectGridOverlays
-                collaboratingLabel={data.collaboratingLabel}
                 onAddPhotos={openFilePicker}
                 isUploading={isUploading}
                 showAddPhotos={Boolean(data.canUploadPhotos)}

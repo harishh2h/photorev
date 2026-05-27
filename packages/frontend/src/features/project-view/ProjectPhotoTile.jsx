@@ -2,6 +2,12 @@ import { memo } from 'react'
 import PropTypes from 'prop-types'
 import ProjectPhotoImage from './ProjectPhotoImage.jsx'
 import { REVIEW_SCOPE } from '@/utils/projectReviewFilters.js'
+import {
+  GRID_TILE_HOVER_IMAGE_CLASS,
+  GRID_TILE_PLACEHOLDER_BG,
+  GRID_TILE_ROOT_CLASS,
+  GRID_TILE_SHELL_BUTTON_CLASS,
+} from '@/components/photo-grid/gridPhotoTileStyles.js'
 
 function ConflictBadge({ conflictState }) {
   if (conflictState === 'pending_owner') {
@@ -45,7 +51,7 @@ function ConflictBadge({ conflictState }) {
 }
 
 /**
- * @param {{ photo: object; token: string; onOpenPhoto: (photoId: string) => void; reviewScope?: string; canReviewPhotos?: boolean; animationDelay?: string; as?: 'li' | 'div' }} props
+ * @param {{ photo: object; token: string; onOpenPhoto: (photoId: string) => void; reviewScope?: string; canReviewPhotos?: boolean; animationDelay?: string; as?: 'li' | 'div'; layoutSlot?: { width: number; height: number } }} props
  */
 function ProjectPhotoTile({
   photo,
@@ -55,6 +61,7 @@ function ProjectPhotoTile({
   canReviewPhotos = true,
   animationDelay = '0ms',
   as: Tag = 'li',
+  layoutSlot,
 }) {
   const showScopeBadges = canReviewPhotos
   const useTeamScope = reviewScope === REVIEW_SCOPE.TEAM
@@ -62,11 +69,77 @@ function ProjectPhotoTile({
   const showRejected = showScopeBadges && (useTeamScope ? photo.teamIsRejected : photo.myIsRejected)
   const dimRejected = showScopeBadges && showRejected
 
+  if (layoutSlot) {
+    return (
+      <Tag
+        className="animate-fade-up motion-reduce:animate-none h-full w-full"
+        style={{ animationDelay }}
+      >
+        <div
+          className={`${GRID_TILE_ROOT_CLASS} ${dimRejected ? 'border-muted/55 opacity-90' : ''}`}
+        >
+          <button
+            type="button"
+            className={`${GRID_TILE_SHELL_BUTTON_CLASS} ${GRID_TILE_PLACEHOLDER_BG} ${
+              dimRejected ? 'after:pointer-events-none after:absolute after:inset-0 after:bg-muted/30' : ''
+            } focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base-100`}
+            onClick={() => onOpenPhoto(photo.id)}
+            aria-label={`Open ${photo.alt || 'photo'} fullscreen`}
+          >
+            <ProjectPhotoImage
+              photoId={photo.id}
+              token={token}
+              alt={photo.alt}
+              status={photo.status}
+              blurhash={photo.blurhash}
+              fillSlot
+              className={`${GRID_TILE_HOVER_IMAGE_CLASS} ${
+                dimRejected ? 'opacity-70 grayscale group-hover:opacity-[0.82]' : ''
+              }`}
+            />
+            {showScopeBadges ? (
+              <div className="absolute right-2 top-2 z-[1] flex flex-col items-end gap-2">
+                {showLiked ? (
+                  <span
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-primary-content shadow-card"
+                    aria-label={useTeamScope ? 'Team liked' : 'Liked by you'}
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden>
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                  </span>
+                ) : null}
+                {showRejected ? (
+                  <span
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-error text-primary-content shadow-card"
+                    aria-label={useTeamScope ? 'Team rejected' : 'Rejected by you'}
+                  >
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                      <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </span>
+                ) : null}
+                {photo.hasConflict ? <ConflictBadge conflictState={photo.conflictState} /> : null}
+              </div>
+            ) : null}
+          </button>
+          {photo.selectionLabel ? (
+            <div className="pointer-events-none absolute bottom-2 left-2 z-[1] inline-flex max-w-[calc(100%-1rem)] items-center gap-2 rounded-full bg-black/70 px-3 py-2 font-base text-xs font-semibold text-primary-content backdrop-blur-md">
+              <span className="flex text-accent-mid" aria-hidden>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                </svg>
+              </span>
+              {photo.selectionLabel}
+            </div>
+          ) : null}
+        </div>
+      </Tag>
+    )
+  }
+
   return (
-    <Tag
-      className="animate-fade-up motion-reduce:animate-none"
-      style={{ animationDelay }}
-    >
+    <Tag className="animate-fade-up motion-reduce:animate-none" style={{ animationDelay }}>
       <article
         className={`group relative overflow-hidden rounded-sm border-[1.5px] bg-base-100 text-left shadow-card transition-[transform,box-shadow] duration-[380ms] ease-out hover:-translate-y-1 hover:shadow-card-hover ${
           dimRejected ? 'border-muted/55' : 'border-base-300'
@@ -86,7 +159,8 @@ function ProjectPhotoTile({
             alt={photo.alt}
             status={photo.status}
             blurhash={photo.blurhash}
-            className={`block h-full w-full object-cover transition-transform duration-[380ms] ease-out group-hover:scale-[1.04] ${
+            fillSlot={false}
+            className={`${GRID_TILE_HOVER_IMAGE_CLASS} ${
               dimRejected ? 'opacity-70 grayscale group-hover:opacity-[0.82]' : ''
             }`}
           />
@@ -138,10 +212,16 @@ ProjectPhotoTile.propTypes = {
   canReviewPhotos: PropTypes.bool,
   animationDelay: PropTypes.string,
   as: PropTypes.oneOf(['li', 'div']),
+  layoutSlot: PropTypes.shape({
+    width: PropTypes.number.isRequired,
+    height: PropTypes.number.isRequired,
+  }),
   photo: PropTypes.shape({
     id: PropTypes.string.isRequired,
     alt: PropTypes.string.isRequired,
     status: PropTypes.oneOf(['pending', 'ready', 'failed', 'trashed']),
+    width: PropTypes.number,
+    height: PropTypes.number,
     blurhash: PropTypes.string,
     myIsLiked: PropTypes.bool,
     myIsRejected: PropTypes.bool,
