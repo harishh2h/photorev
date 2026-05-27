@@ -98,6 +98,23 @@ export async function findPreviewFileAbsolute(dirAbsolute: string): Promise<stri
   }
   return path.join(dirAbsolute, match);
 }
+
+/**
+ * Finds the first file in `dirAbsolute` whose name is `original.<ext>` (any extension, case-insensitive).
+ */
+export async function findOriginalFileAbsolute(dirAbsolute: string): Promise<string | null> {
+  let names: string[];
+  try {
+    names = await fs.promises.readdir(dirAbsolute);
+  } catch {
+    return null;
+  }
+  const match = names.find((n) => n.toLowerCase().startsWith("original."));
+  if (!match) {
+    return null;
+  }
+  return path.join(dirAbsolute, match);
+}
 const ALLOWED_MIME = [
   "image/jpeg",
   "image/png",

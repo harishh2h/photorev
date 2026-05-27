@@ -15,7 +15,13 @@ import {
   signPhotoContentUrl,
   type PhotoContentVariant as SignedPhotoContentVariant,
 } from "../utils/content-signature";
-import { getStorageRoot, findPreviewFileAbsolute, streamFileToDisk, removeUploadDir } from "../utils/storage";
+import {
+  getStorageRoot,
+  findOriginalFileAbsolute,
+  findPreviewFileAbsolute,
+  streamFileToDisk,
+  removeUploadDir,
+} from "../utils/storage";
 
 function getMimeTypeForImagePath(filePath: string): string {
   const lower = filePath.toLowerCase();
@@ -128,11 +134,38 @@ async function resolvePhotoStreamAbsolutePath(
   return pickFirst([originalDb, previewDisk, previewDb, thumbDiskPath, thumbDb]);
 }
 
+/**
+ * Download-only resolver: original file on disk only — never preview or thumbnail fallbacks.
+ */
+async function resolveOriginalOnlyAbsolutePath(
+  storageRoot: string,
+  photo: PhotoDto,
+): Promise<string | null> {
+  const photoDir = path.join(storageRoot, "photos", photo.projectId, photo.id);
+  const joinRel = (rel: string | null | undefined): string | null =>
+    rel != null && String(rel).trim() !== "" ? path.join(storageRoot, String(rel)) : null;
+
+  const originalDb = joinRel(photo.originalPath);
+  if (originalDb) {
+    const fromDb = await readablePathOrNull(originalDb);
+    if (fromDb) {
+      return fromDb;
+    }
+  }
+
+  const originalDisk = await findOriginalFileAbsolute(photoDir);
+  if (!originalDisk) {
+    return null;
+  }
+  return readablePathOrNull(originalDisk);
+}
+
 export interface PhotosHandlerMethods {
   listPhotos: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   getPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   getPhotoContentUrl: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   streamPhotoContent: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  downloadPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   updatePhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   uploadPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 }
@@ -237,6 +270,34 @@ function buildPhotosHandler(
       }
       const mimeType = getMimeTypeForImagePath(absolutePath) || photo.mimeType || "image/jpeg";
       reply.header("Cache-Control", cacheControlForVariant(variant as SignedPhotoContentVariant));
+      reply.type(mimeType);
+      return reply.send(fs.createReadStream(absolutePath));
+    },
+    downloadPhoto: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const userId = getAuthenticatedUserId(request);
+      const paramsRaw = request.params as { photoId: string };
+      const params: GetPhotoParams = {
+        userId,
+        photoId: paramsRaw.photoId,
+      };
+      const photo = await service.getPhoto(params);
+      if (!photo) {
+        sendFailure(reply, 404, "Photo not found", null);
+        return;
+      }
+      const storageRoot = getStorageRoot();
+      const absolutePath = await resolveOriginalOnlyAbsolutePath(storageRoot, photo);
+      if (!absolutePath) {
+        sendFailure(reply, 404, "Original file not available", null);
+        return;
+      }
+      const safeName = (photo.originalName || `photo-${paramsRaw.photoId}.jpg`).replace(/"/g, "");
+      const mimeType = getMimeTypeForImagePath(absolutePath) || photo.mimeType || "image/jpeg";
+      reply.header("Cache-Control", "no-store");
+      reply.header("Content-Disposition", `attachment; filename="${safeName}"`);
+      if (photo.fileSize) {
+        reply.header("Content-Length", String(photo.fileSize));
+      }
       reply.type(mimeType);
       return reply.send(fs.createReadStream(absolutePath));
     },

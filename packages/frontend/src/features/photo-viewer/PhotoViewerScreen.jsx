@@ -7,6 +7,7 @@ import PhotoViewerSwipeCard from '@/features/photo-viewer/PhotoViewerSwipeCard.j
 import PhotoViewerPhotoCounter from '@/features/photo-viewer/PhotoViewerPhotoCounter.jsx'
 import PhotoViewerReviewControls from '@/features/photo-viewer/PhotoViewerReviewControls.jsx'
 import PhotoViewerRenameControl from '@/features/photo-viewer/PhotoViewerRenameControl.jsx'
+import PhotoViewerDownloadControl from '@/features/photo-viewer/PhotoViewerDownloadControl.jsx'
 import { usePhotoViewerShortcuts } from '@/features/photo-viewer/usePhotoViewerShortcuts.js'
 import { useAdjacentPhotoPrefetch } from '@/features/photo-viewer/useAdjacentPhotoPrefetch.js'
 import { upsertPhotoReview } from '@/services/photoReviewService.js'
@@ -50,6 +51,7 @@ export default function PhotoViewerScreen({
   const [renameDraft, setRenameDraft] = useState('')
   const [renameFocused, setRenameFocused] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isPhotoZoomed, setIsPhotoZoomed] = useState(false)
   const [localPhotos, setLocalPhotos] = useState(photos)
   const [liveMessage, setLiveMessage] = useState('')
   const isSavingRef = useRef(false)
@@ -174,6 +176,13 @@ export default function PhotoViewerScreen({
     void saveReview({ renamedTo: trimmed.length > 0 ? trimmed : null })
   }, [renameDraft, saveReview])
 
+  const handleDownloadError = useCallback(
+    (err) => {
+      showToast(err instanceof Error ? err.message : 'Could not download photo', 'error')
+    },
+    [showToast]
+  )
+
   const onExit = useCallback(() => {
     navigate(`/projects/${projectId}`, { state: navState })
   }, [navigate, projectId, navState])
@@ -208,7 +217,8 @@ export default function PhotoViewerScreen({
     Boolean(current) &&
     !detailOpen &&
     !renameFocused &&
-    !isSaving
+    !isSaving &&
+    !isPhotoZoomed
 
   if (!current) {
     return (
@@ -226,6 +236,7 @@ export default function PhotoViewerScreen({
       status={current.status}
       width={current.width}
       height={current.height}
+      onZoomChange={setIsPhotoZoomed}
     />
   )
 
@@ -258,6 +269,12 @@ export default function PhotoViewerScreen({
             onFocusChange={setRenameFocused}
           />
         ) : null}
+        <PhotoViewerDownloadControl
+          photoId={current.id}
+          filename={current.alt}
+          token={token}
+          onError={handleDownloadError}
+        />
         <button
           type="button"
           onClick={() => setDetailOpen(true)}
@@ -271,7 +288,7 @@ export default function PhotoViewerScreen({
         </button>
       </div>
 
-      <div className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0 min-h-0 min-w-0">
         {isMobile ? (
           <PhotoViewerSwipeCard
             enabled={swipeEnabled}

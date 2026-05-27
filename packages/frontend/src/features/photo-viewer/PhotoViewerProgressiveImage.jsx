@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { getViewerImagePresentation } from '@/features/photo-viewer/viewerImageLayout.js'
-import { useViewerStageSize } from '@/features/photo-viewer/useViewerStageSize.js'
+import { usePhotoViewerZoom } from '@/features/photo-viewer/usePhotoViewerZoom.js'
 import { resolveOriginalUrl, resolvePreviewUrl } from '@/features/photo-viewer/photoContentLoader.js'
 import { isPhotoSignedUrlsEnabled } from '@/utils/photoContentUrl.js'
 import { releasePhotoContentUrl } from '@/utils/photoContentCache.js'
@@ -28,6 +28,8 @@ export default function PhotoViewerProgressiveImage({
   width = null,
   height = null,
   className = '',
+  zoomEnabled = true,
+  onZoomChange,
 }) {
   const [displayUrl, setDisplayUrl] = useState(null)
   const [hasError, setHasError] = useState(false)
@@ -37,12 +39,8 @@ export default function PhotoViewerProgressiveImage({
   const fetchingOriginalRef = useRef(false)
   const upgradeFnRef = useRef(async () => {})
   const signedEnabled = isPhotoSignedUrlsEnabled()
-  const { stageRef, stageWidth, stageHeight } = useViewerStageSize()
 
-  const presentation = useMemo(
-    () => getViewerImagePresentation(width, height, stageWidth, stageHeight),
-    [width, height, stageWidth, stageHeight],
-  )
+  const presentation = useMemo(() => getViewerImagePresentation(width, height), [width, height])
 
   const clearIdleTimer = useCallback(() => {
     if (idleTimerRef.current != null) {
@@ -50,6 +48,32 @@ export default function PhotoViewerProgressiveImage({
       idleTimerRef.current = null
     }
   }, [])
+
+  const scheduleOriginalFromInteraction = useCallback(() => {
+    void upgradeFnRef.current()
+  }, [])
+
+  const {
+    containerRef,
+    contentRef,
+    isZoomed,
+    resetZoom,
+    cursor,
+    innerStyle,
+    handlers: zoomHandlers,
+  } = usePhotoViewerZoom({
+    enabled: zoomEnabled && status === 'ready' && !hasError && Boolean(displayUrl),
+    onInteraction: scheduleOriginalFromInteraction,
+  })
+
+  useEffect(() => {
+    onZoomChange?.(isZoomed)
+  }, [isZoomed, onZoomChange])
+
+  useEffect(() => {
+    resetZoom()
+    onZoomChange?.(false)
+  }, [photoId, resetZoom, onZoomChange])
 
   useEffect(() => {
     cancelledForPhotoRef.current = false
@@ -123,44 +147,30 @@ export default function PhotoViewerProgressiveImage({
     }
   }, [photoId, token, status, clearIdleTimer, signedEnabled])
 
-  const scheduleOriginalFromInteraction = useCallback(() => {
-    void upgradeFnRef.current()
-  }, [])
-
-  const handleWheel = useCallback(
-    (e) => {
-      if (!e.ctrlKey) return
-      e.preventDefault()
-      scheduleOriginalFromInteraction()
-    },
-    [scheduleOriginalFromInteraction],
-  )
-
-  const handleTouchStart = useCallback(
-    (e) => {
-      if (e.touches.length >= 2) {
-        scheduleOriginalFromInteraction()
-      }
-    },
-    [scheduleOriginalFromInteraction],
-  )
-
-  const interactionProps = {
-    onWheel: handleWheel,
-    onTouchStart: handleTouchStart,
-    onDoubleClick: scheduleOriginalFromInteraction,
-  }
+  const handleDoubleClick = useCallback(() => {
+    scheduleOriginalFromInteraction()
+  }, [scheduleOriginalFromInteraction])
 
   const frameClassName = `${presentation.frameClassName} ${className}`.trim()
 
-  const renderFrame = (content) => (
-    <div ref={stageRef} className={frameClassName} role="presentation" {...interactionProps}>
+  const renderZoomableFrame = (content) => (
+    <div
+      ref={containerRef}
+      className={frameClassName}
+      role="presentation"
+      style={{
+        cursor,
+        touchAction: zoomEnabled ? 'none' : undefined,
+      }}
+      onDoubleClick={handleDoubleClick}
+      {...zoomHandlers}
+    >
       {content}
     </div>
   )
 
   if (status === 'pending') {
-    return renderFrame(
+    return renderZoomableFrame(
       <div className={`${pendingShellClass} h-full w-full`.trim()} role="img" aria-label={`${alt} (processing)`}>
         <span className="loading loading-spinner loading-md text-accent" aria-hidden />
       </div>,
@@ -168,7 +178,7 @@ export default function PhotoViewerProgressiveImage({
   }
 
   if (status === 'failed') {
-    return renderFrame(
+    return renderZoomableFrame(
       <div
         className={`${pendingShellClass} h-full w-full`.trim()}
         role="img"
@@ -180,20 +190,20 @@ export default function PhotoViewerProgressiveImage({
   }
 
   if (hasError || !displayUrl) {
-    return renderFrame(
+    return renderZoomableFrame(
       <div className={`${fallbackClass} h-full w-full`.trim()} role="img" aria-label={alt} />,
     )
   }
 
-  return renderFrame(
+  return renderZoomableFrame(
     <img
+      ref={contentRef}
       src={displayUrl}
       alt={alt}
-      width={width ?? undefined}
-      height={height ?? undefined}
       className={presentation.imgClassName}
-      style={presentation.imgStyle}
+      style={{ ...presentation.imgStyle, ...innerStyle }}
       decoding="async"
+      draggable={false}
     />,
   )
 }
@@ -206,4 +216,6 @@ PhotoViewerProgressiveImage.propTypes = {
   width: PropTypes.number,
   height: PropTypes.number,
   className: PropTypes.string,
+  zoomEnabled: PropTypes.bool,
+  onZoomChange: PropTypes.func,
 }

@@ -122,3 +122,42 @@ export async function fetchPhotoContentBlob(token, photoId, options = {}) {
   }
   return res.blob()
 }
+
+/**
+ * Strict original-only download — never preview or thumbnail (see GET /photos/:id/download).
+ *
+ * @param {string} token
+ * @param {string} photoId
+ * @param {{ signal?: AbortSignal }} [options]
+ * @returns {Promise<Blob>}
+ */
+export async function fetchPhotoDownloadBlob(token, photoId, options = {}) {
+  const base = getApiBaseUrl()
+  const res = await fetch(`${base}/photos/${encodeURIComponent(photoId)}/download`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: options.signal,
+  })
+  if (res.status === 401) {
+    notifyUnauthorized()
+  }
+  if (!res.ok) {
+    const contentType = res.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      const text = await res.text()
+      try {
+        const parsed = JSON.parse(text)
+        if (isApiEnvelope(parsed)) {
+          throw new Error(parsed.message)
+        }
+      } catch (err) {
+        if (err instanceof SyntaxError) {
+          // use generic message below
+        } else {
+          throw err
+        }
+      }
+    }
+    throw new Error('Original file not available')
+  }
+  return res.blob()
+}

@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.ts",
   "scripts": {
-    "dev": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
     "migrate:latest": "tsx node_modules/knex/bin/cli.js migrate:latest --knexfile src/db/knexfile.ts",
     "migrate:make": "tsx node_modules/knex/bin/cli.js migrate:make --knexfile src/db/knexfile.ts -x ts",
     "migrate:rollback": "tsx node_modules/knex/bin/cli.js migrate:rollback --knexfile src/db/knexfile.ts",

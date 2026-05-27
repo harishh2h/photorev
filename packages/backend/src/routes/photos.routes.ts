@@ -90,6 +90,15 @@ async function photosRoutes(
     handler.streamPhotoContent,
   );
   fastify.get(
+    "/:photoId/download",
+    {
+      schema: photoIdParamsSchema,
+      preHandler: ensureAuthenticated,
+      config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
+    },
+    handler.downloadPhoto,
+  );
+  fastify.get(
     "/:photoId",
     { schema: photoIdParamsSchema, preHandler: ensureAuthenticated },
     handler.getPhoto,

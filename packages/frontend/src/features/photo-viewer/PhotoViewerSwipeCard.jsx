@@ -44,12 +44,12 @@ export default function PhotoViewerSwipeCard({
 
   return (
     <div
-      className="relative flex h-full w-full max-w-full touch-none select-none items-center justify-center"
+      className="relative flex h-full min-h-0 w-full max-w-full touch-none select-none items-center justify-center"
       style={{ touchAction: 'none' }}
       {...handlers}
     >
       <div
-        className="relative flex max-h-full h-full w-full items-center justify-center will-change-transform"
+        className="relative flex h-full min-h-0 w-full max-h-full min-w-0 items-center justify-center will-change-transform"
         style={{
           transform,
           transition: isExiting
