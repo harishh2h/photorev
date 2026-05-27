@@ -1,7 +1,12 @@
 import { apiFetch, getApiBaseUrl } from '@/services/httpClient.js'
 
+const SIGNED_URL_SESSION_KEY = 'photorev:signed-photo-urls'
+const SIGNED_URL_EXPIRY_BUFFER_SEC = 60
+
 /** @type {Map<string, string>} */
 const signedUrlCache = new Map()
+
+let sessionHydrated = false
 
 function cacheKey(photoId, variant) {
   return `${photoId}:${variant}`
@@ -10,6 +15,70 @@ function cacheKey(photoId, variant) {
 function isSignedUrlsEnabled() {
   const raw = import.meta.env.VITE_PHOTO_SIGNED_URLS
   return raw === undefined || raw === 'true' || raw === '1'
+}
+
+function parseSignedUrlExpiry(fullUrl) {
+  try {
+    const exp = Number(new URL(fullUrl).searchParams.get('exp'))
+    return Number.isFinite(exp) ? exp : null
+  } catch {
+    return null
+  }
+}
+
+function isSignedUrlUsable(fullUrl) {
+  const exp = parseSignedUrlExpiry(fullUrl)
+  if (exp == null) {
+    return false
+  }
+  const now = Math.floor(Date.now() / 1000)
+  return exp > now + SIGNED_URL_EXPIRY_BUFFER_SEC
+}
+
+function hydrateSignedUrlCacheFromSession() {
+  if (sessionHydrated || typeof sessionStorage === 'undefined') {
+    sessionHydrated = true
+    return
+  }
+  sessionHydrated = true
+  try {
+    const raw = sessionStorage.getItem(SIGNED_URL_SESSION_KEY)
+    if (!raw) {
+      return
+    }
+    const parsed = JSON.parse(raw)
+    if (parsed == null || typeof parsed !== 'object') {
+      return
+    }
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value !== 'string' || !isSignedUrlUsable(value)) {
+        continue
+      }
+      signedUrlCache.set(key, value)
+    }
+  } catch {
+    /* ignore corrupt session cache */
+  }
+}
+
+function persistSignedUrlCacheToSession() {
+  if (typeof sessionStorage === 'undefined') {
+    return
+  }
+  try {
+    const payload = Object.fromEntries(signedUrlCache.entries())
+    sessionStorage.setItem(SIGNED_URL_SESSION_KEY, JSON.stringify(payload))
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function rememberSignedUrl(key, fullUrl) {
+  if (!isSignedUrlUsable(fullUrl)) {
+    return
+  }
+  signedUrlCache.set(key, fullUrl)
+  persistSignedUrlCacheToSession()
 }
 
 /**
@@ -22,10 +91,14 @@ export async function buildAuthenticatedPhotoUrl(token, photoId, variant = 'thum
   if (!isSignedUrlsEnabled()) {
     return null
   }
+  hydrateSignedUrlCacheFromSession()
   const key = cacheKey(photoId, variant)
   const cached = signedUrlCache.get(key)
-  if (cached) {
+  if (cached && isSignedUrlUsable(cached)) {
     return cached
+  }
+  if (cached) {
+    signedUrlCache.delete(key)
   }
   const search = new URLSearchParams()
   search.set('variant', variant)
@@ -40,7 +113,7 @@ export async function buildAuthenticatedPhotoUrl(token, photoId, variant = 'thum
   }
   const base = getApiBaseUrl()
   const full = `${base}${relative}`
-  signedUrlCache.set(key, full)
+  rememberSignedUrl(key, full)
   return full
 }
 
@@ -50,7 +123,18 @@ export async function buildAuthenticatedPhotoUrl(token, photoId, variant = 'thum
  * @returns {string | null}
  */
 export function peekAuthenticatedPhotoUrl(photoId, variant = 'thumbnail') {
-  return signedUrlCache.get(cacheKey(photoId, variant)) ?? null
+  hydrateSignedUrlCacheFromSession()
+  const key = cacheKey(photoId, variant)
+  const cached = signedUrlCache.get(key)
+  if (!cached) {
+    return null
+  }
+  if (!isSignedUrlUsable(cached)) {
+    signedUrlCache.delete(key)
+    persistSignedUrlCacheToSession()
+    return null
+  }
+  return cached
 }
 
 export function isPhotoSignedUrlsEnabled() {

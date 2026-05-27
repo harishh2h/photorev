@@ -3,9 +3,9 @@ import crypto from "node:crypto";
 export type PhotoContentVariant = "thumbnail" | "preview" | "original";
 
 const DEFAULT_TTL_BY_VARIANT: Record<PhotoContentVariant, number> = {
-  thumbnail: 3600,
-  preview: 3600,
-  original: 900,
+  thumbnail: 86400,
+  preview: 86400,
+  original: 86400,
 };
 
 function signingSecret(): string {
@@ -78,7 +78,7 @@ export function cacheControlForVariant(variant: PhotoContentVariant): string {
     return "private, max-age=86400, immutable";
   }
   if (variant === "preview") {
-    return "private, max-age=3600";
+    return "private, max-age=86400, immutable";
   }
-  return "private, no-cache";
+  return "private, max-age=86400, immutable";
 }

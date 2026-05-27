@@ -11,6 +11,8 @@ export interface ProjectGridItemDto {
   readonly id: string;
   readonly originalName: string | null;
   readonly status: string;
+  readonly width: number | null;
+  readonly height: number | null;
   readonly myDecision: number | null;
   readonly renamedTo: string | null;
   readonly teamDecision: number | null;
@@ -44,6 +46,8 @@ interface PhotoGridRow {
   readonly id: string;
   readonly original_name: string | null;
   readonly status: string;
+  readonly width: number | null;
+  readonly height: number | null;
   readonly final_decision: number | null;
   readonly conflict_state: string | null;
   readonly blurhash: string | null;
@@ -58,6 +62,8 @@ function mapGridRow(row: PhotoGridRow): ProjectGridItemDto {
     id: row.id,
     originalName: row.original_name,
     status: row.status,
+    width: row.width,
+    height: row.height,
     myDecision: row.my_decision,
     renamedTo: row.renamed_to,
     teamDecision: row.final_decision,
@@ -123,6 +129,8 @@ function buildProjectGridService(
         "photos.id",
         "photos.original_name",
         "photos.status",
+        "photos.width",
+        "photos.height",
         "photos.final_decision",
         "photos.conflict_state",
         "photos.blurhash",

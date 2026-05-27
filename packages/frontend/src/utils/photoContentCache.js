@@ -46,7 +46,8 @@ export function acquirePhotoContentUrl(photoId, variant) {
 }
 
 /**
- * Session cache — decrement ref count only; blob URLs stay for scroll-back reuse.
+ * In-memory blob URL cache for the current tab session.
+ * Pairs with browser HTTP cache when signed URLs are enabled (`<img src>` + Cache-Control).
  *
  * @param {string} photoId
  * @param {'thumbnail' | 'preview' | 'original'} variant

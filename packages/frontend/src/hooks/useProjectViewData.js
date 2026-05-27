@@ -39,6 +39,8 @@ function mapGridItemToPhoto(p) {
     id: p.id,
     alt: typeof p.originalName === 'string' ? p.originalName : 'Photo',
     status,
+    width: typeof p.width === 'number' && p.width > 0 ? p.width : null,
+    height: typeof p.height === 'number' && p.height > 0 ? p.height : null,
     blurhash: typeof p.blurhash === 'string' ? p.blurhash : null,
     myDecision,
     myIsLiked,

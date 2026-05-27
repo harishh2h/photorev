@@ -49,7 +49,7 @@ export default function PhotoViewerSwipeCard({
       {...handlers}
     >
       <div
-        className="relative flex max-h-full w-full items-center justify-center will-change-transform"
+        className="relative flex max-h-full h-full w-full items-center justify-center will-change-transform"
         style={{
           transform,
           transition: isExiting

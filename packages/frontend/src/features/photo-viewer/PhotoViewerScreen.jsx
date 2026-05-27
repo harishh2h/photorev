@@ -4,25 +4,32 @@ import PropTypes from 'prop-types'
 import PhotoViewerProgressiveImage from '@/features/photo-viewer/PhotoViewerProgressiveImage.jsx'
 import PhotoViewerInfoPanel from '@/features/photo-viewer/PhotoViewerInfoPanel.jsx'
 import PhotoViewerSwipeCard from '@/features/photo-viewer/PhotoViewerSwipeCard.jsx'
-import PhotoViewerMobileNav from '@/features/photo-viewer/PhotoViewerMobileNav.jsx'
+import PhotoViewerPhotoCounter from '@/features/photo-viewer/PhotoViewerPhotoCounter.jsx'
 import PhotoViewerReviewControls from '@/features/photo-viewer/PhotoViewerReviewControls.jsx'
+import PhotoViewerRenameControl from '@/features/photo-viewer/PhotoViewerRenameControl.jsx'
 import { usePhotoViewerShortcuts } from '@/features/photo-viewer/usePhotoViewerShortcuts.js'
+import { useAdjacentPhotoPrefetch } from '@/features/photo-viewer/useAdjacentPhotoPrefetch.js'
 import { upsertPhotoReview } from '@/services/photoReviewService.js'
 import { useToast } from '@/components/Toast/index.js'
 import { useBreakpoint } from '@/hooks/useBreakpoint.js'
+import {
+  viewerChromeMutedTextClass,
+  viewerChromePillClass,
+} from '@/features/photo-viewer/viewerChromeStyles.js'
+
+const topChromeBtnClass = `flex h-11 min-h-[44px] min-w-[44px] items-center justify-center ${viewerChromePillClass} ${viewerChromeMutedTextClass} transition-[color,background-color,border-color] duration-150 hover:border-white/25 hover:bg-white/[0.08] hover:text-white/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent`
 
 const photoPropShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
   alt: PropTypes.string.isRequired,
   status: PropTypes.oneOf(['pending', 'ready', 'failed']),
+  width: PropTypes.number,
+  height: PropTypes.number,
   isLiked: PropTypes.bool.isRequired,
   isRejected: PropTypes.bool.isRequired,
   renamedTo: PropTypes.string,
   selectionLabel: PropTypes.string,
 })
-
-const imageClassName =
-  'max-h-[min(calc(100dvh-10rem),calc(100vh-10rem))] w-auto max-w-full object-contain'
 
 /**
  * @param {{ photos: object[]; token: string; onRefresh: () => void; collaboratorMembers: Array<{ id: string; name: string }>; canReviewPhotos?: boolean }} props
@@ -55,8 +62,6 @@ export default function PhotoViewerScreen({
   const index = localPhotos.findIndex((p) => p.id === photoId)
   const current = index >= 0 ? localPhotos[index] : null
   const total = localPhotos.length
-  const canGoPrev = index > 0
-  const canGoNext = index >= 0 && index < total - 1
 
   useEffect(() => {
     if (current) {
@@ -192,6 +197,12 @@ export default function PhotoViewerScreen({
     canReview: canReviewPhotos,
   })
 
+  useAdjacentPhotoPrefetch({
+    token,
+    photos: localPhotos,
+    index,
+  })
+
   const swipeEnabled =
     isMobile &&
     Boolean(current) &&
@@ -213,20 +224,21 @@ export default function PhotoViewerScreen({
       token={token}
       alt={current.alt}
       status={current.status}
-      className={imageClassName}
+      width={current.width}
+      height={current.height}
     />
   )
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex flex-col bg-black pt-[env(safe-area-inset-top)]"
+      className="fixed inset-0 z-[300] flex flex-col overflow-hidden bg-black pt-[env(safe-area-inset-top)]"
       role="presentation"
     >
       <div className="absolute left-2 top-[max(0.5rem,env(safe-area-inset-top))] z-10 md:left-4">
         <button
           type="button"
           onClick={onExit}
-          className="flex h-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-pill border-[1.5px] border-white/15 bg-white/[0.04] text-white/55 transition-[color,background-color,border-color] duration-150 hover:border-white/25 hover:bg-white/[0.08] hover:text-white/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className={topChromeBtnClass}
           aria-label="Back to grid"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -235,11 +247,21 @@ export default function PhotoViewerScreen({
         </button>
       </div>
 
-      <div className="absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] z-10 md:right-4">
+      <div className="absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] z-10 flex items-center gap-2 md:right-4">
+        {canReviewPhotos ? (
+          <PhotoViewerRenameControl
+            photoId={current.id}
+            renameDraft={renameDraft}
+            savedRename={current.renamedTo ?? ''}
+            onRenameChange={setRenameDraft}
+            onRenameSubmit={handleRenameSubmit}
+            onFocusChange={setRenameFocused}
+          />
+        ) : null}
         <button
           type="button"
           onClick={() => setDetailOpen(true)}
-          className="flex h-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-pill border-[1.5px] border-white/15 bg-white/[0.04] text-white/55 transition-[color,background-color,border-color] duration-150 hover:border-white/25 hover:bg-white/[0.08] hover:text-white/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className={topChromeBtnClass}
           aria-label="Photo details"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -249,7 +271,7 @@ export default function PhotoViewerScreen({
         </button>
       </div>
 
-      <div className={`flex min-h-0 flex-1 items-center justify-center px-3 pt-16 sm:px-6 ${isMobile ? 'pb-44' : 'pb-36'}`}>
+      <div className="absolute inset-0 z-0">
         {isMobile ? (
           <PhotoViewerSwipeCard
             enabled={swipeEnabled}
@@ -267,58 +289,24 @@ export default function PhotoViewerScreen({
         )}
       </div>
 
-      {isMobile && canReviewPhotos ? (
-        <p className="pointer-events-none absolute inset-x-0 bottom-[calc(max(1rem,env(safe-area-inset-bottom))+11.5rem)] z-10 px-6 text-center font-base text-xs text-white/35">
-          Swipe right to like, left to reject. Swipe up or down to browse.
-        </p>
-      ) : null}
-
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
-        <div className="pointer-events-auto flex w-full flex-col gap-3 px-3 sm:px-6">
-          {isMobile ? (
-            <>
-              <PhotoViewerMobileNav
-                index={index}
-                total={total}
-                onPrev={goPrev}
-                onNext={goNext}
-                canGoPrev={canGoPrev}
-                canGoNext={canGoNext}
-                disabled={isSaving}
+        <div className="pointer-events-auto flex w-full items-center justify-between gap-3 px-3 sm:px-6">
+          <div className="flex min-w-0 flex-1 items-center">
+            {canReviewPhotos ? (
+              <PhotoViewerReviewControls
+                isLiked={current.isLiked}
+                isRejected={current.isRejected}
+                onLike={onLike}
+                onReject={onReject}
+                canReviewPhotos={canReviewPhotos}
               />
-              {canReviewPhotos ? (
-                <PhotoViewerReviewControls
-                  isLiked={current.isLiked}
-                  isRejected={current.isRejected}
-                  renameDraft={renameDraft}
-                  onRenameChange={setRenameDraft}
-                  onRenameSubmit={handleRenameSubmit}
-                  onLike={onLike}
-                  onReject={onReject}
-                  canReviewPhotos={canReviewPhotos}
-                  layout="mobile"
-                  onRenameFocusChange={setRenameFocused}
-                />
-              ) : (
-                <p className="mx-auto mb-1 max-w-lg rounded-full border-[1.5px] border-accent/45 bg-accent/15 px-5 py-3 text-center font-base text-sm font-medium leading-snug text-accent">
-                  View-only — favorites and rename are disabled for your role on this project.
-                </p>
-              )}
-            </>
-          ) : (
-            <PhotoViewerReviewControls
-              isLiked={current.isLiked}
-              isRejected={current.isRejected}
-              renameDraft={renameDraft}
-              onRenameChange={setRenameDraft}
-              onRenameSubmit={handleRenameSubmit}
-              onLike={onLike}
-              onReject={onReject}
-              canReviewPhotos={canReviewPhotos}
-              layout="desktop"
-              onRenameFocusChange={setRenameFocused}
-            />
-          )}
+            ) : (
+              <p className="max-w-lg rounded-full border-[1.5px] border-accent/45 bg-accent/15 px-5 py-3 font-base text-sm font-medium leading-snug text-accent">
+                View-only — favorites and rename are disabled for your role on this project.
+              </p>
+            )}
+          </div>
+          <PhotoViewerPhotoCounter index={index} total={total} />
         </div>
       </div>
 
