@@ -1,4 +1,6 @@
 export { default as DashboardHero } from './DashboardHero.jsx'
+export { default as DashboardEmptyHero } from './DashboardEmptyHero.jsx'
+export { default as ProjectsListEmpty } from './ProjectsListEmpty.jsx'
 export { default as StatCard } from './StatCard.jsx'
 export { default as ResumeSection } from './ResumeSection.jsx'
 export { default as ResumeCard } from './ResumeCard.jsx'

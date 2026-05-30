@@ -1,13 +1,12 @@
 import PropTypes from 'prop-types'
 import { Link } from 'react-router-dom'
 import AuthenticatedPhotoImage from '@/components/AuthenticatedPhotoImage'
+import DashboardEmptyHero from './DashboardEmptyHero.jsx'
 
 const coverFrameClass =
   'relative aspect-video w-full overflow-hidden rounded-[calc(1.5rem-8px)] bg-accent/10'
 const featuredPh = 'absolute inset-0 h-full w-full min-h-0'
 const coverImgClass = 'absolute inset-0 block h-full w-full min-h-0 object-cover object-center'
-const emptyVisualPh =
-  `${coverFrameClass} bg-base-200 bg-[radial-gradient(circle_at_1px_1px,rgba(16,185,129,0.28)_1px,transparent_0)] bg-[length:14px_14px]`
 
 function FeaturedCover({ usePhotoBanner, useLegacyBanner, effectivePhotoId, authToken, bannerUrl }) {
   return (
@@ -89,8 +88,18 @@ export default function DashboardHero({
   featuredProject = null,
   authToken = '',
   fallbackCoverPhotoId = '',
+  showEmptyWelcome = false,
+  onNewProjectClick,
 }) {
   const hasFeatured = featuredProject != null && featuredProject.id != null
+
+  if (showEmptyWelcome && typeof onNewProjectClick === 'function') {
+    return (
+      <section className="mb-10 md:mb-12">
+        <DashboardEmptyHero onNewProjectClick={onNewProjectClick} />
+      </section>
+    )
+  }
   const bannerPhotoId =
     hasFeatured && typeof featuredProject.bannerPhotoId === 'string' ? featuredProject.bannerPhotoId : ''
   const fallbackId =
@@ -100,11 +109,14 @@ export default function DashboardHero({
   const usePhotoBanner = effectivePhotoId.length > 0 && authToken.length > 0
   const useLegacyBanner = !usePhotoBanner && bannerUrl.length > 0
 
+  if (!hasFeatured) {
+    return null
+  }
+
   return (
     <section className="mb-10 md:mb-12">
       <article className="grid grid-cols-1 items-center gap-5 overflow-hidden rounded-card border-[1.5px] border-accent/40 bg-base-100 p-4 md:grid-cols-[minmax(0,52%)_1fr] md:gap-10 md:p-6">
-        {hasFeatured ? (
-          <>
+        <>
             <FeaturedCover
               usePhotoBanner={usePhotoBanner}
               useLegacyBanner={useLegacyBanner}
@@ -132,18 +144,7 @@ export default function DashboardHero({
                 Open project <span aria-hidden>→</span>
               </Link>
             </div>
-          </>
-        ) : (
-          <>
-            <div className={emptyVisualPh} aria-hidden />
-            <div className="flex min-w-0 flex-col gap-3">
-              <h2 className="m-0 font-base text-3xl text-base-content md:text-4xl">No projects yet</h2>
-              <p className="font-base text-base text-muted">
-                Use <span className="font-semibold text-base-content">+ New Project</span> above to create your first one.
-              </p>
-            </div>
-          </>
-        )}
+        </>
       </article>
     </section>
   )
@@ -164,4 +165,6 @@ DashboardHero.propTypes = {
   authToken: PropTypes.string,
   fallbackCoverPhotoId: PropTypes.string,
   featuredProject: featuredShape,
+  showEmptyWelcome: PropTypes.bool,
+  onNewProjectClick: PropTypes.func,
 }

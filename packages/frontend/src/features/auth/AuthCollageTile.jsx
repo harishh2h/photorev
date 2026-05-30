@@ -4,9 +4,10 @@ import { AuthLikedBadge, AuthRejectedBadge } from './AuthReviewBadges.jsx'
 /**
  * Decorative collage tile with optional liked / rejected review styling.
  */
-export default function AuthCollageTile({ url, variant = 'plain', className = '' }) {
+export default function AuthCollageTile({ url, variant = 'plain', className = '', imageScale = 1 }) {
   const isRejected = variant === 'rejected'
   const isLiked = variant === 'liked'
+  const zoomedImage = imageScale !== 1
 
   return (
     <div
@@ -19,6 +20,7 @@ export default function AuthCollageTile({ url, variant = 'plain', className = ''
         }`}
         style={{
           backgroundImage: `linear-gradient(to top, rgba(17,17,17,0.2), rgba(17,17,17,0)), url(${url})`,
+          ...(zoomedImage ? { transform: `scale(${imageScale})` } : {}),
         }}
       />
       {isRejected ? <div className="absolute inset-0 bg-muted/30" aria-hidden /> : null}
@@ -32,4 +34,6 @@ AuthCollageTile.propTypes = {
   url: PropTypes.string.isRequired,
   variant: PropTypes.oneOf(['plain', 'liked', 'rejected']),
   className: PropTypes.string,
+  /** Values below 1 pull the photo back inside the frame (less tight crop). */
+  imageScale: PropTypes.number,
 }

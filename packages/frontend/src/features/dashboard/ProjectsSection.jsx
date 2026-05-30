@@ -2,6 +2,7 @@ import PropTypes from 'prop-types'
 import { useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import LazyCoverProjectCard from './LazyCoverProjectCard'
+import ProjectsListEmpty from './ProjectsListEmpty.jsx'
 import { formatShortDate } from '@/utils/formatDate.js'
 import { useInViewport } from '@/hooks/useInViewport.js'
 
@@ -24,9 +25,11 @@ export default function ProjectsSection({
   isLoadingMore = false,
   hasMore = false,
   onLoadMore,
+  onNewProjectClick,
   authToken = '',
   coverContentVariant = 'thumbnail',
 }) {
+  const isEmpty = !isLoading && projects.length === 0
   const { ref: loadMoreRef, isInViewport } = useInViewport({ enabled: hasMore })
 
   useEffect(() => {
@@ -37,13 +40,19 @@ export default function ProjectsSection({
 
   return (
     <section className="mb-8">
-      <h2 className="m-0 mb-6 font-base text-2xl font-semibold text-base-content sm:text-3xl">Your projects</h2>
+      <div className="mb-6">
+        <h2 className="m-0 font-base text-2xl font-semibold text-base-content sm:text-3xl">Your projects</h2>
+        {isEmpty ? (
+          <p className="mt-2 mb-0 font-base text-sm text-muted">You haven&apos;t created any projects yet.</p>
+        ) : null}
+      </div>
       {isLoading && projects.length === 0 ? (
         <p className="mb-4 font-base text-sm text-muted">Loading…</p>
       ) : null}
-      {!isLoading && projects.length === 0 ? (
-        <p className="mb-6 font-base text-sm text-muted">No projects yet. Use “New Project” above to create one.</p>
+      {isEmpty && typeof onNewProjectClick === 'function' ? (
+        <ProjectsListEmpty onNewProjectClick={onNewProjectClick} />
       ) : null}
+      {!isEmpty ? (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {projects.map((project, index) => (
           <NavLink
@@ -76,6 +85,7 @@ export default function ProjectsSection({
           </NavLink>
         ))}
       </div>
+      ) : null}
       {hasMore ? (
         <div ref={loadMoreRef} className="mt-6 flex min-h-12 items-center justify-center" aria-hidden={!isLoadingMore}>
           {isLoadingMore ? (
@@ -106,6 +116,7 @@ ProjectsSection.propTypes = {
   isLoadingMore: PropTypes.bool,
   hasMore: PropTypes.bool,
   onLoadMore: PropTypes.func,
+  onNewProjectClick: PropTypes.func,
   authToken: PropTypes.string,
   coverContentVariant: PropTypes.oneOf(['thumbnail', 'preview', 'original']),
 }

@@ -162,6 +162,8 @@ export default function Dashboard() {
           featuredProject={featuredProject}
           authToken={token || ''}
           fallbackCoverPhotoId={heroFallbackCoverPhotoId || ''}
+          showEmptyWelcome={!isLoading && projects.length === 0}
+          onNewProjectClick={handleOpenAddProject}
         />
         <ProjectsSection
           projects={projects}
@@ -169,6 +171,7 @@ export default function Dashboard() {
           isLoadingMore={isLoadingMore}
           hasMore={hasMore}
           onLoadMore={loadMore}
+          onNewProjectClick={handleOpenAddProject}
           authToken={token || ''}
           coverContentVariant="preview"
         />
