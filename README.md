@@ -2,6 +2,20 @@
 
 Speed up photo review workflows after events.
 
+## UI Screenshots
+
+### Dashboard
+
+![PhotoRev dashboard — projects overview with review progress](assets/dashboard.png)
+
+*Home screen with your latest project, photo counts, and review progress at a glance.*
+
+### Project review
+
+![PhotoRev project view — photo grid with liked and rejected filters](assets/project.png)
+
+*Inside a project: filter by status, collaborate with your team, and mark favorites or rejects on the grid.*
+
 ## Structure
 
 - `packages/backend` - Fastify API (TypeScript, Knex, PostgreSQL)
