@@ -3,7 +3,6 @@ import path from "node:path";
 import sharp, { type Metadata } from "sharp";
 import { encode } from "blurhash";
 import { extractPhotoExif } from "./exifExtract";
-import { getDisplayDimensions as resolveDisplayDimensions } from "../../utils/photo-display-dimensions";
 
 const THUMBNAIL_MAX_PX = 320;
 const PREVIEW_MAX_PX = 1920;
@@ -83,14 +82,9 @@ export class ImageProcessor {
   }
 
   /**
-   * Returns display dimensions after applying EXIF orientation (swap for 90° rotations).
-   */
-  static getDisplayDimensions(meta: Metadata): { width: number | null; height: number | null } {
-    return resolveDisplayDimensions(meta.width ?? null, meta.height ?? null, meta.orientation ?? null);
-  }
-
-  /**
-   * Builds JSON-safe metadata plus dimensions for `photos.metadata` / `width` / `height`.
+   * Builds JSON-safe metadata plus raw file dimensions for `photos.metadata` / `width` / `height`.
+   * Stores Sharp's unrotated width/height; EXIF orientation is applied at read time via
+   * `getDisplayDimensionsFromMetadata`.
    * Omits Buffer fields (exif, icc, etc.) so JSONB storage does not bloat or fail.
    */
   static metadataToRow(meta: Metadata): {
@@ -112,11 +106,10 @@ export class ImageProcessor {
       pagePrimary: meta.pagePrimary ?? null,
       hasProfile: meta.hasProfile ?? null,
     };
-    const { width, height } = ImageProcessor.getDisplayDimensions(meta);
     return {
       metadata,
-      width,
-      height,
+      width: meta.width ?? null,
+      height: meta.height ?? null,
     };
   }
 
