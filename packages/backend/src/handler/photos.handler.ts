@@ -2,13 +2,16 @@ import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from "fastify";
+import type { Knex } from "knex";
 import buildPhotosService, {
   GetPhotoParams,
   ListPhotosFilters,
   PhotoDto,
   UpdatePhotoMetadataParams,
 } from "../services/photos.service";
+import { exportDisplayNameForPhoto } from "../utils/export-photo-paths";
 import { sendFailure, sendSuccess } from "../utils/api-response";
+import { sanitizeZipEntryName } from "../utils/zip-entry-name";
 import { getAuthenticatedUserId } from "../utils/auth";
 import {
   cacheControlForVariant,
@@ -174,6 +177,7 @@ function buildPhotosHandler(
   fastify: FastifyInstance,
   _opts: FastifyPluginOptions,
 ): PhotosHandlerMethods {
+  const db: Knex = fastify.db;
   const service = buildPhotosService(fastify, _opts);
 
   const handler: PhotosHandlerMethods = {
@@ -291,7 +295,21 @@ function buildPhotosHandler(
         sendFailure(reply, 404, "Original file not available", null);
         return;
       }
-      const safeName = (photo.originalName || `photo-${paramsRaw.photoId}.jpg`).replace(/"/g, "");
+      const review = await db("photo_reviews")
+        .select("renamed_to")
+        .where("photo_id", paramsRaw.photoId)
+        .where("user_id", userId)
+        .first<{ renamed_to: string | null }>();
+      const safeName = sanitizeZipEntryName(
+        exportDisplayNameForPhoto({
+          id: paramsRaw.photoId,
+          original_name: photo.originalName,
+          renamed_to: review?.renamed_to ?? null,
+          original_path: null,
+          preview_path: null,
+        }),
+        `photo-${paramsRaw.photoId}.jpg`,
+      ).replace(/"/g, "");
       const mimeType = getMimeTypeForImagePath(absolutePath) || photo.mimeType || "image/jpeg";
       reply.header("Cache-Control", "no-store");
       reply.header("Content-Disposition", `attachment; filename="${safeName}"`);

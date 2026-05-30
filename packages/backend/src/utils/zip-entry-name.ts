@@ -11,3 +11,22 @@ export function sanitizeZipEntryName(raw: string, fallback: string): string {
   }
   return fallback;
 }
+
+/** Ensures each entry name is unique within one ZIP archive. */
+export function uniquifyZipEntryName(name: string, used: Set<string>): string {
+  if (!used.has(name)) {
+    used.add(name);
+    return name;
+  }
+  const ext = path.extname(name);
+  const stem = ext ? name.slice(0, -ext.length) : name;
+  let i = 2;
+  while (true) {
+    const candidate = `${stem}-${i}${ext}`;
+    if (!used.has(candidate)) {
+      used.add(candidate);
+      return candidate;
+    }
+    i += 1;
+  }
+}

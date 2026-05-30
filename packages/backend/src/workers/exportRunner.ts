@@ -8,7 +8,7 @@ import {
 } from "../models/project-export";
 import {
   resolveExportPhotoAbsolutePath,
-  zipEntryNameForPhoto,
+  zipEntryNamesForPhotos,
   type ExportPhotoRow,
 } from "../utils/export-photo-paths";
 import { getStorageRoot } from "../utils/storage";
@@ -60,18 +60,37 @@ export class ExportRunner {
 
   private async processExport(job: ProjectExportRecord): Promise<void> {
     try {
-      const photos = await db<ExportPhotoRow>("photos")
-        .select("id", "original_name", "original_path", "preview_path")
-        .where("project_id", job.project_id)
-        .andWhere("status", "ready")
-        .andWhere("final_decision", 1)
-        .orderBy("created_at", "asc");
+      let photosQuery = db<ExportPhotoRow>("photos")
+        .select(
+          "photos.id",
+          "photos.original_name",
+          "photos.original_path",
+          "photos.preview_path",
+        )
+        .where("photos.project_id", job.project_id)
+        .andWhere("photos.status", "ready")
+        .andWhere("photos.final_decision", 1)
+        .orderBy("photos.created_at", "asc");
+
+      if (job.created_by_user_id) {
+        photosQuery = photosQuery
+          .leftJoin("photo_reviews", function joinCreatorReview() {
+            this.on("photo_reviews.photo_id", "photos.id").andOn(
+              "photo_reviews.user_id",
+              db.raw("?", [job.created_by_user_id]),
+            );
+          })
+          .select(db.raw("photo_reviews.renamed_to as renamed_to"));
+      }
+
+      const photos = await photosQuery;
 
       if (photos.length === 0) {
         throw new Error("No selected photos to export");
       }
 
       const variant = job.variant as ProjectExportVariant;
+      const entryNames = zipEntryNamesForPhotos(photos, variant);
       const entries: Array<{ absolutePath: string; entryName: string }> = [];
 
       for (let i = 0; i < photos.length; i += 1) {
@@ -80,7 +99,7 @@ export class ExportRunner {
         if (!abs) continue;
         entries.push({
           absolutePath: abs,
-          entryName: zipEntryNameForPhoto(photo, variant, i),
+          entryName: entryNames[i],
         });
       }
 

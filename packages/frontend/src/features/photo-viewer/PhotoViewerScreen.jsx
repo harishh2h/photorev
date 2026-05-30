@@ -8,6 +8,7 @@ import PhotoViewerPhotoCounter from '@/features/photo-viewer/PhotoViewerPhotoCou
 import PhotoViewerReviewControls from '@/features/photo-viewer/PhotoViewerReviewControls.jsx'
 import PhotoViewerRenameControl from '@/features/photo-viewer/PhotoViewerRenameControl.jsx'
 import PhotoViewerDownloadControl from '@/features/photo-viewer/PhotoViewerDownloadControl.jsx'
+import { exportDownloadFilename } from '@/utils/exportDownloadFilename.js'
 import { usePhotoViewerShortcuts } from '@/features/photo-viewer/usePhotoViewerShortcuts.js'
 import { useAdjacentPhotoPrefetch } from '@/features/photo-viewer/useAdjacentPhotoPrefetch.js'
 import { upsertPhotoReview } from '@/services/photoReviewService.js'
@@ -285,7 +286,12 @@ export default function PhotoViewerScreen({
         ) : null}
         <PhotoViewerDownloadControl
           photoId={displayPhoto.id}
-          filename={displayPhoto.alt}
+          filename={
+            exportDownloadFilename({
+              originalName: displayPhoto.alt,
+              renamedTo: displayPhoto.renamedTo,
+            }) ?? displayPhoto.alt
+          }
           token={token}
           onError={handleDownloadError}
         />

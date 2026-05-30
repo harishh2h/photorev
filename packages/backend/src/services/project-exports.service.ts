@@ -181,7 +181,11 @@ function buildProjectExportsService(
     userId: string | null;
     shareLinkId: string | null;
   }): Promise<ProjectExportDto> {
-    const { hash, photoCount } = await computeProjectSelectionHash(db, params.projectId);
+    const { hash, photoCount } = await computeProjectSelectionHash(
+      db,
+      params.projectId,
+      params.userId,
+    );
     if (photoCount === 0) {
       throw new Error("No selected photos to download");
     }

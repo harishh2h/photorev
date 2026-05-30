@@ -7,11 +7,12 @@ import {
   getStorageRoot,
   mediaStoragePathForApi,
 } from "./storage";
-import { sanitizeZipEntryName } from "./zip-entry-name";
+import { sanitizeZipEntryName, uniquifyZipEntryName } from "./zip-entry-name";
 
 export interface ExportPhotoRow {
   readonly id: string;
   readonly original_name: string | null;
+  readonly renamed_to?: string | null;
   readonly original_path: string | null;
   readonly preview_path: string | null;
 }
@@ -57,17 +58,44 @@ export async function resolveExportPhotoAbsolutePath(
   return disk ? readableOrNull(disk) : null;
 }
 
-export function zipEntryNameForPhoto(
-  photo: ExportPhotoRow,
-  variant: ProjectExportVariant,
-  index: number,
-): string {
+/**
+ * Client-facing filename: rename suggestion when set, otherwise upload original_name.
+ */
+export function exportDisplayNameForPhoto(photo: ExportPhotoRow): string {
+  const renamed = photo.renamed_to?.trim();
+  if (renamed) {
+    if (!path.extname(renamed) && photo.original_name) {
+      const originalExt = path.extname(photo.original_name);
+      if (originalExt) {
+        return `${renamed}${originalExt}`;
+      }
+    }
+    return renamed;
+  }
+  return photo.original_name?.trim() ?? "";
+}
+
+export function zipEntryNameForPhoto(photo: ExportPhotoRow, variant: ProjectExportVariant): string {
   const fallback =
     variant === "preview" ? `photo-${photo.id}.jpg` : `photo-${photo.id}`;
-  const base = sanitizeZipEntryName(photo.original_name ?? "", fallback);
+  const base = sanitizeZipEntryName(exportDisplayNameForPhoto(photo), fallback);
   if (variant === "preview") {
     const stem = base.replace(/\.[^.]+$/, "") || `photo-${photo.id}`;
-    return `${String(index + 1).padStart(4, "0")}-${stem}.jpg`;
+    return `${stem}.jpg`;
   }
-  return `${String(index + 1).padStart(4, "0")}-${base}`;
+  return base;
+}
+
+/**
+ * Assigns ZIP entry names; resolves collisions with numeric suffixes (foo-2.jpg).
+ */
+export function zipEntryNamesForPhotos(
+  photos: ExportPhotoRow[],
+  variant: ProjectExportVariant,
+): string[] {
+  const used = new Set<string>();
+  return photos.map((photo) => {
+    const raw = zipEntryNameForPhoto(photo, variant);
+    return uniquifyZipEntryName(raw, used);
+  });
 }
