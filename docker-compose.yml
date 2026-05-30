@@ -40,7 +40,7 @@ services:
       AUTH_PUBLIC_REGISTRATION: ${AUTH_PUBLIC_REGISTRATION:-false}
       NODE_ENV: ${NODE_ENV:-development}
     volumes:
-      - ${STORAGE_PATH:-~/data/photorev}:/app/storage
+      - ${STORAGE_PATH:-/data/photorev}:/app/storage
     ports:
       - "${API_PORT:-3000}:3000"
     networks:
