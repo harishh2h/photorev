@@ -7,6 +7,12 @@ import {
 } from "../utils/pagination";
 import { loadProjectPermissionContext } from "../utils/project-permissions";
 import { getDisplayDimensionsFromMetadata } from "../utils/photo-display-dimensions";
+import {
+  applyProjectGridFilters,
+  ProjectGridPhotoFilter,
+  ProjectGridQueryFilters,
+  ProjectGridReviewScope,
+} from "../utils/project-grid-filters";
 
 export interface ProjectGridItemDto {
   readonly id: string;
@@ -108,11 +114,16 @@ function buildFilterCounts(rows: PhotoGridRow[]): ProjectGridFilterCounts {
   };
 }
 
+export interface ProjectGridQuery extends PaginationParams {
+  readonly scope?: ProjectGridReviewScope;
+  readonly filter?: ProjectGridPhotoFilter;
+}
+
 export interface ProjectGridServiceMethods {
   getProjectGrid: (
     userId: string,
     projectId: string,
-    pagination: PaginationParams,
+    query: ProjectGridQuery,
   ) => Promise<ProjectGridResult | null>;
   getPendingPhotoStatuses: (
     userId: string,
@@ -164,18 +175,23 @@ function buildProjectGridService(
   async function getProjectGrid(
     userId: string,
     projectId: string,
-    pagination: PaginationParams,
+    query: ProjectGridQuery,
   ): Promise<ProjectGridResult | null> {
     const allRows = await loadAccessibleProjectPhotos(userId, projectId);
     if (!allRows) {
       return null;
     }
-    const total = allRows.length;
-    const page = pagination.page && pagination.page > 0 ? pagination.page : 1;
+    const gridFilters: ProjectGridQueryFilters = {
+      scope: query.scope ?? "mine",
+      filter: query.filter ?? "all",
+    };
+    const filteredRows = applyProjectGridFilters(allRows, gridFilters);
+    const total = filteredRows.length;
+    const page = query.page && query.page > 0 ? query.page : 1;
     const pageSize =
-      pagination.pageSize && pagination.pageSize > 0 ? Math.min(pagination.pageSize, 100) : 100;
+      query.pageSize && query.pageSize > 0 ? Math.min(query.pageSize, 100) : 100;
     const offset = (page - 1) * pageSize;
-    const pageRows = allRows.slice(offset, offset + pageSize);
+    const pageRows = filteredRows.slice(offset, offset + pageSize);
     const items = pageRows.map(mapGridRow);
     const base = buildPaginatedResult(items, total, page, pageSize);
     return {

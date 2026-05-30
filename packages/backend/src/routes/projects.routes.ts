@@ -118,6 +118,11 @@ const projectGridSchema = {
     properties: {
       page: { type: "integer", minimum: 1 },
       pageSize: { type: "integer", minimum: 1, maximum: 100 },
+      scope: { type: "string", enum: ["mine", "team"] },
+      filter: {
+        type: "string",
+        enum: ["all", "liked", "rejected", "unreviewed", "conflicts", "trashed"],
+      },
     },
     additionalProperties: false,
   },

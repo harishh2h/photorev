@@ -3,12 +3,14 @@ import { apiFetch } from './httpClient.js'
 /**
  * @param {string} token
  * @param {string} projectId
- * @param {{ page?: number; pageSize?: number }} [params]
+ * @param {{ page?: number; pageSize?: number; scope?: string; filter?: string }} [params]
  */
 export async function fetchProjectGrid(token, projectId, params = {}) {
   const search = new URLSearchParams()
   if (params.page) search.set('page', String(params.page))
   if (params.pageSize) search.set('pageSize', String(params.pageSize))
+  if (params.scope) search.set('scope', params.scope)
+  if (params.filter) search.set('filter', params.filter)
   const qs = search.toString()
   const path = qs
     ? `/projects/${encodeURIComponent(projectId)}/grid?${qs}`

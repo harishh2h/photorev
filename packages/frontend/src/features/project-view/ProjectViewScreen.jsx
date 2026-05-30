@@ -1,9 +1,8 @@
-import { useMemo, useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PropTypes from 'prop-types'
-import ProjectViewToolbar from './ProjectViewToolbar.jsx'
+import { ProjectChrome } from '@/features/project-view/chrome/index.js'
 import ProjectPhotoTile from './ProjectPhotoTile.jsx'
-import ProjectViewSidebar from './ProjectViewSidebar.jsx'
 import { JustifiedPhotoGrid } from '@/components/photo-grid/index.js'
 import ProjectGridOverlays from './ProjectGridOverlays.jsx'
 import ProjectUploadStatusFloat from './ProjectUploadStatusFloat.jsx'
@@ -14,38 +13,36 @@ import { ShareLinkModal } from '@/features/share/index.js'
 import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
 import { finalizeProject as finalizeProjectApi } from '@/services/projectService.js'
 import { useToast } from '@/components/Toast/index.js'
-import { filterPhotos, REVIEW_SCOPE, PHOTO_FILTER } from '@/utils/projectReviewFilters.js'
+import { REVIEW_SCOPE } from '@/utils/projectReviewFilters.js'
 import { isPhotoVirtualGridEnabled } from '@/utils/photoContentUrl.js'
 
 /**
- * @param {{ data: object; token: string; projectId: string; onRefresh: () => void; onLoadMorePhotos?: () => void; hasMorePhotos?: boolean; isLoadingMore?: boolean }} props
+ * @param {{ data: object; token: string; projectId: string; userDisplayName?: string; onLogout?: () => void; onRefresh: () => void; onLoadMorePhotos?: () => void; hasMorePhotos?: boolean; isLoadingMore?: boolean; isLoadingGrid?: boolean; reviewScope: string; activeFilter: string; onReviewScopeChange: (scope: string) => void; onFilterChange: (filter: string) => void }} props
  * @returns {import('react').JSX.Element}
  */
 export default function ProjectViewScreen({
   data,
   token,
   projectId,
+  userDisplayName = 'User',
+  onLogout,
   onRefresh,
   onLoadMorePhotos,
   hasMorePhotos = false,
   isLoadingMore = false,
+  isLoadingGrid = false,
+  reviewScope,
+  activeFilter,
+  onReviewScopeChange,
+  onFilterChange,
 }) {
   const navigate = useNavigate()
   const { show: showToast } = useToast()
   const canReviewPhotos = data.canReviewPhotos !== false
-  const [reviewScope, setReviewScope] = useState(
-    data.isProjectCreator ? REVIEW_SCOPE.TEAM : REVIEW_SCOPE.MINE
-  )
-  const [activeFilter, setActiveFilter] = useState(PHOTO_FILTER.ALL)
   const [collaboratorsOpen, setCollaboratorsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [finalizeOpen, setFinalizeOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
-
-  useEffect(() => {
-    setReviewScope(data.isProjectCreator ? REVIEW_SCOPE.TEAM : REVIEW_SCOPE.MINE)
-    setActiveFilter(PHOTO_FILTER.ALL)
-  }, [projectId, data.isProjectCreator])
 
   const {
     fileInputRef,
@@ -63,20 +60,14 @@ export default function ProjectViewScreen({
     maxUploadConcurrency,
   } = useProjectPhotoUpload({ token, projectId, onAfterBatch: onRefresh })
 
-  const filteredPhotos = useMemo(() => {
-    if (!canReviewPhotos) {
-      return data.photos.filter((p) => p.teamIsLiked)
-    }
-    return filterPhotos(data.photos, data.trashedPhotos ?? [], {
-      scope: reviewScope,
-      filter: activeFilter,
-    })
-  }, [canReviewPhotos, activeFilter, reviewScope, data.photos, data.trashedPhotos])
+  const gridPhotos = data.photos
 
-  const handleReviewScopeChange = useCallback((scope) => {
-    setReviewScope(scope)
-    setActiveFilter(PHOTO_FILTER.ALL)
-  }, [])
+  const handleReviewScopeChange = useCallback(
+    (scope) => {
+      onReviewScopeChange(scope)
+    },
+    [onReviewScopeChange]
+  )
 
   const handleFinalize = useCallback(() => {
     if (data.isProjectCreator) {
@@ -114,10 +105,10 @@ export default function ProjectViewScreen({
   const openPhotoViewer = useCallback(
     (photoId) => {
       navigate(`/projects/${projectId}/photos/${photoId}`, {
-        state: { viewerPhotoIds: filteredPhotos.map((p) => p.id) },
+        state: { viewerPhotoIds: gridPhotos.map((p) => p.id) },
       })
     },
-    [navigate, projectId, filteredPhotos]
+    [navigate, projectId, gridPhotos]
   )
 
   const emptyMessage = canReviewPhotos
@@ -126,7 +117,7 @@ export default function ProjectViewScreen({
   const useVirtualGrid = isPhotoVirtualGridEnabled()
 
   return (
-    <div className="lg:pr-[min(300px,100vw)]">
+    <div>
       <input
         ref={fileInputRef}
         type="file"
@@ -137,15 +128,28 @@ export default function ProjectViewScreen({
         aria-hidden
         onChange={handleFileInputChange}
       />
-      <ProjectViewToolbar
+      <ProjectChrome
         projectTitle={data.projectTitle}
+        isFinalized={Boolean(data.isFinalized)}
+        userDisplayName={userDisplayName}
+        onLogout={onLogout}
+        token={token}
+        projectId={projectId}
+        isProjectCreator={Boolean(data.isProjectCreator)}
+        canShare={Boolean(data.isProjectCreator)}
         canReviewPhotos={canReviewPhotos}
         reviewScope={reviewScope}
         onReviewScopeChange={handleReviewScopeChange}
         filterCounts={data.filterCounts}
         activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
-        isFinalized={Boolean(data.isFinalized)}
+        onFilterChange={onFilterChange}
+        sidebarStats={data.sidebarStats}
+        collaboratorMembers={data.collaboratorMembers}
+        onManageCollaborators={data.isProjectCreator ? handleManageCollaborators : undefined}
+        onShare={handleShare}
+        onFinalize={handleFinalize}
+        onSettings={handleSettings}
+        viewerSelectedCount={data.sidebarStats.viewer.selected}
       />
       {showUploadPanel ? (
         <ProjectUploadStatusFloat
@@ -160,18 +164,22 @@ export default function ProjectViewScreen({
           onRetryFailed={retryFailedUploads}
         />
       ) : null}
-      <div className={`flex flex-col gap-6 pb-28 pt-4 lg:block ${canReviewPhotos ? 'lg:pb-32' : 'lg:pb-10'}`}>
+      <div className={`relative flex flex-col gap-6 pb-28 pt-4 ${canReviewPhotos ? 'lg:pb-16' : 'lg:pb-10'}`}>
+        {isLoadingGrid ? (
+          <div
+            className="pointer-events-none absolute inset-0 z-raised flex items-start justify-center bg-base-100/50 pt-16"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <span className="loading loading-spinner loading-md text-accent" aria-hidden />
+            <span className="sr-only">Loading photos…</span>
+          </div>
+        ) : null}
         <div className="min-w-0">
           <div className="relative pb-8 lg:pb-10">
-            {canReviewPhotos && data.collaboratingLabel !== 'SOLO REVIEW' ? (
-              <p className="pointer-events-none mb-4 flex w-fit max-w-full items-center gap-2 rounded-full border-[1.5px] border-base-300 bg-base-100 px-5 py-2 font-base text-xs font-semibold uppercase tracking-[0.06em] text-muted shadow-card">
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
-                {data.collaboratingLabel}
-              </p>
-            ) : null}
-            {filteredPhotos.length > 0 ? (
+            {gridPhotos.length > 0 ? (
               <JustifiedPhotoGrid
-                photos={filteredPhotos}
+                photos={gridPhotos}
                 virtualized={useVirtualGrid}
                 onLoadMore={onLoadMorePhotos}
                 hasMore={hasMorePhotos}
@@ -203,22 +211,6 @@ export default function ProjectViewScreen({
             ) : null}
           </div>
         </div>
-        <ProjectViewSidebar
-          sidebarStats={data.sidebarStats}
-          reviewScope={reviewScope}
-          canReviewPhotos={canReviewPhotos}
-          collaboratorMembers={data.collaboratorMembers}
-          showSettings={Boolean(data.isProjectCreator)}
-          isFinalized={Boolean(data.isFinalized)}
-          canShare={Boolean(data.isProjectCreator)}
-          isProjectCreator={Boolean(data.isProjectCreator)}
-          token={token}
-          projectId={projectId}
-          onFinalize={handleFinalize}
-          onShare={handleShare}
-          onSettings={handleSettings}
-          onManageCollaborators={data.isProjectCreator ? handleManageCollaborators : undefined}
-        />
       </div>
       <ProjectSettingsModal
         isOpen={settingsOpen}
@@ -240,10 +232,7 @@ export default function ProjectViewScreen({
         token={token}
         projectId={projectId}
         members={Array.isArray(data.collaboratorsRows) ? data.collaboratorsRows : []}
-        onSaved={() => {
-          setCollaboratorsOpen(false)
-          onRefresh()
-        }}
+        onSaved={onRefresh}
       />
       <FinalizeReviewModal
         isOpen={finalizeOpen}
@@ -289,10 +278,17 @@ const collaboratorMemberShape = PropTypes.shape({
 ProjectViewScreen.propTypes = {
   token: PropTypes.string.isRequired,
   projectId: PropTypes.string.isRequired,
+  userDisplayName: PropTypes.string,
+  onLogout: PropTypes.func,
   onRefresh: PropTypes.func.isRequired,
   onLoadMorePhotos: PropTypes.func,
   hasMorePhotos: PropTypes.bool,
   isLoadingMore: PropTypes.bool,
+  isLoadingGrid: PropTypes.bool,
+  reviewScope: PropTypes.oneOf([REVIEW_SCOPE.MINE, REVIEW_SCOPE.TEAM]).isRequired,
+  activeFilter: PropTypes.string.isRequired,
+  onReviewScopeChange: PropTypes.func.isRequired,
+  onFilterChange: PropTypes.func.isRequired,
   data: PropTypes.shape({
     projectTitle: PropTypes.string.isRequired,
     collaboratingLabel: PropTypes.string.isRequired,

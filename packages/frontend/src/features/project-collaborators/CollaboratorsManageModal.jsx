@@ -7,19 +7,53 @@ import {
   removeProjectMember,
   updateMemberRole,
 } from '@/services/projectMemberService.js'
+import CollaboratorTeamRow from './CollaboratorTeamRow.jsx'
+import {
+  INVITE_ROLE,
+  REVIEWER_ROLE_HINT,
+  TEAM_ROLE_FILTERS,
+  memberMatchesTeamFilter,
+} from './collaboratorRoles.js'
 
-const ROLE_OPTIONS = /** @type {const} */ (['viewer', 'reviewer', 'contributor'])
-
-const ROLE_HINT = {
-  viewer: 'View photos only — no voting or uploads.',
-  reviewer: 'Vote and rename — no uploads.',
-  contributor: 'Vote, rename, and upload photos.',
+function UserPlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="8.5" cy="7" r="4" />
+      <path d="M20 8v6M23 11h-6" />
+    </svg>
+  )
 }
 
-function roleLabel(role) {
-  if (role === 'viewer') return 'Viewer'
-  if (role === 'contributor') return 'Contributor'
-  return 'Reviewer'
+function UsersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  )
+}
+
+function ChevronIcon({ open }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+      className={`shrink-0 text-muted transition-transform duration-250 ease-out ${open ? 'rotate-180' : ''}`}
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}
+
+ChevronIcon.propTypes = {
+  open: PropTypes.bool.isRequired,
 }
 
 /**
@@ -36,7 +70,8 @@ export default function CollaboratorsManageModal({
   const [emailDraft, setEmailDraft] = useState('')
   const [lookupUser, setLookupUser] = useState(/** @type {{ id: string; name: string; email: string } | null | undefined} */ (undefined))
   const [lookupPending, setLookupPending] = useState(false)
-  const [inviteRole, setInviteRole] = useState('reviewer')
+  const [teamFilter, setTeamFilter] = useState('all')
+  const [inviteOpen, setInviteOpen] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const debounceRef = useRef(/** @type {ReturnType<typeof setTimeout> | null} */ (null))
@@ -45,7 +80,8 @@ export default function CollaboratorsManageModal({
     if (!isOpen) {
       setEmailDraft('')
       setLookupUser(undefined)
-      setInviteRole('reviewer')
+      setTeamFilter('all')
+      setInviteOpen(false)
       setError('')
       setBusy(false)
       return undefined
@@ -86,6 +122,7 @@ export default function CollaboratorsManageModal({
 
   const memberIds = new Set(members.map((m) => String(m.userId ?? '')))
   const canInviteLookup = Boolean(lookupUser && !memberIds.has(lookupUser.id))
+  const filteredMembers = members.filter((m) => memberMatchesTeamFilter(m, teamFilter))
 
   const handleInvite = useCallback(async () => {
     if (!lookupUser || !canInviteLookup) return
@@ -94,17 +131,18 @@ export default function CollaboratorsManageModal({
     try {
       await addProjectMember(token, projectId, {
         userId: lookupUser.id,
-        role: /** @type {'viewer' | 'reviewer' | 'contributor'} */ (inviteRole),
+        role: INVITE_ROLE,
       })
       onSaved()
       setEmailDraft('')
       setLookupUser(undefined)
+      setInviteOpen(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not add member')
     } finally {
       setBusy(false)
     }
-  }, [canInviteLookup, inviteRole, lookupUser, onSaved, projectId, token])
+  }, [canInviteLookup, lookupUser, onSaved, projectId, token])
 
   const handleRemove = useCallback(
     async (userId) => {
@@ -124,6 +162,9 @@ export default function CollaboratorsManageModal({
 
   const handleRoleChange = useCallback(
     async (userId, role) => {
+      const member = members.find((m) => String(m.userId ?? '') === userId)
+      if (member && String(member.role) === role) return
+
       setBusy(true)
       setError('')
       try {
@@ -137,7 +178,7 @@ export default function CollaboratorsManageModal({
         setBusy(false)
       }
     },
-    [onSaved, projectId, token]
+    [members, onSaved, projectId, token]
   )
 
   if (!isOpen) return null
@@ -155,129 +196,140 @@ export default function CollaboratorsManageModal({
         role="dialog"
         aria-labelledby="collab-modal-title"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 id="collab-modal-title" className="m-0 font-base text-xl font-semibold text-base-content">
-              Collaborators
-            </h2>
-            <p className="mt-1 font-base text-sm text-muted">Invite by email and set roles. Only you can manage this list.</p>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 id="collab-modal-title" className="m-0 font-base text-xl font-bold text-base-content">
+                Collaborators
+              </h2>
+              <p className="mt-1 font-base text-sm text-muted">
+                Invite people to collaborate and set their roles.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-sm btn-circle btn-ghost min-h-11 min-w-11 border-[1.5px] border-transparent text-muted transition-[border-color,background-color,transform] duration-150 ease-out hover:border-accent-mid hover:bg-surface-hover active:scale-[0.94] focus-visible:outline-none focus-visible:shadow-focus"
+              aria-label="Close"
+              disabled={busy}
+              onClick={onClose}
+            >
+              ✕
+            </button>
           </div>
-          <button
-            type="button"
-            className="btn btn-sm btn-circle btn-ghost min-h-11 min-w-11 border-[1.5px] border-transparent text-muted hover:border-accent-mid hover:bg-[#F4F9F6]"
-            aria-label="Close"
-            disabled={busy}
-            onClick={onClose}
-          >
-            ✕
-          </button>
-        </div>
 
-        <div className="rounded-md border-[1.5px] border-accent/25 bg-[#EDF7F2] p-4">
-          <label htmlFor="collab-email" className="font-base text-xs font-semibold uppercase tracking-[0.06em] text-muted">
-            Email lookup
-          </label>
-          <input
-            id="collab-email"
-            type="email"
-            autoComplete="off"
-            placeholder="name@studio.com"
-            value={emailDraft}
-            onChange={(e) => {
-              setEmailDraft(e.target.value)
-              setError('')
-            }}
-            className="input input-bordered mt-2 w-full rounded-full border-[1.5px] border-base-300 bg-base-100 px-4 py-3 font-base text-sm text-base-content placeholder:text-muted focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(16,185,129,0.2)]"
-          />
-          <p className="mt-2 mb-0 font-base text-xs text-muted">
-            {lookupPending ? 'Searching…' : null}
-            {!lookupPending && lookupUser === null && emailDraft.trim().length >= 3 ? 'No account found for this email.' : null}
-            {!lookupPending && lookupUser ? `${lookupUser.name} · ${lookupUser.email}` : null}
-          </p>
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label className="flex min-w-0 flex-1 flex-col gap-1 font-base text-xs font-semibold uppercase tracking-[0.06em] text-muted">
-              Role
+          <section className="rounded-md border-[1.5px] border-base-300 bg-bg">
+            <button
+              type="button"
+              className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-4 py-3 font-base text-sm font-semibold text-base-content transition-[background-color] duration-150 ease-out hover:bg-surface-hover focus-visible:outline-none focus-visible:shadow-focus"
+              aria-expanded={inviteOpen}
+              aria-controls="collab-invite-panel"
+              onClick={() => setInviteOpen((open) => !open)}
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-accent" aria-hidden>
+                  <UserPlusIcon />
+                </span>
+                Invite collaborator
+              </span>
+              <ChevronIcon open={inviteOpen} />
+            </button>
+            {inviteOpen ? (
+              <div id="collab-invite-panel" className="border-t-[1.5px] border-base-300 px-4 pb-4 pt-3">
+                <label htmlFor="collab-email" className="block font-base text-sm font-medium text-base-content">
+                  Email address
+                </label>
+                <input
+                  id="collab-email"
+                  type="email"
+                  autoComplete="off"
+                  placeholder="name@studio.com"
+                  value={emailDraft}
+                  onChange={(e) => {
+                    setEmailDraft(e.target.value)
+                    setError('')
+                  }}
+                  className="input input-bordered mt-2 w-full rounded-full border-[1.5px] border-base-300 bg-base-100 px-4 py-3 font-base text-sm text-base-content placeholder:text-muted focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(16,185,129,0.2)]"
+                />
+                <p className="mt-2 mb-0 font-base text-xs text-muted">
+                  {lookupPending ? 'Searching…' : null}
+                  {!lookupPending && lookupUser === null && emailDraft.trim().length >= 3
+                    ? 'No account found for this email.'
+                    : null}
+                  {!lookupPending && lookupUser ? `${lookupUser.name} · ${lookupUser.email}` : null}
+                </p>
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <label className="flex min-w-0 flex-1 flex-col gap-1 font-base text-sm font-medium text-base-content">
+                    Role
+                    <select
+                      value={INVITE_ROLE}
+                      disabled
+                      className="select select-bordered w-full rounded-full border-[1.5px] border-base-300 bg-base-100 px-4 py-3 font-base text-sm focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(16,185,129,0.2)]"
+                      aria-describedby="collab-role-hint"
+                    >
+                      <option value="reviewer">Reviewer</option>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!canInviteLookup || busy}
+                    onClick={handleInvite}
+                    className="btn shrink-0 rounded-full border-0 bg-accent px-6 font-base text-sm font-semibold text-white transition-[transform,opacity,background-color] duration-150 ease-out hover:bg-accent-hover active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Add
+                  </button>
+                </div>
+                <p id="collab-role-hint" className="mt-2 mb-0 font-base text-xs text-muted">
+                  {REVIEWER_ROLE_HINT}
+                </p>
+                {lookupUser && memberIds.has(lookupUser.id) ? (
+                  <p className="mt-2 mb-0 font-base text-xs text-muted">This person is already on the project.</p>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+
+          {error ? (
+            <p className="m-0 font-base text-sm text-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <section className="rounded-card border-[1.5px] border-base-300 bg-bg p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="m-0 flex items-center gap-2 font-base text-sm font-semibold text-base-content">
+                <span className="text-accent" aria-hidden>
+                  <UsersIcon />
+                </span>
+                Team ({members.length})
+              </h3>
               <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value)}
-                className="select select-bordered w-full rounded-full border-[1.5px] border-base-300 bg-base-100 px-4 py-3 font-base text-sm focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(16,185,129,0.2)]"
+                value={teamFilter}
+                onChange={(e) => setTeamFilter(e.target.value)}
+                className="select select-bordered select-sm rounded-full border-[1.5px] border-base-300 bg-base-100 font-base text-xs focus:border-accent"
+                aria-label="Filter team by role"
               >
-                {ROLE_OPTIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {roleLabel(r)}
+                {TEAM_ROLE_FILTERS.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
                   </option>
                 ))}
               </select>
-            </label>
-            <button
-              type="button"
-              disabled={!canInviteLookup || busy}
-              onClick={handleInvite}
-              className="btn btn-primary shrink-0 rounded-full border-0 px-6 font-base text-sm font-semibold transition-[transform,opacity] duration-150 ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Add
-            </button>
-          </div>
-          <p className="mt-2 mb-0 font-base text-xs text-accent">{ROLE_HINT[inviteRole]}</p>
-          {lookupUser && memberIds.has(lookupUser.id) ? (
-            <p className="mt-2 mb-0 font-base text-xs text-muted">This person is already on the project.</p>
-          ) : null}
-        </div>
-
-        {error ? (
-          <p className="m-0 font-base text-sm text-error" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="rounded-card border-[1.5px] border-base-300 bg-bg p-3">
-          <p className="m-0 mb-2 font-base text-xs font-semibold uppercase tracking-[0.08em] text-muted">Team</p>
-          <ul className="m-0 flex list-none flex-col gap-2 p-0">
-            {members.map((m) => {
-              const uid = String(m.userId ?? '')
-              const creator = Boolean(m.isCreator)
-              return (
-                <li
-                  key={uid}
-                  className="flex flex-col gap-2 rounded-md border-[1.5px] border-base-300 bg-base-100 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="m-0 truncate font-base text-sm font-semibold text-base-content">{m.name || m.email}</p>
-                    <p className="m-0 truncate font-base text-xs text-muted">{m.email}</p>
-                    {creator ? (
-                      <span className="mt-1 inline-flex rounded-full bg-[#EDF7F2] px-2 py-0.5 font-base text-xs font-semibold text-accent">
-                        Owner
-                      </span>
-                    ) : null}
-                  </div>
-                  {!creator ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <select
-                        value={String(m.role ?? 'reviewer')}
-                        disabled={busy}
-                        onChange={(e) => handleRoleChange(uid, e.target.value)}
-                        className="select select-bordered select-sm rounded-full border-[1.5px] border-base-300 bg-base-100 font-base text-xs focus:border-accent"
-                      >
-                        {ROLE_OPTIONS.map((r) => (
-                          <option key={r} value={r}>
-                            {roleLabel(r)}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => handleRemove(uid)}
-                        className="btn btn-outline btn-sm rounded-full border-[1.5px] border-base-300 font-base text-xs font-semibold text-base-content hover:border-accent-mid hover:bg-[#F4F9F6]"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ) : null}
-                </li>
-              )
-            })}
-          </ul>
+            </div>
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {filteredMembers.map((m) => (
+                <CollaboratorTeamRow
+                  key={String(m.userId ?? '')}
+                  member={m}
+                  busy={busy}
+                  onRoleChange={handleRoleChange}
+                  onRemove={handleRemove}
+                />
+              ))}
+            </ul>
+            {filteredMembers.length === 0 ? (
+              <p className="m-0 px-1 py-2 font-base text-xs text-muted">No members match this filter.</p>
+            ) : null}
+          </section>
         </div>
       </div>
     </div>,

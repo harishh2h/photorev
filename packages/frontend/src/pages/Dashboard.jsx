@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Header from '@/components/Header'
+import { MinimalHeader } from '@/components/Header'
 import DashboardHero from '@/features/dashboard/DashboardHero'
 import ProjectsSection from '@/features/dashboard/ProjectsSection'
 import { AddProjectModal } from '@/features/projects'
@@ -14,7 +14,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false)
   const { projects, isLoading, error, refetch } = useProjects(token)
-  const displayName = user?.name || 'Karthik'
+  const displayName = user?.name || 'User'
   const featured = projects[0]
   const [featuredStats, setFeaturedStats] = useState(null)
   const [heroFallbackCoverPhotoId, setHeroFallbackCoverPhotoId] = useState(/** @type {string | null} */ (null))
@@ -116,7 +116,7 @@ export default function Dashboard() {
   )
   return (
     <div className="min-h-screen bg-base-100">
-      <Header userDisplayName={displayName} onLogout={handleLogout} />
+      <MinimalHeader userDisplayName={displayName} onLogout={handleLogout} />
       <main className="mx-auto max-w-[1280px] px-4 py-6 pb-10 md:px-6 md:py-8 md:pb-10">
         {error ? (
           <p className="mb-4 font-base text-sm text-error" role="alert">

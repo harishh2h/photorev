@@ -11,6 +11,10 @@ import buildFinalizationService, {
   FinalizeAction,
 } from "../services/finalization.service";
 import buildProjectGridService from "../services/project-grid.service";
+import {
+  normalizeProjectGridFilter,
+  normalizeProjectGridScope,
+} from "../utils/project-grid-filters";
 import { sendFailure, sendSuccess } from "../utils/api-response";
 import { getAuthenticatedUserId } from "../utils/auth";
 import { RootPathValidationError } from "../utils/storage";
@@ -221,10 +225,17 @@ function buildProjectsHandler(
     getProjectGrid: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);
       const params = request.params as { projectId: string };
-      const query = request.query as { page?: number; pageSize?: number };
+      const query = request.query as {
+        page?: number;
+        pageSize?: number;
+        scope?: string;
+        filter?: string;
+      };
       const result = await gridService.getProjectGrid(userId, params.projectId, {
         page: query.page,
         pageSize: query.pageSize,
+        scope: normalizeProjectGridScope(query.scope),
+        filter: normalizeProjectGridFilter(query.filter),
       });
       if (!result) {
         sendFailure(reply, 404, "Project not found", null);

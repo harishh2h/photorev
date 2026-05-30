@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { getProject } from '@/services/projectService.js'
 import { fetchProjectGrid, fetchPendingPhotoStatuses } from '@/services/projectGridService.js'
 import { listProjectMembers } from '@/services/projectMemberService.js'
-import { hasTeamConflict, needsOwnerDecision } from '@/utils/projectReviewFilters.js'
+import { hasTeamConflict, needsOwnerDecision, REVIEW_SCOPE, PHOTO_FILTER } from '@/utils/projectReviewFilters.js'
 
 const PENDING_POLL_MS = 2500
 const GRID_PAGE_SIZE = 100
@@ -63,21 +63,28 @@ function mapGridItemToPhoto(p) {
 }
 
 /**
- * @param {object[]} allPhotos
+ * @param {boolean} canReviewPhotos
+ * @param {string} reviewScope
+ * @param {string} activeFilter
+ * @returns {{ scope: string; filter: string }}
+ */
+function resolveGridQuery(canReviewPhotos, reviewScope, activeFilter) {
+  if (!canReviewPhotos) {
+    return { scope: REVIEW_SCOPE.TEAM, filter: PHOTO_FILTER.LIKED }
+  }
+  return { scope: reviewScope, filter: activeFilter }
+}
+
+/**
+ * @param {object[]} gridPhotos
  * @param {object} project
  * @param {object[]} members
  * @param {{ id?: string; name?: string; email?: string } | null} currentUser
  * @param {object | null} filterCounts
  */
-function buildViewData(allPhotos, project, members, currentUser, filterCounts) {
-  const visiblePhotos = allPhotos.filter((p) => p.status !== 'trashed')
-  const trashedPhotos = allPhotos.filter((p) => p.status === 'trashed')
-  const votedPhotoIds = new Set(
-    allPhotos.filter((p) => p.myDecision !== null && p.myDecision !== undefined).map((p) => p.id),
-  )
-  const totalPhotos = visiblePhotos.length
-  const reviewProgressPercent =
-    totalPhotos > 0 ? Math.min(100, Math.round((votedPhotoIds.size / totalPhotos) * 100)) : 0
+function buildViewData(gridPhotos, project, members, currentUser, filterCounts) {
+  const visiblePhotos = gridPhotos.filter((p) => p.status !== 'trashed')
+  const trashedPhotos = gridPhotos.filter((p) => p.status === 'trashed')
   const vc = project.viewerContext
   const canReviewPhotos = vc == null ? true : Boolean(vc.isCreator === true || vc.role !== 'viewer')
   const canUploadPhotos = vc == null ? true : Boolean(vc.isCreator === true || vc.role === 'contributor')
@@ -109,6 +116,10 @@ function buildViewData(allPhotos, project, members, currentUser, filterCounts) {
     trashed: 0,
     viewerSelected: 0,
   }
+  const reviewProgressPercent =
+    counts.mine.all > 0
+      ? Math.min(100, Math.round(((counts.mine.all - counts.mine.unreviewed) / counts.mine.all) * 100))
+      : 0
 
   return {
     projectTitle: typeof project.name === 'string' ? project.name : 'Project',
@@ -145,7 +156,7 @@ function buildViewData(allPhotos, project, members, currentUser, filterCounts) {
       pendingConflicts: counts.pendingConflicts,
       trashed: counts.trashed,
     },
-    photos: visiblePhotos,
+    photos: canReviewPhotos ? visiblePhotos : visiblePhotos.filter((p) => p.teamIsLiked),
     trashedPhotos,
   }
 }
@@ -159,20 +170,30 @@ export function useProjectViewData(projectId, token, currentUser) {
   const [data, setData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isLoadingGrid, setIsLoadingGrid] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [loadedCount, setLoadedCount] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
+  const [reviewScope, setReviewScope] = useState(REVIEW_SCOPE.MINE)
+  const [activeFilter, setActiveFilter] = useState(PHOTO_FILTER.ALL)
   const prevScopeRef = useRef(null)
   const gridPageRef = useRef(1)
   const projectRef = useRef(null)
   const membersRef = useRef([])
   const filterCountsRef = useRef(null)
-  const allPhotosRef = useRef([])
+  const gridPhotosRef = useRef([])
+  const canReviewPhotosRef = useRef(true)
+  const [projectReady, setProjectReady] = useState(false)
 
   const refetch = useCallback(() => {
     setReloadKey((k) => k + 1)
+  }, [])
+
+  const setReviewScopeAndReset = useCallback((scope) => {
+    setReviewScope(scope)
+    setActiveFilter(PHOTO_FILTER.ALL)
   }, [])
 
   useEffect(() => {
@@ -187,12 +208,17 @@ export function useProjectViewData(projectId, token, currentUser) {
       setData(null)
       setIsLoading(true)
       setIsRefreshing(false)
+      setIsLoadingGrid(false)
       setIsLoadingMore(false)
       setError(null)
       setLoadedCount(0)
       setTotalCount(0)
+      setReviewScope(REVIEW_SCOPE.MINE)
+      setActiveFilter(PHOTO_FILTER.ALL)
       gridPageRef.current = 1
-      allPhotosRef.current = []
+      gridPhotosRef.current = []
+      projectRef.current = null
+      setProjectReady(false)
     }
   }, [projectId, token])
 
@@ -214,25 +240,27 @@ export function useProjectViewData(projectId, token, currentUser) {
         setIsRefreshing(true)
       }
       setError(null)
-      gridPageRef.current = 1
-      allPhotosRef.current = []
+      setProjectReady(false)
 
       try {
-        const [project, grid, members] = await Promise.all([
+        const [project, members] = await Promise.all([
           getProject(token, projectId),
-          fetchProjectGrid(token, projectId, { page: 1, pageSize: GRID_PAGE_SIZE }),
           listProjectMembers(token, projectId),
         ])
         if (cancelled) return
 
         projectRef.current = project
         membersRef.current = members
-        filterCountsRef.current = grid.filterCounts ?? null
-        const mapped = grid.items.map(mapGridItemToPhoto)
-        allPhotosRef.current = mapped
-        setLoadedCount(mapped.length)
-        setTotalCount(grid.total)
-        setData(buildViewData(mapped, project, members, currentUser, grid.filterCounts ?? null))
+        const vc = project.viewerContext
+        const canReview = vc == null ? true : Boolean(vc.isCreator === true || vc.role !== 'viewer')
+        canReviewPhotosRef.current = canReview
+        const isCreator = Boolean(vc?.isCreator)
+        if (isCreator) {
+          setReviewScope(REVIEW_SCOPE.TEAM)
+        } else if (canReview) {
+          setReviewScope(REVIEW_SCOPE.MINE)
+        }
+        setProjectReady(true)
       } catch (err) {
         if (!cancelled) {
           if (isColdLoad) setData(null)
@@ -252,39 +280,105 @@ export function useProjectViewData(projectId, token, currentUser) {
     }
   }, [projectId, token, reloadKey, currentUser?.id, currentUser?.name, currentUser?.email])
 
+  useEffect(() => {
+    if (!projectId || !token || !projectReady || !projectRef.current) {
+      return undefined
+    }
+    let cancelled = false
+
+    async function run() {
+      setIsLoadingGrid(true)
+      setError(null)
+      gridPageRef.current = 1
+      gridPhotosRef.current = []
+
+      const query = resolveGridQuery(canReviewPhotosRef.current, reviewScope, activeFilter)
+
+      try {
+        const grid = await fetchProjectGrid(token, projectId, {
+          page: 1,
+          pageSize: GRID_PAGE_SIZE,
+          scope: query.scope,
+          filter: query.filter,
+        })
+        if (cancelled) return
+
+        filterCountsRef.current = grid.filterCounts ?? null
+        const mapped = grid.items.map(mapGridItemToPhoto)
+        gridPhotosRef.current = mapped
+        setLoadedCount(mapped.length)
+        setTotalCount(grid.total)
+        setData(
+          buildViewData(
+            mapped,
+            projectRef.current,
+            membersRef.current,
+            currentUser,
+            grid.filterCounts ?? null,
+          ),
+        )
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load photos')
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingGrid(false)
+        }
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    projectId,
+    token,
+    reviewScope,
+    activeFilter,
+    reloadKey,
+    projectReady,
+    currentUser?.id,
+    currentUser?.name,
+    currentUser?.email,
+  ])
+
   const loadMorePhotos = useCallback(async () => {
-    if (!projectId || !token || isLoadingMore) return
+    if (!projectId || !token || isLoadingMore || !projectRef.current) return
     if (loadedCount >= totalCount) return
 
     setIsLoadingMore(true)
+    const query = resolveGridQuery(canReviewPhotosRef.current, reviewScope, activeFilter)
     try {
       const nextPage = gridPageRef.current + 1
       const grid = await fetchProjectGrid(token, projectId, {
         page: nextPage,
         pageSize: GRID_PAGE_SIZE,
+        scope: query.scope,
+        filter: query.filter,
       })
       gridPageRef.current = nextPage
       const mapped = grid.items.map(mapGridItemToPhoto)
-      allPhotosRef.current = [...allPhotosRef.current, ...mapped]
-      setLoadedCount(allPhotosRef.current.length)
+      gridPhotosRef.current = [...gridPhotosRef.current, ...mapped]
+      setLoadedCount(gridPhotosRef.current.length)
       setTotalCount(grid.total)
-      if (projectRef.current) {
-        setData(
-          buildViewData(
-            allPhotosRef.current,
-            projectRef.current,
-            membersRef.current,
-            currentUser,
-            filterCountsRef.current,
-          ),
-        )
-      }
+      filterCountsRef.current = grid.filterCounts ?? filterCountsRef.current
+      setData(
+        buildViewData(
+          gridPhotosRef.current,
+          projectRef.current,
+          membersRef.current,
+          currentUser,
+          filterCountsRef.current,
+        ),
+      )
     } catch {
       /* keep existing grid on pagination failure */
     } finally {
       setIsLoadingMore(false)
     }
-  }, [projectId, token, isLoadingMore, loadedCount, totalCount, currentUser])
+  }, [projectId, token, isLoadingMore, loadedCount, totalCount, reviewScope, activeFilter, currentUser])
 
   const hasMorePhotos = loadedCount < totalCount
 
@@ -306,7 +400,7 @@ export function useProjectViewData(projectId, token, currentUser) {
 
         const updateById = new Map(updates.map((row) => [row.id, row]))
         let changed = false
-        allPhotosRef.current = allPhotosRef.current.map((photo) => {
+        gridPhotosRef.current = gridPhotosRef.current.map((photo) => {
           const update = updateById.get(photo.id)
           if (!update) {
             return photo
@@ -346,7 +440,7 @@ export function useProjectViewData(projectId, token, currentUser) {
         if (changed && projectRef.current) {
           setData(
             buildViewData(
-              allPhotosRef.current,
+              gridPhotosRef.current,
               projectRef.current,
               membersRef.current,
               currentUser,
@@ -370,10 +464,15 @@ export function useProjectViewData(projectId, token, currentUser) {
     data,
     isLoading,
     isRefreshing,
+    isLoadingGrid,
     isLoadingMore,
     error,
     refetch,
     loadMorePhotos,
     hasMorePhotos,
+    reviewScope,
+    activeFilter,
+    setReviewScope: setReviewScopeAndReset,
+    setActiveFilter,
   }
 }
