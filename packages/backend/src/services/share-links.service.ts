@@ -69,7 +69,7 @@ export interface ShareLinksServiceMethods {
   revokeShareLink: (params: RevokeShareLinkParams) => Promise<ShareLinkRevokeResult>;
   verifyShareToken: (token: string, password: string | null) => Promise<VerifyShareTokenResult>;
   loadShareByToken: (token: string) => Promise<ShareLink | null>;
-  recordView: (shareId: string) => Promise<void>;
+  recordView: (shareId: string, viewSessionId: string) => Promise<boolean>;
 }
 
 function generateToken(): string {
@@ -204,13 +204,32 @@ function buildShareLinksService(
     return { ok: true, link: row };
   }
 
-  async function recordView(shareId: string): Promise<void> {
+  async function recordView(shareId: string, viewSessionId: string): Promise<boolean> {
+    const sessionId = viewSessionId.trim().slice(0, 64);
+    if (sessionId.length < 8) {
+      return false;
+    }
+
+    const inserted = await db<{ share_link_id: string }>("share_link_view_sessions")
+      .insert({
+        share_link_id: shareId,
+        view_session_id: sessionId,
+      })
+      .onConflict(["share_link_id", "view_session_id"])
+      .ignore()
+      .returning("share_link_id");
+
+    if (inserted.length === 0) {
+      return false;
+    }
+
     await db("share_links")
       .where("id", shareId)
       .update({
         view_count: db.raw("view_count + 1"),
         last_viewed_at: new Date(),
       });
+    return true;
   }
 
   return {

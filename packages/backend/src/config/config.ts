@@ -37,3 +37,34 @@ export const config : Config = {
         },
     }
 }
+
+const PLACEHOLDER_SECRETS = new Set([
+    'change-me-in-production',
+    'changeme',
+    'secret',
+    'your-secret-here',
+]);
+const MIN_SECRET_LENGTH = 16;
+
+/**
+ * Fails fast at boot if security-critical secrets are missing, too short, or left at a known
+ * placeholder. Tokens and signed photo URLs are only as strong as JWT_SECRET, so an
+ * unconfigured deployment must never start.
+ */
+export function assertSecurityConfig(): void {
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret || jwtSecret.trim().length === 0) {
+        throw new Error('JWT_SECRET is not set. Refusing to start.');
+    }
+    if (PLACEHOLDER_SECRETS.has(jwtSecret.trim().toLowerCase())) {
+        throw new Error('JWT_SECRET is set to an insecure placeholder value. Set a strong, unique secret.');
+    }
+    if (jwtSecret.trim().length < MIN_SECRET_LENGTH) {
+        throw new Error(`JWT_SECRET must be at least ${MIN_SECRET_LENGTH} characters long.`);
+    }
+
+    const contentSecret = process.env.CONTENT_SIGNING_SECRET;
+    if (contentSecret && contentSecret.trim().length < MIN_SECRET_LENGTH) {
+        throw new Error(`CONTENT_SIGNING_SECRET must be at least ${MIN_SECRET_LENGTH} characters long when set.`);
+    }
+}

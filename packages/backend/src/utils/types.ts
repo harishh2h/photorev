@@ -8,7 +8,9 @@ export const RegisterSchema ={
         required: ['email', 'password', 'name'],
         properties: {
           email: { type: 'string', format: 'email', minLength: 3, maxLength: 255 },
-          password: { type: 'string', minLength: 6, maxLength: 255 },
+          // New accounts require >= 8 chars; login keeps the legacy minimum so existing
+          // (shorter) passwords still authenticate.
+          password: { type: 'string', minLength: 8, maxLength: 255 },
           name: { type: 'string', minLength: 3, maxLength: 255 }
         },
         additionalProperties: false

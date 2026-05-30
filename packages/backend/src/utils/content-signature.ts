@@ -2,10 +2,12 @@ import crypto from "node:crypto";
 
 export type PhotoContentVariant = "thumbnail" | "preview" | "original";
 
+// Signatures travel in the query string (logs, history, Referer), so keep the lifetime short.
+// The frontend transparently re-signs URLs as they approach expiry.
 const DEFAULT_TTL_BY_VARIANT: Record<PhotoContentVariant, number> = {
-  thumbnail: 86400,
-  preview: 86400,
-  original: 86400,
+  thumbnail: 3600,
+  preview: 3600,
+  original: 3600,
 };
 
 function signingSecret(): string {

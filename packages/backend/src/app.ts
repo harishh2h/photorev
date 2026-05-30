@@ -20,6 +20,21 @@ const CLIENT_ERROR_MESSAGES: Record<number, string> = {
   429: "Too many requests",
 };
 
+/**
+ * `CORS_ORIGIN` may be a comma-separated allowlist (locked-down, recommended for production).
+ * When unset, origins are reflected (`true`) to keep local development frictionless.
+ */
+function resolveCorsOrigin(raw: string | undefined): string[] | boolean {
+  if (raw == null || raw.trim() === "") {
+    return true;
+  }
+  const origins = raw
+    .split(",")
+    .map((o) => o.trim())
+    .filter((o) => o.length > 0);
+  return origins.length > 0 ? origins : true;
+}
+
 function buildApp(opts: BuildOptions = {}): FastifyInstance {
 
   const app = Fastify(opts);
@@ -47,7 +62,7 @@ function buildApp(opts: BuildOptions = {}): FastifyInstance {
     sendFailure(reply, 404, "Not found", null);
   });
   app.register(cors, {
-    origin: process.env.CORS_ORIGIN ?? true,
+    origin: resolveCorsOrigin(process.env.CORS_ORIGIN),
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   });
@@ -62,23 +77,26 @@ function buildApp(opts: BuildOptions = {}): FastifyInstance {
     global: false,
   });
 
-  app.register(swagger, {
-    openapi: {
-      info: {
-        title: "PhotoRev API",
-        description: "Local-first collaborative photo review API",
-        version: "1.0.0",
+  // API docs disclose the full surface area; keep them out of production deployments.
+  if (process.env.NODE_ENV !== "production") {
+    app.register(swagger, {
+      openapi: {
+        info: {
+          title: "PhotoRev API",
+          description: "Local-first collaborative photo review API",
+          version: "1.0.0",
+        },
       },
-    },
-  });
+    });
 
-  app.register(swaggerUi, {
-    routePrefix: "/docs",
-    uiConfig: {
-      docExpansion: "list",
-      deepLinking: true,
-    },
-  });
+    app.register(swaggerUi, {
+      routePrefix: "/docs",
+      uiConfig: {
+        docExpansion: "list",
+        deepLinking: true,
+      },
+    });
+  }
 
   app.decorate("db", db);
   app.addHook("onClose", (instance: FastifyInstance, done: () => void) => {

@@ -85,6 +85,28 @@ export async function getPublicShareListing(token, unlockToken) {
 }
 
 /**
+ * Record one gallery view per browser session (deduped server-side).
+ * @param {string} token
+ * @param {string} viewSessionId
+ * @param {string | null} [unlockToken]
+ * @returns {Promise<void>}
+ */
+export async function recordPublicShareView(token, viewSessionId, unlockToken) {
+  const base = getApiBaseUrl()
+  const url = `${base}/public/share/${encodeURIComponent(token)}/view`
+  const headers = { 'Content-Type': 'application/json' }
+  if (unlockToken) headers.Authorization = `Bearer ${unlockToken}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ viewSessionId }),
+  })
+  if (!res.ok) {
+    return
+  }
+}
+
+/**
  * @param {string} token
  * @param {string} photoId
  * @param {'thumb' | 'preview'} variant

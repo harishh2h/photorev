@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { getProject } from '@/services/projectService.js'
 import { fetchProjectGrid, fetchPendingPhotoStatuses } from '@/services/projectGridService.js'
 import { listProjectMembers } from '@/services/projectMemberService.js'
+import {
+  clearProjectViewCache,
+  projectViewCacheKey,
+  readProjectViewCache,
+  writeProjectViewCache,
+} from '@/hooks/projectViewDataCache.js'
 import { hasTeamConflict, needsOwnerDecision, REVIEW_SCOPE, PHOTO_FILTER } from '@/utils/projectReviewFilters.js'
 
 const PENDING_POLL_MS = 2500
@@ -165,25 +171,28 @@ function buildViewData(gridPhotos, project, members, currentUser, filterCounts) 
  * @param {{ id?: string; name?: string; email?: string } | null} currentUser
  */
 export function useProjectViewData(projectId, token, currentUser) {
-  const [data, setData] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const initialCache = readProjectViewCache(projectId, token)
+  const skipInitialGridFetchRef = useRef(Boolean(initialCache))
+
+  const [data, setData] = useState(() => initialCache?.data ?? null)
+  const [isLoading, setIsLoading] = useState(() => !initialCache)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isLoadingGrid, setIsLoadingGrid] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [error, setError] = useState(null)
   const [reloadKey, setReloadKey] = useState(0)
-  const [loadedCount, setLoadedCount] = useState(0)
-  const [totalCount, setTotalCount] = useState(0)
-  const [reviewScope, setReviewScope] = useState(REVIEW_SCOPE.MINE)
-  const [activeFilter, setActiveFilter] = useState(PHOTO_FILTER.ALL)
+  const [loadedCount, setLoadedCount] = useState(() => initialCache?.loadedCount ?? 0)
+  const [totalCount, setTotalCount] = useState(() => initialCache?.totalCount ?? 0)
+  const [reviewScope, setReviewScope] = useState(() => initialCache?.reviewScope ?? REVIEW_SCOPE.MINE)
+  const [activeFilter, setActiveFilter] = useState(() => initialCache?.activeFilter ?? PHOTO_FILTER.ALL)
   const prevScopeRef = useRef(null)
-  const gridPageRef = useRef(1)
-  const projectRef = useRef(null)
-  const membersRef = useRef([])
-  const filterCountsRef = useRef(null)
-  const gridPhotosRef = useRef([])
-  const canReviewPhotosRef = useRef(true)
-  const [projectReady, setProjectReady] = useState(false)
+  const gridPageRef = useRef(initialCache?.gridPage ?? 1)
+  const projectRef = useRef(initialCache?.project ?? null)
+  const membersRef = useRef(initialCache?.members ?? [])
+  const filterCountsRef = useRef(initialCache?.filterCounts ?? null)
+  const gridPhotosRef = useRef(initialCache?.gridPhotos ?? [])
+  const canReviewPhotosRef = useRef(initialCache?.canReviewPhotos ?? true)
+  const [projectReady, setProjectReady] = useState(() => Boolean(initialCache))
 
   const refetch = useCallback(() => {
     setReloadKey((k) => k + 1)
@@ -201,7 +210,9 @@ export function useProjectViewData(projectId, token, currentUser) {
       return
     }
     if (prev.projectId !== projectId || prev.token !== token) {
+      clearProjectViewCache(prev.projectId, prev.token)
       prevScopeRef.current = { projectId, token }
+      skipInitialGridFetchRef.current = false
       setReloadKey(0)
       setData(null)
       setIsLoading(true)
@@ -229,16 +240,21 @@ export function useProjectViewData(projectId, token, currentUser) {
       return undefined
     }
     const isColdLoad = reloadKey === 0
+    const cachedSnapshot = isColdLoad ? readProjectViewCache(projectId, token) : null
     let cancelled = false
 
     async function run() {
-      if (isColdLoad) {
+      if (isColdLoad && cachedSnapshot) {
+        setIsRefreshing(true)
+      } else if (isColdLoad) {
         setIsLoading(true)
       } else {
         setIsRefreshing(true)
       }
       setError(null)
-      setProjectReady(false)
+      if (!(isColdLoad && cachedSnapshot)) {
+        setProjectReady(false)
+      }
 
       try {
         const [project, members] = await Promise.all([
@@ -280,6 +296,10 @@ export function useProjectViewData(projectId, token, currentUser) {
 
   useEffect(() => {
     if (!projectId || !token || !projectReady || !projectRef.current) {
+      return undefined
+    }
+    if (reloadKey === 0 && skipInitialGridFetchRef.current) {
+      skipInitialGridFetchRef.current = false
       return undefined
     }
     let cancelled = false
@@ -379,6 +399,24 @@ export function useProjectViewData(projectId, token, currentUser) {
   }, [projectId, token, isLoadingMore, loadedCount, totalCount, reviewScope, activeFilter, currentUser])
 
   const hasMorePhotos = loadedCount < totalCount
+
+  useEffect(() => {
+    const key = projectViewCacheKey(projectId, token)
+    if (!key || data == null || projectRef.current == null) return
+    writeProjectViewCache(key, {
+      data,
+      reviewScope,
+      activeFilter,
+      gridPhotos: gridPhotosRef.current,
+      loadedCount,
+      totalCount,
+      filterCounts: filterCountsRef.current,
+      project: projectRef.current,
+      members: membersRef.current,
+      gridPage: gridPageRef.current,
+      canReviewPhotos: canReviewPhotosRef.current,
+    })
+  }, [projectId, token, data, reviewScope, activeFilter, loadedCount, totalCount])
 
   const pendingPhotoIds = useMemo(() => {
     if (!data?.photos?.length) return []

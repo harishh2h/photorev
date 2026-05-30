@@ -25,15 +25,18 @@ export default function AppBottomSheet({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-modal flex items-end justify-center md:items-center" role="presentation">
+    <div
+      className="modal-overlay-in fixed inset-0 z-modal flex items-end justify-center bg-black/40 md:items-center"
+      role="presentation"
+    >
       <button
         type="button"
-        className="absolute inset-0 cursor-default bg-black/40"
+        className="absolute inset-0 cursor-default bg-transparent"
         onClick={onClose}
         aria-label="Close"
       />
       <div
-        className={`relative z-[1] flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-xl border-[1.5px] border-base-300 bg-base-100 shadow-modal md:max-w-md md:rounded-xl ${className}`}
+        className={`modal-panel-up relative z-[1] flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-xl border-[1.5px] border-base-300 bg-base-100 shadow-modal md:max-w-md md:rounded-xl ${className}`}
         role="dialog"
         aria-modal="true"
         aria-label={title || ariaLabel}

@@ -109,7 +109,14 @@ async function photosRoutes(
     handler.updatePhoto,
   );
 
-  fastify.post("/upload", { preHandler: ensureAuthenticated }, handler.uploadPhoto);
+  fastify.post(
+    "/upload",
+    {
+      preHandler: ensureAuthenticated,
+      config: { rateLimit: { max: 120, timeWindow: "1 minute" } },
+    },
+    handler.uploadPhoto,
+  );
 }
 
 export default photosRoutes;

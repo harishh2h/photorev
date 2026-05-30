@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
-import { getPublicShareListing, unlockShare } from '@/services/publicShareService.js'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  getPublicShareListing,
+  recordPublicShareView,
+  unlockShare,
+} from '@/services/publicShareService.js'
+import { getShareViewSessionId } from '@/utils/shareViewSession.js'
 
 function storageKey(token) {
   return `photorev_share_unlock_${token}`
@@ -21,6 +26,8 @@ export function usePublicShare(token) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [requiresPassword, setRequiresPassword] = useState(false)
+  const unlockTokenRef = useRef(unlockToken)
+  unlockTokenRef.current = unlockToken
 
   const persistUnlock = useCallback(
     (value) => {
@@ -35,15 +42,29 @@ export function usePublicShare(token) {
     [token]
   )
 
+  const recordViewOnce = useCallback(
+    (passedUnlock) => {
+      if (!token) return
+      void recordPublicShareView(
+        token,
+        getShareViewSessionId(token),
+        passedUnlock ?? unlockTokenRef.current
+      )
+    },
+    [token]
+  )
+
   const load = useCallback(
     async (passedToken) => {
       if (!token) return
       setLoading(true)
       setError(null)
+      const unlock = passedToken ?? unlockTokenRef.current
       try {
-        const payload = await getPublicShareListing(token, passedToken ?? unlockToken)
+        const payload = await getPublicShareListing(token, unlock)
         setListing(payload)
         setRequiresPassword(false)
+        recordViewOnce(unlock)
       } catch (err) {
         if (err && err.status === 401) {
           setRequiresPassword(true)
@@ -59,13 +80,42 @@ export function usePublicShare(token) {
         setLoading(false)
       }
     },
-    [token, unlockToken]
+    [token, recordViewOnce]
   )
 
   useEffect(() => {
-    if (!token) return
-    void load()
-  }, [token, load])
+    if (!token) return undefined
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      setError(null)
+      const unlock = unlockTokenRef.current
+      try {
+        const payload = await getPublicShareListing(token, unlock)
+        if (cancelled) return
+        setListing(payload)
+        setRequiresPassword(false)
+        recordViewOnce(unlock)
+      } catch (err) {
+        if (cancelled) return
+        if (err && err.status === 401) {
+          setRequiresPassword(true)
+          setListing(null)
+        } else if (err && err.status === 410) {
+          setError(err.message || 'Share link no longer available')
+          setListing(null)
+        } else {
+          setError(err instanceof Error ? err.message : 'Could not load share')
+          setListing(null)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [token, recordViewOnce])
 
   const submitPassword = useCallback(
     async (password) => {

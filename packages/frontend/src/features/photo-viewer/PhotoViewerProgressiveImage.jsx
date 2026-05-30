@@ -3,8 +3,8 @@ import PropTypes from 'prop-types'
 import { getViewerImagePresentation } from '@/features/photo-viewer/viewerImageLayout.js'
 import { usePhotoViewerZoom } from '@/features/photo-viewer/usePhotoViewerZoom.js'
 import { resolveOriginalUrl, resolvePreviewUrl } from '@/features/photo-viewer/photoContentLoader.js'
-import { isPhotoSignedUrlsEnabled } from '@/utils/photoContentUrl.js'
-import { releasePhotoContentUrl } from '@/utils/photoContentCache.js'
+import { isPhotoSignedUrlsEnabled, peekAuthenticatedPhotoUrl } from '@/utils/photoContentUrl.js'
+import { acquirePhotoContentUrl, peekPhotoContentUrl, releasePhotoContentUrl } from '@/utils/photoContentCache.js'
 
 const ORIGINAL_UPGRADE_MS = 3000
 
@@ -33,6 +33,7 @@ export default function PhotoViewerProgressiveImage({
 }) {
   const [displayUrl, setDisplayUrl] = useState(null)
   const [hasError, setHasError] = useState(false)
+  const [isImageVisible, setIsImageVisible] = useState(false)
   const cancelledForPhotoRef = useRef(false)
   const idleTimerRef = useRef(null)
   const originalDoneRef = useRef(false)
@@ -86,11 +87,23 @@ export default function PhotoViewerProgressiveImage({
     clearIdleTimer()
     originalDoneRef.current = false
     fetchingOriginalRef.current = false
-    setDisplayUrl(null)
     setHasError(false)
+    setIsImageVisible(false)
 
     if (status !== 'ready') {
+      setDisplayUrl(null)
       return undefined
+    }
+
+    const cachedPreview = signedEnabled
+      ? peekAuthenticatedPhotoUrl(photoId, 'preview')
+      : peekPhotoContentUrl(photoId, 'preview')
+    if (cachedPreview) {
+      if (!signedEnabled) acquirePhotoContentUrl(photoId, 'preview')
+      setDisplayUrl(cachedPreview)
+      setIsImageVisible(true)
+    } else {
+      setDisplayUrl(null)
     }
 
     async function upgradeToOriginal() {
@@ -109,6 +122,7 @@ export default function PhotoViewerProgressiveImage({
         }
         originalDoneRef.current = true
         setDisplayUrl(next)
+        setIsImageVisible(true)
       } catch {
         /* keep preview */
       } finally {
@@ -130,6 +144,7 @@ export default function PhotoViewerProgressiveImage({
           return
         }
         setDisplayUrl(url)
+        setIsImageVisible(true)
         idleTimerRef.current = window.setTimeout(() => {
           void upgradeToOriginal()
         }, ORIGINAL_UPGRADE_MS)
@@ -195,15 +210,20 @@ export default function PhotoViewerProgressiveImage({
     )
   }
 
+  const imgClassName = `${presentation.imgClassName} transition-opacity duration-300 ease-out motion-reduce:transition-none ${
+    isImageVisible ? 'opacity-100' : 'opacity-0'
+  }`.trim()
+
   return renderZoomableFrame(
     <img
       ref={contentRef}
       src={displayUrl}
       alt={alt}
-      className={presentation.imgClassName}
+      className={imgClassName}
       style={{ ...presentation.imgStyle, ...innerStyle }}
       decoding="async"
       draggable={false}
+      onLoad={() => setIsImageVisible(true)}
     />,
   )
 }

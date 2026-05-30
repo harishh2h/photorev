@@ -1,15 +1,28 @@
 import { useCallback, useRef, useState } from 'react'
 
-const LOCK_THRESHOLD = 12
-const COMMIT_THRESHOLD = 56
-const MAX_ROTATION = 8
-const EXIT_ANIMATION_MS = 260
+const LOCK_THRESHOLD = 10
+const COMMIT_THRESHOLD = 52
+const MAX_ROTATION = 10
+const EXIT_ANIMATION_MS = 320
+const SNAP_BACK_MS = 320
+const RUBBER_BAND = 0.38
+const EASE_OUT = 'cubic-bezier(0, 0, 0.2, 1)'
 
 /** @typedef {'horizontal' | 'vertical' | null} AxisLock */
 
 /**
  * @typedef {'like' | 'reject' | 'next' | 'prev' | null} SwipeIntent
  */
+
+/**
+ * @param {number} value
+ * @param {boolean} limited
+ * @returns {number}
+ */
+function rubberBand(value, limited) {
+  if (!limited) return value
+  return value * RUBBER_BAND
+}
 
 /**
  * Mobile swipe review: horizontal vote (+ auto-advance via callbacks), vertical navigate.
@@ -21,6 +34,8 @@ const EXIT_ANIMATION_MS = 260
  *   enabled: boolean;
  *   canVote: boolean;
  *   isSaving: boolean;
+ *   hasNext?: boolean;
+ *   hasPrev?: boolean;
  * }} opts
  */
 export function usePhotoViewerGestures({
@@ -31,6 +46,8 @@ export function usePhotoViewerGestures({
   enabled,
   canVote,
   isSaving,
+  hasNext = true,
+  hasPrev = true,
 }) {
   const [offsetX, setOffsetX] = useState(0)
   const [offsetY, setOffsetY] = useState(0)
@@ -100,9 +117,9 @@ export function usePhotoViewerGestures({
       const dy = e.clientY - startRef.current.y
 
       if (!axisLockRef.current) {
-        if (canVote && Math.abs(dx) > LOCK_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+        if (canVote && Math.abs(dx) > LOCK_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.05) {
           axisLockRef.current = 'horizontal'
-        } else if (Math.abs(dy) > LOCK_THRESHOLD && Math.abs(dy) > Math.abs(dx)) {
+        } else if (Math.abs(dy) > LOCK_THRESHOLD && Math.abs(dy) > Math.abs(dx) * 1.05) {
           axisLockRef.current = 'vertical'
         }
       }
@@ -116,12 +133,14 @@ export function usePhotoViewerGestures({
       }
 
       if (axisLockRef.current === 'vertical') {
+        const nextIntent = dy < 0 ? 'next' : 'prev'
+        const limited = (nextIntent === 'next' && !hasNext) || (nextIntent === 'prev' && !hasPrev)
         setOffsetX(0)
-        setOffsetY(dy)
-        setIntent(dy < 0 ? 'next' : 'prev')
+        setOffsetY(rubberBand(dy, limited))
+        setIntent(nextIntent)
       }
     },
-    [canVote, isDragging, isExiting]
+    [canVote, hasNext, hasPrev, isDragging, isExiting]
   )
 
   const handlePointerUp = useCallback(
@@ -139,25 +158,25 @@ export function usePhotoViewerGestures({
 
       if (lock === 'horizontal' && canVote) {
         if (dx >= COMMIT_THRESHOLD) {
-          await runExitAnimation(window.innerWidth * 0.6, 0, onLikeAndNext)
+          await runExitAnimation(window.innerWidth * 0.55, 0, onLikeAndNext)
           return
         }
         if (dx <= -COMMIT_THRESHOLD) {
-          await runExitAnimation(-window.innerWidth * 0.6, 0, onRejectAndNext)
+          await runExitAnimation(-window.innerWidth * 0.55, 0, onRejectAndNext)
           return
         }
       }
 
       if (lock === 'vertical') {
-        if (dy <= -COMMIT_THRESHOLD) {
-          await runExitAnimation(0, -window.innerHeight * 0.35, async () => {
+        if (dy <= -COMMIT_THRESHOLD && hasNext) {
+          await runExitAnimation(0, -window.innerHeight * 0.4, async () => {
             goNext()
             return true
           })
           return
         }
-        if (dy >= COMMIT_THRESHOLD) {
-          await runExitAnimation(0, window.innerHeight * 0.35, async () => {
+        if (dy >= COMMIT_THRESHOLD && hasPrev) {
+          await runExitAnimation(0, window.innerHeight * 0.4, async () => {
             goPrev()
             return true
           })
@@ -171,6 +190,8 @@ export function usePhotoViewerGestures({
       canVote,
       goNext,
       goPrev,
+      hasNext,
+      hasPrev,
       isDragging,
       isExiting,
       onLikeAndNext,
@@ -193,8 +214,21 @@ export function usePhotoViewerGestures({
 
   const rotation =
     intent === 'like' || intent === 'reject'
-      ? Math.max(-MAX_ROTATION, Math.min(MAX_ROTATION, offsetX / 20))
+      ? Math.max(-MAX_ROTATION, Math.min(MAX_ROTATION, offsetX / 18))
       : 0
+
+  const dragOpacity =
+    intent === 'next' || intent === 'prev'
+      ? Math.max(0.72, 1 - Math.min(Math.abs(offsetY) / 280, 0.28))
+      : 1
+
+  const overlayStrength = Math.min(
+    1,
+    Math.max(
+      intent === 'like' || intent === 'reject' ? Math.abs(offsetX) / COMMIT_THRESHOLD : 0,
+      intent === 'next' || intent === 'prev' ? Math.abs(offsetY) / COMMIT_THRESHOLD : 0,
+    ),
+  )
 
   return {
     offsetX,
@@ -203,6 +237,11 @@ export function usePhotoViewerGestures({
     intent,
     isDragging,
     isExiting,
+    dragOpacity,
+    overlayStrength,
+    snapBackMs: SNAP_BACK_MS,
+    exitAnimationMs: EXIT_ANIMATION_MS,
+    easeOut: EASE_OUT,
     handlers: {
       onPointerDown: handlePointerDown,
       onPointerMove: handlePointerMove,
@@ -213,4 +252,4 @@ export function usePhotoViewerGestures({
   }
 }
 
-export { COMMIT_THRESHOLD, EXIT_ANIMATION_MS, MAX_ROTATION }
+export { COMMIT_THRESHOLD, EXIT_ANIMATION_MS, MAX_ROTATION, SNAP_BACK_MS }

@@ -19,6 +19,7 @@ import {
 import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
 import { REVIEW_SCOPE } from '@/utils/projectReviewFilters.js'
 import { isPhotoVirtualGridEnabled } from '@/utils/photoContentUrl.js'
+import { mapPhotosForViewer } from '@/utils/mapPhotosForViewer.js'
 
 /**
  * @param {{ data: object; token: string; projectId: string; userEmail?: string; onLogout?: () => void; onRefresh: () => void; onLoadMorePhotos?: () => void; hasMorePhotos?: boolean; isLoadingMore?: boolean; isLoadingGrid?: boolean; reviewScope: string; activeFilter: string; onReviewScopeChange: (scope: string) => void; onFilterChange: (filter: string) => void }} props
@@ -102,7 +103,10 @@ export default function ProjectViewScreen({
   const openPhotoViewer = useCallback(
     (photoId) => {
       navigate(`/projects/${projectId}/photos/${photoId}`, {
-        state: { viewerPhotoIds: gridPhotos.map((p) => p.id) },
+        state: {
+          viewerPhotoIds: gridPhotos.map((p) => p.id),
+          viewerPhotos: mapPhotosForViewer(gridPhotos),
+        },
       })
     },
     [navigate, projectId, gridPhotos]
@@ -192,7 +196,7 @@ export default function ProjectViewScreen({
         />
       ) : null}
       <div className={`relative flex flex-col gap-6 pb-28 pt-4 ${canReviewPhotos ? 'lg:pb-16' : 'lg:pb-10'}`}>
-        {isLoadingGrid ? (
+        {isLoadingGrid && gridPhotos.length === 0 ? (
           <div
             className="pointer-events-none absolute inset-0 z-raised flex items-start justify-center bg-base-100/50 pt-16"
             aria-live="polite"

@@ -65,13 +65,20 @@ export async function ensurePhotoContentAccess(
   await ensureAuthenticated(request, reply);
 }
 
+/**
+ * The header-based auth bypass is strictly a test affordance. It is only honored when the
+ * process is running under the test runner (`NODE_ENV === "test"`), so it can never be used
+ * to impersonate a user in development or production deployments.
+ */
+function isTestAuthBypassAllowed(): boolean {
+  return process.env.NODE_ENV === "test";
+}
+
 export async function ensureAuthenticated(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  // Test mode bypass for development - remove this in production
-  const bypassHeader = request.headers["x-test-bypass-auth"];
-  if (bypassHeader === "1") {
+  if (isTestAuthBypassAllowed() && request.headers["x-test-bypass-auth"] === "1") {
     const userIdHeader = request.headers["x-test-user-id"];
     if (typeof userIdHeader === "string" && userIdHeader.length > 0) {
       (request as any).user = { id: userIdHeader };

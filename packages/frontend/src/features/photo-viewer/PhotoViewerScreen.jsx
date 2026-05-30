@@ -55,22 +55,27 @@ export default function PhotoViewerScreen({
   const [localPhotos, setLocalPhotos] = useState(photos)
   const [liveMessage, setLiveMessage] = useState('')
   const isSavingRef = useRef(false)
+  const lastPhotoRef = useRef(null)
 
   useEffect(() => {
-    setLocalPhotos(photos)
+    if (photos.length > 0) setLocalPhotos(photos)
   }, [photos])
 
   const navState = location.state
   const index = localPhotos.findIndex((p) => p.id === photoId)
   const current = index >= 0 ? localPhotos[index] : null
+  if (current) lastPhotoRef.current = current
+  const displayPhoto = current ?? lastPhotoRef.current
   const total = localPhotos.length
+  const hasNext = index >= 0 && index < localPhotos.length - 1
+  const hasPrev = index > 0
 
   useEffect(() => {
-    if (current) {
-      setRenameDraft(current.renamedTo ?? '')
+    if (displayPhoto) {
+      setRenameDraft(displayPhoto.renamedTo ?? '')
     }
     setLiveMessage('')
-  }, [current?.id, current?.renamedTo])
+  }, [displayPhoto?.id, displayPhoto?.renamedTo])
 
   const memberNameByUserId = useMemo(() => {
     const m = new Map()
@@ -202,7 +207,7 @@ export default function PhotoViewerScreen({
     goNext,
     onLike,
     onReject,
-    enabled: Boolean(photoId && current) && !isMobile,
+    enabled: Boolean(photoId && displayPhoto) && !isMobile,
     canReview: canReviewPhotos,
   })
 
@@ -214,29 +219,38 @@ export default function PhotoViewerScreen({
 
   const swipeEnabled =
     isMobile &&
-    Boolean(current) &&
+    Boolean(displayPhoto) &&
     !detailOpen &&
     !renameFocused &&
     !isSaving &&
     !isPhotoZoomed
 
-  if (!current) {
+  if (!displayPhoto) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-black px-4 font-base text-sm text-white/50">
-        {localPhotos.length === 0 ? 'No photos in this view.' : 'Loading…'}
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-black px-4 font-base text-sm text-white/50">
+        {localPhotos.length === 0 ? (
+          <p className="m-0">No photos in this view.</p>
+        ) : (
+          <>
+            <span className="loading loading-spinner loading-md text-accent" aria-hidden />
+            <span className="sr-only">Loading photo…</span>
+          </>
+        )}
       </div>
     )
   }
 
   const imageNode = (
     <PhotoViewerProgressiveImage
-      photoId={current.id}
+      key={displayPhoto.id}
+      photoId={displayPhoto.id}
       token={token}
-      alt={current.alt}
-      status={current.status}
-      width={current.width}
-      height={current.height}
+      alt={displayPhoto.alt}
+      status={displayPhoto.status}
+      width={displayPhoto.width}
+      height={displayPhoto.height}
       onZoomChange={setIsPhotoZoomed}
+      className="photo-viewer-image-in motion-reduce:animate-none"
     />
   )
 
@@ -261,17 +275,17 @@ export default function PhotoViewerScreen({
       <div className="absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] z-10 flex items-center gap-2 md:right-4">
         {canReviewPhotos ? (
           <PhotoViewerRenameControl
-            photoId={current.id}
+            photoId={displayPhoto.id}
             renameDraft={renameDraft}
-            savedRename={current.renamedTo ?? ''}
+            savedRename={displayPhoto.renamedTo ?? ''}
             onRenameChange={setRenameDraft}
             onRenameSubmit={handleRenameSubmit}
             onFocusChange={setRenameFocused}
           />
         ) : null}
         <PhotoViewerDownloadControl
-          photoId={current.id}
-          filename={current.alt}
+          photoId={displayPhoto.id}
+          filename={displayPhoto.alt}
           token={token}
           onError={handleDownloadError}
         />
@@ -294,6 +308,8 @@ export default function PhotoViewerScreen({
             enabled={swipeEnabled}
             canVote={canReviewPhotos}
             isSaving={isSaving}
+            hasNext={hasNext}
+            hasPrev={hasPrev}
             onLikeAndNext={onLikeAndNext}
             onRejectAndNext={onRejectAndNext}
             goNext={goNext}
@@ -311,8 +327,8 @@ export default function PhotoViewerScreen({
           <div className="flex min-w-0 flex-1 items-center">
             {canReviewPhotos ? (
               <PhotoViewerReviewControls
-                isLiked={current.isLiked}
-                isRejected={current.isRejected}
+                isLiked={displayPhoto.isLiked}
+                isRejected={displayPhoto.isRejected}
                 onLike={onLike}
                 onReject={onReject}
                 canReviewPhotos={canReviewPhotos}
@@ -323,7 +339,10 @@ export default function PhotoViewerScreen({
               </p>
             )}
           </div>
-          <PhotoViewerPhotoCounter index={index} total={total} />
+          <PhotoViewerPhotoCounter
+            index={index >= 0 ? index : Math.max(0, localPhotos.findIndex((p) => p.id === displayPhoto.id))}
+            total={total}
+          />
         </div>
       </div>
 
@@ -333,7 +352,7 @@ export default function PhotoViewerScreen({
 
       <PhotoViewerInfoPanel
         open={detailOpen}
-        photoId={current.id}
+        photoId={displayPhoto.id}
         token={token}
         memberNameByUserId={memberNameByUserId}
         canReviewPhotos={canReviewPhotos}

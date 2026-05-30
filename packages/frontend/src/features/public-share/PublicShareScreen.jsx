@@ -82,23 +82,15 @@ export default function PublicShareScreen({ token }) {
               <p className="m-0 max-w-prose font-base text-sm text-muted">{meta.description}</p>
             ) : null}
           </div>
-          <div className="flex flex-col items-stretch gap-3 sm:items-end">
-            <div className="relative -rotate-1 self-start rounded-md border-[1.5px] border-accent/40 bg-base-100 px-4 py-3 shadow-floating sm:self-end">
-              <span className="block font-base text-sm font-bold leading-tight text-accent">
-                {photos.length} photo{photos.length === 1 ? '' : 's'}
-              </span>
-              <span className="font-base text-xs font-semibold uppercase tracking-[0.06em] text-muted">
-                {meta.allowDownload ? 'Downloads on' : 'Downloads off'}
-              </span>
-            </div>
-            {meta.allowDownload && photos.length > 0 ? (
+          {meta.allowDownload && photos.length > 0 ? (
+            <div className="flex shrink-0 items-center md:pb-1">
               <ProjectDownloadDropdown
                 disabled={exportState.isBusy}
                 onSelectFullQuality={handleExportFullQuality}
                 onSelectCompressed={handleExportCompressed}
               />
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </header>
       <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-6 md:px-8 md:pt-10">
@@ -141,7 +133,6 @@ export default function PublicShareScreen({ token }) {
           unlockToken={unlockToken}
           photos={photos}
           index={activeIndex}
-          allowDownload={meta.allowDownload}
           showMetadata={meta.showMetadata}
           onClose={() => setActiveIndex(null)}
           onChange={(next) => setActiveIndex(next)}

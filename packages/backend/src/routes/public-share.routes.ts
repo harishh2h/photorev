@@ -32,6 +32,18 @@ const tokenOnly = {
   },
 };
 
+const recordViewSchema = {
+  params: tokenOnly.params,
+  body: {
+    type: "object",
+    required: ["viewSessionId"],
+    properties: {
+      viewSessionId: { type: "string", minLength: 8, maxLength: 64 },
+    },
+    additionalProperties: false,
+  },
+};
+
 const photoVariantSchema = {
   params: {
     type: "object",
@@ -215,8 +227,41 @@ async function publicShareRoutes(
         sendFailure(reply, 404, "Share link not found", null);
         return;
       }
-      void shareSvc.recordView(link.id);
       sendSuccess(reply, 200, listing, "OK");
+    },
+  );
+
+  fastify.post(
+    "/share/:token/view",
+    {
+      schema: recordViewSchema,
+      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+    },
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const { token } = request.params as { token: string };
+      const { viewSessionId } = request.body as { viewSessionId: string };
+      const link = await shareSvc.loadShareByToken(token);
+      if (!link) {
+        sendFailure(reply, 404, "Share link not found", null);
+        return;
+      }
+      if (link.revoked_at) {
+        sendFailure(reply, 410, "Share link was revoked", null);
+        return;
+      }
+      if (link.expires_at && link.expires_at.getTime() < Date.now()) {
+        sendFailure(reply, 410, "Share link has expired", null);
+        return;
+      }
+      if (link.password_hash) {
+        const unlock = await verifyUnlockToken(request, token);
+        if (!unlock || unlock.shareId !== link.id) {
+          sendFailure(reply, 401, "Password required", { requiresPassword: true });
+          return;
+        }
+      }
+      const recorded = await shareSvc.recordView(link.id, viewSessionId);
+      sendSuccess(reply, 200, { recorded }, recorded ? "View recorded" : "Already counted");
     },
   );
 

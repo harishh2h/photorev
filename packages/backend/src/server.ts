@@ -2,7 +2,7 @@ import "dotenv/config";
 import fs from "fs";
 import path from "path";
 import buildApp from "./app";
-import { config } from "./config/config";
+import { config, assertSecurityConfig } from "./config/config";
 import { initJobSystem } from "./workers";
 
 const server = buildApp({
@@ -12,6 +12,14 @@ const server = buildApp({
 })
 
 const start = async (): Promise<void> => {
+    // Fail fast on insecure/missing secrets before accepting any traffic
+    try {
+        assertSecurityConfig();
+    } catch (error) {
+        server.log.error(error, 'Security configuration check failed');
+        process.exit(1);
+    }
+
     // Check database connection
     try {
         await server.db.raw('SELECT NOW()');
