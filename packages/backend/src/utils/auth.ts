@@ -9,6 +9,7 @@ export interface AuthUserPayload {
   readonly id: string;
   readonly email?: string;
   readonly name?: string;
+  readonly role?: string | null;
 }
 
 export function getAuthenticatedUserId(request: FastifyRequest): string {
@@ -72,6 +73,20 @@ export async function ensurePhotoContentAccess(
  */
 function isTestAuthBypassAllowed(): boolean {
   return process.env.NODE_ENV === "test";
+}
+
+/**
+ * Requires the caller to be an authenticated admin.
+ * Must be used as a Fastify preHandler — it sends a reply and returns early on failure.
+ */
+export async function ensureAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  await ensureAuthenticated(request, reply);
+  // Guard against double-reply if ensureAuthenticated already sent a 401
+  if (reply.sent) return;
+  const user = (request as FastifyRequest & { user?: AuthUserPayload }).user;
+  if (user?.role !== 'admin') {
+    sendFailure(reply, 403, 'Admin access required', null);
+  }
 }
 
 export async function ensureAuthenticated(

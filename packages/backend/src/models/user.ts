@@ -1,6 +1,6 @@
 export const USERS_TABLE = 'users'
 
-export type UserRole = 'admin' | 'reviewer'
+export type UserRole = 'admin' | 'user'
 
 export interface User {
   id: string
@@ -8,6 +8,7 @@ export interface User {
   email: string
   password_hash: string
   role: UserRole
+  is_active: boolean
   created_at: Date
 }
 

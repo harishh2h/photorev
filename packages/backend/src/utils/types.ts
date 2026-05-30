@@ -17,6 +17,19 @@ export const RegisterSchema ={
       }
 }
 
+export const SetupSchema = {
+    body: {
+        type: 'object',
+        required: ['email', 'password', 'name'],
+        properties: {
+            email: { type: 'string', format: 'email', minLength: 3, maxLength: 255 },
+            password: { type: 'string', minLength: 8, maxLength: 255 },
+            name: { type: 'string', minLength: 3, maxLength: 255 },
+        },
+        additionalProperties: false,
+    },
+}
+
 export const LoginSchema = {
     body: {
         type: 'object',

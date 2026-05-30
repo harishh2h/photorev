@@ -8,7 +8,12 @@ import {
   useState,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { login as apiLogin, register as apiRegister } from '@/services/authService.js'
+import {
+  login as apiLogin,
+  register as apiRegister,
+  setupAdmin as apiSetupAdmin,
+  fetchAuthConfig,
+} from '@/services/authService.js'
 import { apiFetch, setUnauthorizedHandler } from '@/services/httpClient.js'
 
 const TOKEN_KEY = 'photorev_token'
@@ -25,7 +30,7 @@ function getStored() {
   }
 }
 
-/** @typedef {{ user: object | null; token: string | null; isAuthenticated: boolean; isLoading: boolean; login: Function; register: Function; logout: Function }} AuthContextValue */
+/** @typedef {{ user: object | null; token: string | null; isAuthenticated: boolean; isLoading: boolean; isInitialized: boolean; registrationEnabled: boolean; login: Function; register: Function; setupAdmin: Function; logout: Function }} AuthContextValue */
 /** @type {import('react').Context<AuthContextValue | null>} */
 const AuthContext = createContext(null)
 
@@ -34,6 +39,8 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null)
   const [user, setUser] = useState(null)
   const [sessionReady, setSessionReady] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(true)
+  const [registrationEnabled, setRegistrationEnabled] = useState(false)
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)
@@ -54,38 +61,53 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let cancelled = false
+
     async function bootstrap() {
       const { token: storedToken, user: storedUser } = getStored()
       setToken(storedToken)
       setUser(storedUser)
-      if (!storedToken) {
-        if (!cancelled) {
-          setSessionReady(true)
-        }
-        return
+
+      // Run auth config fetch and session validation concurrently
+      const [configResult, sessionResult] = await Promise.allSettled([
+        fetchAuthConfig(),
+        storedToken
+          ? apiFetch('/auth/me', { token: storedToken, skipUnauthorizedHandler: true })
+          : Promise.resolve(null),
+      ])
+
+      if (cancelled) return
+
+      // Apply auth config — fail safe: if fetch fails, assume initialized + no public registration
+      if (configResult.status === 'fulfilled' && configResult.value) {
+        setIsInitialized(configResult.value.isInitialized)
+        setRegistrationEnabled(configResult.value.registrationEnabled)
       }
-      const r = await apiFetch('/auth/me', { token: storedToken })
+      // On network error leave the defaults (isInitialized: true, registrationEnabled: false)
+
+      // Apply session validation result
       if (
-        r.ok &&
-        r.data &&
-        typeof r.data === 'object' &&
-        typeof /** @type {{ id?: unknown }} */ (r.data).id === 'string'
+        sessionResult.status === 'fulfilled' &&
+        sessionResult.value &&
+        sessionResult.value.ok &&
+        sessionResult.value.data &&
+        typeof sessionResult.value.data === 'object'
       ) {
-        const d = /** @type {{ id: string; email?: unknown; name?: unknown }} */ (r.data)
-        const nextUser = {
-          id: d.id,
-          email: typeof d.email === 'string' ? d.email : '',
-          name: typeof d.name === 'string' ? d.name : '',
-        }
-        localStorage.setItem(USER_KEY, JSON.stringify(nextUser))
-        if (!cancelled) {
+        const d = /** @type {{ id?: unknown; email?: unknown; name?: unknown; role?: unknown }} */ (sessionResult.value.data)
+        if (typeof d.id === 'string') {
+          const nextUser = {
+            id: d.id,
+            email: typeof d.email === 'string' ? d.email : '',
+            name: typeof d.name === 'string' ? d.name : '',
+            role: typeof d.role === 'string' ? d.role : null,
+          }
+          localStorage.setItem(USER_KEY, JSON.stringify(nextUser))
           setUser(nextUser)
         }
       }
-      if (!cancelled) {
-        setSessionReady(true)
-      }
+
+      setSessionReady(true)
     }
+
     bootstrap()
     return () => {
       cancelled = true
@@ -120,17 +142,33 @@ export function AuthProvider({ children }) {
     return { success: true }
   }, [])
 
+  const setupAdmin = useCallback(async ({ email, password, name }) => {
+    const result = await apiSetupAdmin({ email, password, name })
+    if (!result.success || !result.data) {
+      return { success: false, message: result.message }
+    }
+    localStorage.setItem(TOKEN_KEY, result.data.token)
+    localStorage.setItem(USER_KEY, JSON.stringify(result.data.user))
+    setToken(result.data.token)
+    setUser(result.data.user)
+    setIsInitialized(true)
+    return { success: true }
+  }, [])
+
   const value = useMemo(
     () => ({
       user,
       token,
       isAuthenticated: Boolean(token),
       isLoading: !sessionReady,
+      isInitialized,
+      registrationEnabled,
       login,
       register,
+      setupAdmin,
       logout,
     }),
-    [user, token, sessionReady, login, register, logout],
+    [user, token, sessionReady, isInitialized, registrationEnabled, login, register, setupAdmin, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

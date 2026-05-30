@@ -56,9 +56,11 @@ export default function AuthForm({ mode, onToggleMode, showBranding = true, comp
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
-  const { login, register } = useAuth()
+  const { login, register, registrationEnabled } = useAuth()
   const navigate = useNavigate()
-  const isSignIn = mode === 'signIn'
+  // When registration is disabled, always stay in sign-in mode
+  const effectiveMode = registrationEnabled ? mode : 'signIn'
+  const isSignIn = effectiveMode === 'signIn'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -81,6 +83,7 @@ export default function AuthForm({ mode, onToggleMode, showBranding = true, comp
         }
         setFormError(result.message || 'Sign up failed')
       }
+
     } finally {
       setIsSubmitting(false)
     }
@@ -115,16 +118,18 @@ export default function AuthForm({ mode, onToggleMode, showBranding = true, comp
         </div>
       ) : null}
 
-      <div className={centered ? 'w-full max-w-[20rem]' : 'w-full'}>
-        <AuthModeTabs
-          isSignIn={isSignIn}
-          onSelectSignIn={handleSelectSignIn}
-          onSelectSignUp={handleSelectSignUp}
-          disabled={isSubmitting}
-        />
-      </div>
+      {registrationEnabled && (
+        <div className={centered ? 'w-full max-w-[20rem]' : 'w-full'}>
+          <AuthModeTabs
+            isSignIn={isSignIn}
+            onSelectSignIn={handleSelectSignIn}
+            onSelectSignUp={handleSelectSignUp}
+            disabled={isSubmitting}
+          />
+        </div>
+      )}
 
-      <div key={mode} className={`${fieldsWrapClass} ${compact ? '' : 'animate-fade-up motion-reduce:animate-none'}`}>
+      <div key={effectiveMode} className={`${fieldsWrapClass} ${compact ? '' : 'animate-fade-up motion-reduce:animate-none'}`}>
         <div className={`flex flex-col ${fieldGap} ${fieldsMinHeight}`}>
           {!isSignIn && (
             <div className={fieldWrapClass}>

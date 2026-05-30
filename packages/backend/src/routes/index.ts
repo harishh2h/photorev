@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import authRoutes from "./auth.routes";
+import adminRoutes from "./admin.routes";
 import projectMembersRoutes from "./project-members.routes";
 import photosRoutes from "./photos.routes";
 import photoReviewsRoutes from "./photo-reviews.routes";
@@ -14,6 +15,7 @@ async function routes(fastify: FastifyInstance, opts: FastifyPluginOptions): Pro
     sendSuccess(reply, 200, null, "ok");
   });
   fastify.register(authRoutes, { prefix: "/auth" });
+  fastify.register(adminRoutes, { prefix: "/admin" });
   fastify.register(projectsRoutes, { prefix: "/projects" });
   fastify.register(projectExportsRoutes, { prefix: "/projects" });
   fastify.register(projectMembersRoutes);

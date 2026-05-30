@@ -23,7 +23,7 @@ describe("Projects CRUD API", () => {
               email: "owner@example.com",
               name: "Owner User",
               password_hash: "hash",
-              role: "reviewer",
+              role: "user",
             },
             ["id"],
           )
@@ -95,7 +95,7 @@ describe("Projects CRUD API", () => {
               email: "owner2@example.com",
               name: "Owner Two",
               password_hash: "hash",
-              role: "reviewer",
+              role: "user",
             },
             ["id"],
           )
@@ -145,7 +145,7 @@ describe("Projects CRUD API", () => {
               email: "owner3@example.com",
               name: "Owner Three",
               password_hash: "hash",
-              role: "reviewer",
+              role: "user",
             },
             ["id"],
           )
@@ -261,7 +261,7 @@ describe("Projects CRUD API", () => {
               email: "owner_outside_root@example.com",
               name: "Outside",
               password_hash: "hash",
-              role: "reviewer",
+              role: "user",
             },
             ["id"],
           )
@@ -294,13 +294,13 @@ describe("Projects CRUD API", () => {
       const db = (app as any).db;
       const owner = await db("users")
         .insert(
-          { email: `cover_owner_${u}@example.com`, name: "Cover Owner", password_hash: "h", role: "reviewer" },
+          { email: `cover_owner_${u}@example.com`, name: "Cover Owner", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
       const stranger = await db("users")
         .insert(
-          { email: `cover_stranger_${u}@example.com`, name: "Stranger", password_hash: "h", role: "reviewer" },
+          { email: `cover_stranger_${u}@example.com`, name: "Stranger", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
@@ -337,7 +337,7 @@ describe("Projects CRUD API", () => {
       const db = (app as any).db;
       const owner = await db("users")
         .insert(
-          { email: `cover_empty_${u}@example.com`, name: "Cover Empty", password_hash: "h", role: "reviewer" },
+          { email: `cover_empty_${u}@example.com`, name: "Cover Empty", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
@@ -377,7 +377,7 @@ describe("Projects CRUD API", () => {
       const db = (app as any).db;
       const owner = await db("users")
         .insert(
-          { email: `cover_ready_${u}@example.com`, name: "Cover Ready", password_hash: "h", role: "reviewer" },
+          { email: `cover_ready_${u}@example.com`, name: "Cover Ready", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
@@ -457,7 +457,7 @@ describe("Projects CRUD API", () => {
       const db = (app as any).db;
       const owner = await db("users")
         .insert(
-          { email: `vc_owner_${u}@example.com`, name: "VC Owner", password_hash: "h", role: "reviewer" },
+          { email: `vc_owner_${u}@example.com`, name: "VC Owner", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
@@ -501,13 +501,13 @@ describe("Projects CRUD API", () => {
       const db = (app as any).db;
       const owner = await db("users")
         .insert(
-          { email: `lu_owner_${u}@example.com`, name: "LU Owner", password_hash: "h", role: "reviewer" },
+          { email: `lu_owner_${u}@example.com`, name: "LU Owner", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
       const stranger = await db("users")
         .insert(
-          { email: `lu_str_${u}@example.com`, name: "Stranger", password_hash: "h", role: "reviewer" },
+          { email: `lu_str_${u}@example.com`, name: "Stranger", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
@@ -524,7 +524,7 @@ describe("Projects CRUD API", () => {
         project_id: project.id,
         user_id: stranger.id,
         is_owner: false,
-        role: "reviewer",
+        role: "user",
       });
 
       const okLookup = await app.inject({
@@ -561,13 +561,13 @@ describe("Projects CRUD API", () => {
       const db = (app as any).db;
       const owner = await db("users")
         .insert(
-          { email: `pr_owner_${u}@example.com`, name: "PR Owner", password_hash: "h", role: "reviewer" },
+          { email: `pr_owner_${u}@example.com`, name: "PR Owner", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
       const viewerUser = await db("users")
         .insert(
-          { email: `pr_view_${u}@example.com`, name: "PR Viewer", password_hash: "h", role: "reviewer" },
+          { email: `pr_view_${u}@example.com`, name: "PR Viewer", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
@@ -621,13 +621,13 @@ describe("Projects CRUD API", () => {
       const db = (app as any).db;
       const owner = await db("users")
         .insert(
-          { email: `lr_owner_${u}@example.com`, name: "LR Owner", password_hash: "h", role: "reviewer" },
+          { email: `lr_owner_${u}@example.com`, name: "LR Owner", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
       const viewerUser = await db("users")
         .insert(
-          { email: `lr_view_${u}@example.com`, name: "LR Viewer", password_hash: "h", role: "reviewer" },
+          { email: `lr_view_${u}@example.com`, name: "LR Viewer", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
@@ -680,19 +680,19 @@ describe("Projects CRUD API", () => {
       const db = (app as any).db;
       const owner = await db("users")
         .insert(
-          { email: `mut_owner_${u}@example.com`, name: "Mut Owner", password_hash: "h", role: "reviewer" },
+          { email: `mut_owner_${u}@example.com`, name: "Mut Owner", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
       const member = await db("users")
         .insert(
-          { email: `mut_mem_${u}@example.com`, name: "Mut Member", password_hash: "h", role: "reviewer" },
+          { email: `mut_mem_${u}@example.com`, name: "Mut Member", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
       const stranger = await db("users")
         .insert(
-          { email: `mut_str_${u}@example.com`, name: "Mut Stranger", password_hash: "h", role: "reviewer" },
+          { email: `mut_str_${u}@example.com`, name: "Mut Stranger", password_hash: "h", role: "user" },
           ["id"],
         )
         .then((rows: { id: string }[]) => rows[0]);
@@ -709,7 +709,7 @@ describe("Projects CRUD API", () => {
         project_id: project.id,
         user_id: member.id,
         is_owner: false,
-        role: "reviewer",
+        role: "user",
       });
 
       const strangerPatch = await app.inject({

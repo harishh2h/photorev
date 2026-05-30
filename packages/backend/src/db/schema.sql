@@ -10,7 +10,7 @@ CREATE TABLE users (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('admin', 'reviewer')),
+    role TEXT CHECK (role IN ('admin', 'user')),
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
