@@ -16,38 +16,237 @@ Speed up photo review workflows after events.
 
 *Inside a project: filter by status, collaborate with your team, and mark favorites or rejects on the grid.*
 
-## Structure
+## Prerequisites
 
-- `packages/backend` - Fastify API (TypeScript, Knex, PostgreSQL)
+| Tool | Version |
+|------|---------|
+| [Node.js](https://nodejs.org/) | 20+ (22 recommended) |
+| [pnpm](https://pnpm.io/) | 10.x (`corepack enable`) |
+| [PostgreSQL](https://www.postgresql.org/) | 16+ (local dev only; Docker brings its own) |
+| [Docker](https://www.docker.com/) | Optional — for containerized setup |
 
-## Setup
+## Quick start (local)
+
+### 1. Install dependencies
+
+From the repository root:
 
 ```bash
 pnpm install
 ```
 
-## Development
+### 2. Configure environment
+
+Copy the example env files and edit secrets (especially `JWT_SECRET`):
 
 ```bash
-pnpm backend:dev
+cp packages/backend/.env.example packages/backend/.env
+cp packages/frontend/.env.example packages/frontend/.env
 ```
+
+Generate a strong JWT secret (required — the API refuses to start without one):
+
+```bash
+openssl rand -base64 48
+```
+
+Paste the output into `packages/backend/.env` as `JWT_SECRET=...`.
+
+**Backend** (`packages/backend/.env`) — key variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | PostgreSQL connection |
+| `JWT_SECRET` | Auth tokens (min 16 chars, not a placeholder) |
+| `STORAGE_ROOT` | Uploaded photos and exports (default `./storage`) |
+| `PORT` / `HOST` | API listen address (default `3000` / `0.0.0.0`) |
+
+**Frontend** (`packages/frontend/.env`) — key variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `VITE_API_URL` | Backend URL the browser calls (default `http://localhost:3000`) |
+
+### 3. Prepare the database
+
+Start PostgreSQL locally, then create the database if it does not exist:
+
+```bash
+createdb photorev
+# or: psql -c "CREATE DATABASE photorev;"
+```
+
+Run migrations from the repo root:
+
+```bash
+pnpm migrate:latest
+```
+
+Optional: list migration status:
+
+```bash
+pnpm migrate:list
+```
+
+### 4. Start the application
+
+Use two terminals (or a process manager):
+
+```bash
+# Terminal 1 — API
+pnpm backend:dev
+
+# Terminal 2 — web UI
+pnpm frontend:dev
+```
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| API | http://localhost:3000 |
+| API docs (dev) | http://localhost:3000/docs |
+
+The API creates `STORAGE_ROOT` (photos and exports) on first boot if missing.
+
+## Docker
+
+Runs PostgreSQL, the API, and the web UI with **named volumes** for persistent data.
+
+### 1. Environment file
+
+Copy the Docker-oriented backend env template and set `JWT_SECRET` (recommended for custom secrets):
+
+```bash
+cp packages/backend/.env.docker.example packages/backend/.env
+# Edit packages/backend/.env — set JWT_SECRET (openssl rand -base64 48)
+```
+
+Start with your env file loaded:
+
+```bash
+docker compose --env-file packages/backend/.env up --build -d
+```
+
+Without `--env-file`, Compose uses built-in defaults (including a dev-only `JWT_SECRET`). `docker-compose.yml` sets `DB_HOST=db` and `STORAGE_ROOT=/app/storage`. The frontend image is built with `VITE_API_URL=http://localhost:3000` so the browser on your machine reaches the mapped API port.
+
+### 2. Build and start
+
+```bash
+# With custom secrets from packages/backend/.env
+docker compose --env-file packages/backend/.env up --build -d
+
+# Quick start (Compose defaults)
+docker compose up --build -d
+```
+
+Or via pnpm:
+
+```bash
+pnpm docker:up
+```
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| API | http://localhost:3000 |
+
+Migrations run automatically when the API container starts.
+
+### 3. Docker commands
+
+| Command | Description |
+|---------|-------------|
+| `docker compose up --build -d` | Build images and start all services in the background |
+| `docker compose down` | Stop containers (keeps named volumes) |
+| `docker compose down -v` | Stop and **delete** Postgres + storage volumes |
+| `docker compose logs -f api` | Follow API logs |
+| `docker compose logs -f web` | Follow frontend logs |
+| `docker compose ps` | Service status |
+| `docker compose exec api pnpm run migrate:list` | Migration status inside API container |
+| `pnpm docker:up` | Same as `up --build -d` |
+| `pnpm docker:down` | `docker compose down` |
+| `pnpm docker:logs` | `docker compose logs -f` |
+
+### 4. Persistent volumes
+
+Default named volumes (survive `docker compose down`):
+
+| Volume | Mount | Contents |
+|--------|-------|----------|
+| `photorev_postgres_data` | Postgres data dir | Database files |
+| `photorev_storage` | `/app/storage` in API | Uploaded photos and exports |
+
+Inspect or back up a volume:
+
+```bash
+docker volume inspect photorev_storage
+docker volume inspect photorev_postgres_data
+```
+
+**Bind mounts (optional)** — edit `docker-compose.yml` under `api` / `db` to use host paths instead of named volumes, for example:
+
+```yaml
+# api service — photos on your machine
+volumes:
+  - ./docker-data/storage:/app/storage
+
+# db service — Postgres files on your machine
+volumes:
+  - ./docker-data/postgres:/var/lib/postgresql/data
+```
+
+Create `docker-data/` before starting if you use bind mounts. Add `docker-data/` to `.gitignore` if you adopt this pattern locally.
+
+**Custom env file** — pass at runtime (keeps secrets off the image):
+
+```bash
+docker compose --env-file packages/backend/.env up -d
+```
+
+Or add under the `api` service in `docker-compose.yml`:
+
+```yaml
+env_file:
+  - packages/backend/.env
+```
+
+Keep `JWT_SECRET` and DB credentials out of version control.
+
+### 5. Rebuild after code changes
+
+```bash
+docker compose up --build -d
+```
+
+## Project structure
+
+| Path | Description |
+|------|-------------|
+| `packages/backend` | Fastify API (TypeScript, Knex, PostgreSQL) |
+| `packages/frontend` | React + Vite UI |
+| `Dockerfile` | API image |
+| `Dockerfile.frontend` | Web UI image |
+| `docker-compose.yml` | Postgres + API + web stack |
+| `docker/backend-entrypoint.sh` | Wait for DB, migrate, start API |
 
 ## Database
 
-See `packages/backend/src/db/schema.sql` for the PostgreSQL schema.
+Schema reference: `packages/backend/src/db/schema.sql`.
 
-### Migrations
+### Migrations (Knex)
 
-Migrations are managed with [Knex](https://knexjs.org/). Configuration lives in `packages/backend/src/db/knexfile.ts` and loads `.env` from `packages/backend/.env` (copy from `packages/backend/.env.example` if needed).
+Config: `packages/backend/src/db/knexfile.ts` (reads `packages/backend/.env`).
 
-Run all commands from `packages/backend`:
+From the **repo root**:
 
 | Command | Description |
-|--------|--------------|
-| `pnpm run migrate:latest` | Run all pending migrations |
-| `pnpm run migrate:make <name>` | Create a new migration file (e.g. `pnpm run migrate:make add_avatar_to_users`) |
-| `pnpm run migrate:rollback` | Roll back the last batch of migrations |
-| `pnpm run migrate:list` | List completed and pending migrations |
-| `pnpm run seed:run` | Run seed files |
+|---------|-------------|
+| `pnpm migrate:latest` | Run pending migrations |
+| `pnpm migrate:rollback` | Roll back last batch |
+| `pnpm migrate:list` | List completed and pending |
+| `pnpm migrate:make <name>` | Create a new migration |
+| `pnpm run seed:run` | Run seeds (`packages/backend`) |
 
-Migration files are in `packages/backend/src/db/migrations/` (TypeScript). Ensure PostgreSQL is running and `DB_*` in `.env` are correct before running migrations.
+Migration files: `packages/backend/src/db/migrations/`.
+
+Ensure PostgreSQL is running and `DB_*` values match before migrating.

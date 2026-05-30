@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+.git
+.cursor
+.agents
+**/.env
+**/.env.*
+!**/.env.example
+**/storage
+docker-data
+*.log
+coverage
+.DS_Store
+assets
