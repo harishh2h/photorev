@@ -50,7 +50,7 @@ export interface GetActiveShareLinkParams {
 
 export type ShareLinkMutationResult =
   | { readonly ok: true; readonly link: ShareLinkDto }
-  | { readonly ok: false; readonly reason: "not_found" | "forbidden" | "not_finalized" };
+  | { readonly ok: false; readonly reason: "not_found" | "forbidden" };
 
 export type ShareLinkRevokeResult =
   | { readonly ok: true }
@@ -103,14 +103,14 @@ function buildShareLinksService(
   async function gateOwner(
     userId: string,
     projectId: string,
-  ): Promise<"not_found" | "forbidden" | { status: string } | null> {
+  ): Promise<"not_found" | "forbidden" | "ok"> {
     const row = await db<{ created_by: string; status: string }>("projects")
       .select("created_by", "status")
       .where("id", projectId)
       .first();
     if (!row || row.status === "deleted") return "not_found";
     if (row.created_by !== userId) return "forbidden";
-    return { status: row.status };
+    return "ok";
   }
 
   async function createOrReplaceShareLink(
@@ -119,9 +119,6 @@ function buildShareLinksService(
     const gate = await gateOwner(params.userId, params.projectId);
     if (gate === "not_found") return { ok: false, reason: "not_found" };
     if (gate === "forbidden") return { ok: false, reason: "forbidden" };
-    if (gate == null || typeof gate !== "object" || gate.status !== "finalized") {
-      return { ok: false, reason: "not_finalized" };
-    }
 
     const opts = params.opts;
     const passwordHash =

@@ -1,9 +1,16 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import PublicSharePasswordGate from './PublicSharePasswordGate.jsx'
 import PublicShareGrid from './PublicShareGrid.jsx'
 import PublicShareLightbox from './PublicShareLightbox.jsx'
 import { usePublicShare } from './usePublicShare.js'
+import {
+  getExportStorageKey,
+  ProjectDownloadDropdown,
+  ProjectExportResumeChip,
+  ProjectExportStatusFloat,
+  useProjectExport,
+} from '@/features/project-export/index.js'
 
 /**
  * @param {{ token: string }} props
@@ -12,6 +19,24 @@ export default function PublicShareScreen({ token }) {
   const { listing, loading, error, requiresPassword, unlockToken, submitPassword } =
     usePublicShare(token)
   const [activeIndex, setActiveIndex] = useState(null)
+
+  const exportStorageKey = getExportStorageKey('share', token)
+  const exportState = useProjectExport({
+    mode: 'share',
+    token: '',
+    shareToken: token,
+    unlockToken,
+    projectName: listing?.meta?.projectName ?? 'Gallery',
+    storageKey: exportStorageKey,
+  })
+
+  const handleExportFullQuality = useCallback(() => {
+    void exportState.startExport('original')
+  }, [exportState])
+
+  const handleExportCompressed = useCallback(() => {
+    void exportState.startExport('preview')
+  }, [exportState])
 
   if (loading && !listing) {
     return (
@@ -57,13 +82,22 @@ export default function PublicShareScreen({ token }) {
               <p className="m-0 max-w-prose font-base text-sm text-muted">{meta.description}</p>
             ) : null}
           </div>
-          <div className="relative -rotate-1 self-start rounded-md border-[1.5px] border-accent/40 bg-base-100 px-4 py-3 shadow-floating md:self-end">
-            <span className="block font-base text-sm font-bold leading-tight text-accent">
-              {photos.length} photo{photos.length === 1 ? '' : 's'}
-            </span>
-            <span className="font-base text-xs font-semibold uppercase tracking-[0.06em] text-muted">
-              {meta.allowDownload ? 'Downloads on' : 'Downloads off'}
-            </span>
+          <div className="flex flex-col items-stretch gap-3 sm:items-end">
+            <div className="relative -rotate-1 self-start rounded-md border-[1.5px] border-accent/40 bg-base-100 px-4 py-3 shadow-floating sm:self-end">
+              <span className="block font-base text-sm font-bold leading-tight text-accent">
+                {photos.length} photo{photos.length === 1 ? '' : 's'}
+              </span>
+              <span className="font-base text-xs font-semibold uppercase tracking-[0.06em] text-muted">
+                {meta.allowDownload ? 'Downloads on' : 'Downloads off'}
+              </span>
+            </div>
+            {meta.allowDownload && photos.length > 0 ? (
+              <ProjectDownloadDropdown
+                disabled={exportState.isBusy}
+                onSelectFullQuality={handleExportFullQuality}
+                onSelectCompressed={handleExportCompressed}
+              />
+            ) : null}
           </div>
         </div>
       </header>
@@ -75,6 +109,32 @@ export default function PublicShareScreen({ token }) {
           onSelect={(i) => setActiveIndex(i)}
         />
       </main>
+      <ProjectExportStatusFloat
+        show={exportState.showPanel}
+        variantLabel={exportState.variantLabel}
+        phase={exportState.phase}
+        exportJob={exportState.exportJob}
+        progress={exportState.progress}
+        isPreparing={exportState.isPreparing}
+        downloading={exportState.downloading}
+        error={exportState.error}
+        zipName={exportState.zipName}
+        onDownload={() => {
+          void exportState.downloadZip(exportState.zipName)
+        }}
+        onDismiss={exportState.dismissPanel}
+        onClear={exportState.clearExport}
+      />
+      {exportState.showResumeChip ? (
+        <ProjectExportResumeChip
+          label={
+            exportState.isPreparing
+              ? `Download ${exportState.progress}%`
+              : 'Download ready'
+          }
+          onOpen={exportState.reopenPanel}
+        />
+      ) : null}
       {activeIndex != null ? (
         <PublicShareLightbox
           token={token}

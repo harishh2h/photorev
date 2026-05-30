@@ -1,8 +1,8 @@
 import PropTypes from 'prop-types'
-import { NavLink } from 'react-router-dom'
 import { AppBottomSheet } from '@/components/ui/index.js'
 import { REVIEW_SCOPE } from '@/utils/projectReviewFilters.js'
 import { formatShareExpiry } from './formatShareExpiry.js'
+import { ProjectDownloadDropdown } from '@/features/project-export/index.js'
 
 const sheetActionClass =
   'flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-left font-base text-base font-medium text-base-content transition-colors duration-150 ease-out hover:bg-base-200 focus-visible:outline-none focus-visible:shadow-focus'
@@ -18,17 +18,20 @@ const SCOPE_OPTIONS = [
  *   onClose: () => void;
  *   isProjectCreator?: boolean;
  *   canShare?: boolean;
- *   isFinalized?: boolean;
  *   shareLinkActive?: object | null;
  *   onShare?: () => void;
- *   onFinalize?: () => void;
  *   onManageCollaborators?: () => void;
  *   onLogout?: () => void;
+ *   userEmail?: string;
  *   canReviewPhotos?: boolean;
  *   reviewScope?: string;
  *   onReviewScopeChange?: (scope: string) => void;
  *   sidebarStats?: object;
  *   collaboratorMembers?: object[];
+ *   canDownload?: boolean;
+ *   onSelectFullQuality?: () => void;
+ *   onSelectCompressed?: () => void;
+ *   exportBusy?: boolean;
  * }} props
  */
 export default function ProjectMobileActionsSheet({
@@ -36,17 +39,20 @@ export default function ProjectMobileActionsSheet({
   onClose,
   isProjectCreator = false,
   canShare = false,
-  isFinalized = false,
   shareLinkActive = null,
   onShare,
-  onFinalize,
   onManageCollaborators,
   onLogout,
+  userEmail = '',
   canReviewPhotos = true,
   reviewScope,
   onReviewScopeChange,
   sidebarStats,
   collaboratorMembers = [],
+  canDownload = false,
+  onSelectFullQuality,
+  onSelectCompressed,
+  exportBusy = false,
 }) {
   const handleAction = (action) => {
     onClose()
@@ -145,19 +151,24 @@ export default function ProjectMobileActionsSheet({
         {(canReviewPhotos && reviewScope) || (canReviewPhotos && collaboratorMembers.length > 0) ? (
           <div className="my-2 h-[1.5px] bg-base-300" aria-hidden />
         ) : null}
+        {canDownload && onSelectFullQuality && onSelectCompressed ? (
+          <div className="px-1 py-1">
+            <p className="mx-2 mb-1 mt-0 font-base text-xs font-semibold uppercase tracking-wide text-muted">
+              Download selected
+            </p>
+            <ProjectDownloadDropdown
+              compact
+              disabled={exportBusy}
+              onSelectFullQuality={() => handleAction(onSelectFullQuality)}
+              onSelectCompressed={() => handleAction(onSelectCompressed)}
+            />
+          </div>
+        ) : null}
         {isProjectCreator ? (
           <>
             <button
               type="button"
-              className={`${sheetActionClass} rounded-full border-[1.5px] border-transparent bg-primary font-semibold text-primary-content hover:bg-[#222222] hover:text-primary-content`}
-              onClick={() => handleAction(onFinalize)}
-            >
-              {isFinalized ? 'Re-finalize Review' : 'Finalize Review'}
-            </button>
-            <button
-              type="button"
-              disabled={canShare && !isFinalized}
-              className={`${sheetActionClass} disabled:cursor-not-allowed disabled:opacity-55`}
+              className={sheetActionClass}
               onClick={() => handleAction(onShare)}
             >
               <span className="flex text-accent" aria-hidden>
@@ -168,21 +179,22 @@ export default function ProjectMobileActionsSheet({
               </span>
               Share Link
             </button>
-            {canShare && isFinalized && shareLinkActive ? (
+            {canShare && shareLinkActive ? (
               <p className="mx-3 mb-1 mt-0 font-base text-xs text-muted">
                 Link live · {formatShareExpiry(shareLinkActive.expiresAt)} · {shareLinkActive.viewCount} view
                 {shareLinkActive.viewCount === 1 ? '' : 's'}
               </p>
             ) : null}
-            {canShare && !isFinalized ? (
-              <p className="mx-3 mb-1 mt-0 font-base text-xs text-muted">Finalize the project before sharing.</p>
-            ) : null}
             <div className="my-2 h-[1.5px] bg-base-300" aria-hidden />
           </>
         ) : null}
-        <NavLink to="/profile" className={`${sheetActionClass} no-underline`} onClick={onClose}>
-          Profile
-        </NavLink>
+        <p
+          className="mx-3 mb-1 break-all px-0 py-2 font-base text-sm font-medium text-base-content"
+          role="presentation"
+        >
+          {userEmail || 'Signed in'}
+        </p>
+        <div className="my-2 h-[1.5px] bg-base-300" aria-hidden />
         <button
           type="button"
           className={`${sheetActionClass} text-muted hover:bg-error/10 hover:text-error`}
@@ -200,18 +212,21 @@ ProjectMobileActionsSheet.propTypes = {
   onClose: PropTypes.func.isRequired,
   isProjectCreator: PropTypes.bool,
   canShare: PropTypes.bool,
-  isFinalized: PropTypes.bool,
   shareLinkActive: PropTypes.shape({
     expiresAt: PropTypes.string,
     viewCount: PropTypes.number,
   }),
   onShare: PropTypes.func,
-  onFinalize: PropTypes.func,
   onManageCollaborators: PropTypes.func,
   onLogout: PropTypes.func,
+  userEmail: PropTypes.string,
   canReviewPhotos: PropTypes.bool,
   reviewScope: PropTypes.string,
   onReviewScopeChange: PropTypes.func,
   sidebarStats: PropTypes.object,
   collaboratorMembers: PropTypes.array,
+  canDownload: PropTypes.bool,
+  onSelectFullQuality: PropTypes.func,
+  onSelectCompressed: PropTypes.func,
+  exportBusy: PropTypes.bool,
 }

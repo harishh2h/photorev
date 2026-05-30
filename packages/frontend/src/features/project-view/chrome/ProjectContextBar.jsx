@@ -4,18 +4,17 @@ import ProjectAccountMenu from './ProjectAccountMenu.jsx'
 import ProjectReviewScopeMenu from './ProjectReviewScopeMenu.jsx'
 import ProjectCollaboratorsMenu from './ProjectCollaboratorsMenu.jsx'
 import ProjectSettingsButton from './ProjectSettingsButton.jsx'
+import { ProjectDownloadDropdown } from '@/features/project-export/index.js'
 
 /**
  * @param {{
  *   projectTitle: string;
- *   isFinalized?: boolean;
- *   userDisplayName?: string;
+ *   userEmail?: string;
  *   onLogout?: () => void;
  *   isProjectCreator?: boolean;
  *   canShare?: boolean;
  *   shareLinkActive?: boolean;
  *   onShare?: () => void;
- *   onFinalize?: () => void;
  *   onOpenMobileMenu?: () => void;
  *   viewerSelectedCount?: number;
  *   canReviewPhotos?: boolean;
@@ -27,18 +26,20 @@ import ProjectSettingsButton from './ProjectSettingsButton.jsx'
  *   canManageCollaborators?: boolean;
  *   sheetHintActive?: boolean;
  *   onSettings?: () => void;
+ *   canDownload?: boolean;
+ *   onSelectFullQuality?: () => void;
+ *   onSelectCompressed?: () => void;
+ *   exportBusy?: boolean;
  * }} props
  */
 export default function ProjectContextBar({
   projectTitle,
-  isFinalized = false,
-  userDisplayName = 'User',
+  userEmail = '',
   onLogout,
   isProjectCreator = false,
   canShare = false,
   shareLinkActive = false,
   onShare,
-  onFinalize,
   onOpenMobileMenu,
   viewerSelectedCount = 0,
   canReviewPhotos = true,
@@ -50,6 +51,10 @@ export default function ProjectContextBar({
   canManageCollaborators = false,
   sheetHintActive = false,
   onSettings,
+  canDownload = false,
+  onSelectFullQuality,
+  onSelectCompressed,
+  exportBusy = false,
 }) {
   const showReviewControls = canReviewPhotos && reviewScope && sidebarStats && onReviewScopeChange
 
@@ -69,15 +74,6 @@ export default function ProjectContextBar({
         <h1 className="m-0 min-w-0 truncate font-base text-xl font-bold leading-tight text-base-content md:text-2xl lg:text-3xl">
           {projectTitle}
         </h1>
-        {isFinalized ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/15 px-2.5 py-1 font-base text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-accent md:px-3 md:text-xs">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden>
-              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-            </svg>
-            <span className="hidden sm:inline">Finalized</span>
-            <span className="sm:hidden">Done</span>
-          </span>
-        ) : null}
         {!canReviewPhotos ? (
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/15 px-2.5 py-1 font-base text-xs font-semibold text-accent">
             {viewerSelectedCount} selected
@@ -99,13 +95,20 @@ export default function ProjectContextBar({
         </div>
       ) : null}
       <div className="ml-auto flex shrink-0 items-center gap-2 md:gap-3">
+        {canDownload && onSelectFullQuality && onSelectCompressed ? (
+          <div className="hidden md:block">
+            <ProjectDownloadDropdown
+              disabled={exportBusy}
+              onSelectFullQuality={onSelectFullQuality}
+              onSelectCompressed={onSelectCompressed}
+            />
+          </div>
+        ) : null}
         {isProjectCreator ? (
           <>
             <button
               type="button"
-              disabled={canShare && !isFinalized}
-              title={canShare && !isFinalized ? 'Finalize the project before sharing' : undefined}
-              className="relative hidden min-h-11 items-center gap-2 rounded-full border-[1.5px] border-base-300 bg-base-100 px-4 font-base text-sm font-medium text-base-content transition-[border-color,background-color,transform] duration-150 ease-out hover:border-accent-mid hover:bg-[#F4F9F6] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-55 md:inline-flex"
+              className="relative hidden min-h-11 items-center gap-2 rounded-full border-[1.5px] border-base-300 bg-base-100 px-4 font-base text-sm font-medium text-base-content transition-[border-color,background-color,transform] duration-150 ease-out hover:border-accent-mid hover:bg-[#F4F9F6] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus md:inline-flex"
               onClick={onShare}
             >
               {shareLinkActive ? (
@@ -117,24 +120,12 @@ export default function ProjectContextBar({
               </svg>
               Share Link
             </button>
-            <button
-              type="button"
-              className="group hidden min-h-11 items-center justify-center gap-2 rounded-full border-0 bg-primary px-4 font-base text-sm font-semibold text-primary-content transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus md:inline-flex lg:px-6"
-              onClick={onFinalize}
-            >
-              {isFinalized ? 'Re-finalize Review' : 'Finalize Review'}
-              <span className="flex transition-transform duration-150 ease-out group-hover:-translate-y-0.5" aria-hidden>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 19V5M5 12l7-7 7 7" />
-                </svg>
-              </span>
-            </button>
             {typeof onSettings === 'function' ? (
               <ProjectSettingsButton onClick={onSettings} />
             ) : null}
           </>
         ) : null}
-        <ProjectAccountMenu userDisplayName={userDisplayName} onLogout={onLogout} />
+        <ProjectAccountMenu userEmail={userEmail} onLogout={onLogout} />
         <button
           type="button"
           className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border-[1.5px] border-base-300 bg-base-100 text-base-content transition-[border-color,background-color,transform] duration-150 ease-out hover:border-accent-mid hover:bg-[#F4F9F6] active:scale-[0.94] focus-visible:outline-none focus-visible:shadow-focus md:hidden"
@@ -157,14 +148,12 @@ export default function ProjectContextBar({
 
 ProjectContextBar.propTypes = {
   projectTitle: PropTypes.string.isRequired,
-  isFinalized: PropTypes.bool,
-  userDisplayName: PropTypes.string,
+  userEmail: PropTypes.string,
   onLogout: PropTypes.func,
   isProjectCreator: PropTypes.bool,
   canShare: PropTypes.bool,
   shareLinkActive: PropTypes.bool,
   onShare: PropTypes.func,
-  onFinalize: PropTypes.func,
   onOpenMobileMenu: PropTypes.func,
   viewerSelectedCount: PropTypes.number,
   canReviewPhotos: PropTypes.bool,
@@ -176,4 +165,8 @@ ProjectContextBar.propTypes = {
   canManageCollaborators: PropTypes.bool,
   sheetHintActive: PropTypes.bool,
   onSettings: PropTypes.func,
+  canDownload: PropTypes.bool,
+  onSelectFullQuality: PropTypes.func,
+  onSelectCompressed: PropTypes.func,
+  exportBusy: PropTypes.bool,
 }

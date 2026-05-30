@@ -1,30 +1,43 @@
 import PropTypes from 'prop-types'
+import { useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import LazyCoverProjectCard from './LazyCoverProjectCard'
 import { formatShortDate } from '@/utils/formatDate.js'
+import { useInViewport } from '@/hooks/useInViewport.js'
 
 const STAGGER_MS = 80
 
 /**
- * @param {{ projects?: object[]; isLoading?: boolean; authToken?: string; coverContentVariant?: 'thumbnail' | 'preview' | 'original' }} props
+ * @param {{
+ *   projects?: object[]
+ *   isLoading?: boolean
+ *   isLoadingMore?: boolean
+ *   hasMore?: boolean
+ *   onLoadMore?: () => void
+ *   authToken?: string
+ *   coverContentVariant?: 'thumbnail' | 'preview' | 'original'
+ * }} props
  */
 export default function ProjectsSection({
   projects = [],
   isLoading = false,
+  isLoadingMore = false,
+  hasMore = false,
+  onLoadMore,
   authToken = '',
   coverContentVariant = 'thumbnail',
 }) {
+  const { ref: loadMoreRef, isInViewport } = useInViewport({ enabled: hasMore })
+
+  useEffect(() => {
+    if (isInViewport && hasMore && !isLoadingMore && typeof onLoadMore === 'function') {
+      onLoadMore()
+    }
+  }, [isInViewport, hasMore, isLoadingMore, onLoadMore])
+
   return (
     <section className="mb-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="m-0 font-base text-2xl font-semibold text-base-content sm:text-3xl">Your projects</h2>
-        <NavLink
-          to="/projects"
-          className="font-base text-base font-medium text-accent transition-colors duration-150 ease-out hover:text-[#059669] focus-visible:rounded-full focus-visible:outline-none focus-visible:shadow-focus"
-        >
-          View all
-        </NavLink>
-      </div>
+      <h2 className="m-0 mb-6 font-base text-2xl font-semibold text-base-content sm:text-3xl">Your projects</h2>
       {isLoading && projects.length === 0 ? (
         <p className="mb-4 font-base text-sm text-muted">Loading…</p>
       ) : null}
@@ -41,7 +54,6 @@ export default function ProjectsSection({
             <LazyCoverProjectCard
               projectId={project.id}
               name={project.name}
-              status={String(project.status || 'active').toUpperCase()}
               subtitle={
                 project.createdAt ? `Created ${formatShortDate(project.createdAt)}` : 'Project'
               }
@@ -59,10 +71,18 @@ export default function ProjectsSection({
                     ? 'Shared'
                     : ''
               }
+              isCreator={project.viewerContext?.isCreator !== false}
             />
           </NavLink>
         ))}
       </div>
+      {hasMore ? (
+        <div ref={loadMoreRef} className="mt-6 flex min-h-12 items-center justify-center" aria-hidden={!isLoadingMore}>
+          {isLoadingMore ? (
+            <span className="loading loading-spinner loading-md text-accent" aria-label="Loading more projects" />
+          ) : null}
+        </div>
+      ) : null}
     </section>
   )
 }
@@ -72,7 +92,6 @@ ProjectsSection.propTypes = {
     PropTypes.shape({
       id: PropTypes.string.isRequired,
       name: PropTypes.string.isRequired,
-      status: PropTypes.string,
       createdAt: PropTypes.string,
       metadata: PropTypes.shape({
         banner: PropTypes.string,
@@ -84,6 +103,9 @@ ProjectsSection.propTypes = {
     })
   ),
   isLoading: PropTypes.bool,
+  isLoadingMore: PropTypes.bool,
+  hasMore: PropTypes.bool,
+  onLoadMore: PropTypes.func,
   authToken: PropTypes.string,
   coverContentVariant: PropTypes.oneOf(['thumbnail', 'preview', 'original']),
 }

@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { exportRunner, purgeExpiredExports } from "./exportRunner";
 import { JobRunner } from "./jobRunner";
 import { WorkerPool } from "./workerPool";
 
@@ -49,7 +50,24 @@ export async function initJobSystem() {
     jobRunner.notify();
   }
 
+  const orphanedExports = await db("project_exports")
+    .where({ status: "processing" })
+    .update({ status: "queued", started_at: null })
+    .returning("id");
+  if (orphanedExports.length > 0) {
+    console.log(`[boot] recovered ${orphanedExports.length} orphaned exports`);
+  }
+  const pendingExports = await db("project_exports").where({ status: "queued" }).first();
+  if (pendingExports) {
+    exportRunner.notify();
+  }
+
   void schedulePurgeTick();
+  void purgeExpiredExports();
+  const exportPurgeInterval = setInterval(() => {
+    void purgeExpiredExports();
+  }, PURGE_TICK_MS);
+  exportPurgeInterval.unref?.();
   const purgeInterval = setInterval(() => {
     void schedulePurgeTick();
   }, PURGE_TICK_MS);

@@ -40,6 +40,12 @@ const start = async (): Promise<void> => {
             server.log.info(`Photo directory already exists at ${photoDir}`);
         }
 
+        const exportsDir = path.join(StorageRoot, 'exports');
+        if(!fs.existsSync(exportsDir)) {
+            fs.mkdirSync(exportsDir, { recursive: true });
+            server.log.info(`Created exports directory at ${exportsDir}`);
+        }
+
     } catch (error) {
         server.log.error(error);
         process.exit(1);

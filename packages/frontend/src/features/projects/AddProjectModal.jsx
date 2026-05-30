@@ -70,48 +70,21 @@ export default function AddProjectModal({ isOpen, onClose, onCreate }) {
       onMouseDown={handleOverlayPointerDown}
     >
       <div
-        className="modal-panel-up flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-xl border-[1.5px] border-base-300 bg-base-100 shadow-modal md:max-h-[88vh] md:w-[min(100%,52rem)] md:rounded-xl"
+        className="modal-panel-up flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-xl border-[1.5px] border-base-300 bg-base-100 shadow-modal md:max-h-[88vh] md:w-[min(100%,32rem)] md:rounded-xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-project-title"
         aria-busy={isSubmitting}
       >
-        <div className="flex min-h-[min(520px,85vh)] flex-col md:min-h-[400px] md:flex-row md:items-stretch">
-          <aside
-            className="relative flex-shrink-0 overflow-hidden border-b-[1.5px] border-base-300 bg-base-200 px-5 py-6 md:w-[42%] md:max-w-[22rem] md:border-b-0 md:border-r-[1.5px] md:border-base-300 md:px-6 md:py-8"
-            aria-hidden
-          >
-            <div
-              className="pointer-events-none absolute inset-0 opacity-[0.55]"
-              style={{
-                backgroundImage:
-                  'radial-gradient(circle at 1px 1px, rgba(16, 185, 129, 0.35) 1px, transparent 0)',
-                backgroundSize: '18px 18px',
-              }}
-            />
-            <p className="relative m-0 mb-2 font-base text-xs font-bold uppercase tracking-[0.12em] text-accent">PhotoRev</p>
-            <h3 className="relative m-0 mb-3 max-w-[20rem] font-base text-xl font-bold leading-tight text-base-content">
-              Start a new shoot workspace
-            </h3>
-            <p className="relative m-0 max-w-[22rem] font-base text-sm leading-relaxed text-muted">
-              Projects keep uploads, reviews, and exports together. Only members you invite can see what is inside.
-            </p>
-            <div className="modal-float-stat absolute right-4 top-4 -rotate-1 rounded-md border-[1.5px] border-base-300 bg-base-100 px-4 py-3 text-center shadow-floating">
-              <span className="block font-base text-sm font-bold leading-tight text-accent">Private</span>
-              <span className="font-base text-xs font-semibold uppercase tracking-[0.06em] text-muted">by default</span>
-            </div>
-          </aside>
+        <div className="flex min-h-0 flex-col">
           <div className="min-w-0 flex-1 overflow-y-auto px-5 py-6 pb-8 md:px-8 md:py-8">
             <div className="mb-6 flex items-start justify-between gap-4">
-              <div>
-                <p className="m-0 mb-1 font-base text-xs font-semibold uppercase tracking-[0.08em] text-muted">Create</p>
-                <h2
-                  id="add-project-title"
-                  className="m-0 border-l-[3px] border-accent pl-3 font-base text-2xl font-bold leading-tight text-base-content"
-                >
-                  New project
-                </h2>
-              </div>
+              <h2
+                id="add-project-title"
+                className="m-0 font-base text-2xl font-bold leading-tight text-base-content"
+              >
+                New project
+              </h2>
               <button
                 type="button"
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-[1.5px] border-base-300 bg-base-100 text-base-content transition-[background-color,border-color,transform,opacity] duration-150 ease-out hover:border-accent-mid hover:bg-base-200 active:scale-[0.94] focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-45"
@@ -142,7 +115,6 @@ export default function AddProjectModal({ isOpen, onClose, onCreate }) {
                     if (validationError) setValidationError('')
                     if (submitError) setSubmitError('')
                   }}
-                  placeholder="e.g. Sterling Wedding, Q4 Lookbook"
                   autoComplete="off"
                 />
                 {validationError ? (
@@ -156,7 +128,7 @@ export default function AddProjectModal({ isOpen, onClose, onCreate }) {
                   </p>
                 ) : null}
                 <p className="m-0 font-base text-xs leading-normal text-muted">
-                  Storage path is created for you on the server. Open the project page to upload photos.
+                  You can change the project name later in settings.
                 </p>
               </div>
               <div className="mt-2 flex flex-col-reverse gap-3 md:flex-row md:justify-end">

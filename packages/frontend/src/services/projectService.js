@@ -103,25 +103,3 @@ export async function deleteProject(token, projectId) {
     throw new Error(message)
   }
 }
-
-/**
- * @param {string} token
- * @param {string} projectId
- * @param {'keep_all' | 'soft_delete_rejected' | 'hard_delete_rejected'} action
- * @returns {Promise<{ finalizedAt: string; action: string; affectedPhotos: number }>}
- */
-export async function finalizeProject(token, projectId, action) {
-  const { ok, message, data, status } = await apiFetch(`/projects/${projectId}/finalize`, {
-    token,
-    method: 'POST',
-    body: { action },
-  })
-  if (!ok) {
-    const err = new Error(message)
-    if (status === 409 && data && typeof data === 'object' && 'pendingCount' in data) {
-      err.pendingCount = data.pendingCount
-    }
-    throw err
-  }
-  return /** @type {{ finalizedAt: string; action: string; affectedPhotos: number }} */ (data)
-}

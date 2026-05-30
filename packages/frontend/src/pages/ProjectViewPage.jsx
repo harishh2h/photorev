@@ -7,7 +7,7 @@ export default function ProjectViewPage() {
   const { projectId } = useParams()
   const { user, token, logout } = useAuth()
   const navigate = useNavigate()
-  const displayName = user?.name || 'User'
+  const userEmail = user?.email || ''
   const {
     data,
     isLoading,
@@ -42,7 +42,7 @@ export default function ProjectViewPage() {
             data={data}
             token={token}
             projectId={projectId}
-            userDisplayName={displayName}
+            userEmail={userEmail}
             onLogout={handleLogout}
             onRefresh={refetch}
             onLoadMorePhotos={loadMorePhotos}

@@ -4,6 +4,7 @@ import buildShareLinksService from "../services/share-links.service";
 import buildPublicShareService, {
   PublicVariant,
 } from "../services/public-share.service";
+import buildProjectExportsService from "../services/project-exports.service";
 import { sendFailure, sendSuccess } from "../utils/api-response";
 
 const SHARE_TOKEN_TTL = "12h";
@@ -39,6 +40,35 @@ const photoVariantSchema = {
       token: { type: "string", minLength: 10, maxLength: 200 },
       photoId: { type: "string", format: "uuid" },
       variant: { type: "string", enum: ["thumb", "preview"] },
+    },
+    additionalProperties: false,
+  },
+  querystring: {
+    type: "object",
+    properties: { u: { type: "string", maxLength: 4096 } },
+    additionalProperties: false,
+  },
+};
+
+const shareExportCreateSchema = {
+  params: tokenOnly.params,
+  body: {
+    type: "object",
+    required: ["variant"],
+    properties: {
+      variant: { type: "string", enum: ["original", "preview"] },
+    },
+    additionalProperties: false,
+  },
+};
+
+const shareExportIdSchema = {
+  params: {
+    type: "object",
+    required: ["token", "exportId"],
+    properties: {
+      token: { type: "string", minLength: 10, maxLength: 200 },
+      exportId: { type: "string", format: "uuid" },
     },
     additionalProperties: false,
   },
@@ -102,6 +132,7 @@ async function publicShareRoutes(
 ): Promise<void> {
   const shareSvc = buildShareLinksService(fastify, opts);
   const publicSvc = buildPublicShareService(fastify, opts);
+  const exportSvc = buildProjectExportsService(fastify, opts);
 
   fastify.post(
     "/share/:token/unlock",
@@ -224,6 +255,118 @@ async function publicShareRoutes(
       }
       reply.header("Cache-Control", "private, max-age=3600");
       reply.type(file.mimeType);
+      return reply.send(fs.createReadStream(file.absolutePath));
+    },
+  );
+
+  fastify.post(
+    "/share/:token/exports",
+    {
+      schema: shareExportCreateSchema,
+      config: { rateLimit: { max: 5, timeWindow: "1 hour" } },
+    },
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const { token } = request.params as { token: string };
+      const body = request.body as { variant?: string };
+      const variant = body.variant === "preview" ? "preview" : "original";
+      const link = await shareSvc.loadShareByToken(token);
+      if (!link || link.revoked_at) {
+        sendFailure(reply, 404, "Share link not found", null);
+        return;
+      }
+      if (link.expires_at && link.expires_at.getTime() < Date.now()) {
+        sendFailure(reply, 410, "Share link has expired", null);
+        return;
+      }
+      if (!link.allow_download) {
+        sendFailure(reply, 403, "Download disabled for this share", null);
+        return;
+      }
+      if (link.password_hash) {
+        const unlock = await verifyUnlockToken(request, token);
+        if (!unlock || unlock.shareId !== link.id) {
+          sendFailure(reply, 401, "Password required", null);
+          return;
+        }
+      }
+      try {
+        const created = await exportSvc.createForShare({ shareToken: token, variant });
+        if (!created) {
+          sendFailure(reply, 404, "Share link not found", null);
+          return;
+        }
+        sendSuccess(reply, 201, created, "Export queued");
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not start export";
+        const code = message.includes("disabled") ? 403 : 400;
+        sendFailure(reply, code, message, null);
+      }
+    },
+  );
+
+  fastify.get(
+    "/share/:token/exports/:exportId",
+    {
+      schema: shareExportIdSchema,
+      config: { rateLimit: { max: 120, timeWindow: "1 minute" } },
+    },
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const { token, exportId } = request.params as { token: string; exportId: string };
+      const link = await shareSvc.loadShareByToken(token);
+      if (!link || link.revoked_at) {
+        sendFailure(reply, 404, "Share link not found", null);
+        return;
+      }
+      if (link.password_hash) {
+        const unlock = await verifyUnlockToken(request, token);
+        if (!unlock || unlock.shareId !== link.id) {
+          sendFailure(reply, 401, "Password required", null);
+          return;
+        }
+      }
+      const row = await exportSvc.getForShare({ shareToken: token, exportId });
+      if (!row) {
+        sendFailure(reply, 404, "Export not found", null);
+        return;
+      }
+      sendSuccess(reply, 200, row, "Export status");
+    },
+  );
+
+  fastify.get(
+    "/share/:token/exports/:exportId/download",
+    {
+      schema: shareExportIdSchema,
+      config: { rateLimit: { max: 10, timeWindow: "1 hour" } },
+    },
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const { token, exportId } = request.params as { token: string; exportId: string };
+      const link = await shareSvc.loadShareByToken(token);
+      if (!link || link.revoked_at) {
+        sendFailure(reply, 404, "Share link not found", null);
+        return;
+      }
+      if (!link.allow_download) {
+        sendFailure(reply, 403, "Download disabled for this share", null);
+        return;
+      }
+      if (link.password_hash) {
+        const unlock = await verifyUnlockToken(request, token);
+        if (!unlock || unlock.shareId !== link.id) {
+          sendFailure(reply, 401, "Password required", null);
+          return;
+        }
+      }
+      const file = await exportSvc.resolveDownloadForShare({ shareToken: token, exportId });
+      if (!file) {
+        sendFailure(reply, 404, "Download not available", null);
+        return;
+      }
+      const stat = await fs.promises.stat(file.absolutePath);
+      reply.header("Cache-Control", "no-store");
+      reply.header("Content-Disposition", `attachment; filename="${file.filename.replace(/"/g, "")}"`);
+      reply.header("Content-Length", String(stat.size));
+      reply.type("application/zip");
       return reply.send(fs.createReadStream(file.absolutePath));
     },
   );

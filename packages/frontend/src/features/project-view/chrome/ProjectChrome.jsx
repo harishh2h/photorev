@@ -11,8 +11,7 @@ import ProjectMobileActionsSheet from './ProjectMobileActionsSheet.jsx'
  */
 export default function ProjectChrome({
   projectTitle,
-  isFinalized = false,
-  userDisplayName = 'User',
+  userEmail = '',
   onLogout,
   token,
   projectId,
@@ -28,15 +27,18 @@ export default function ProjectChrome({
   collaboratorMembers,
   onManageCollaborators,
   onShare,
-  onFinalize,
   onSettings,
+  canDownload = false,
+  onSelectFullQuality,
+  onSelectCompressed,
+  exportBusy = false,
   viewerSelectedCount = 0,
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeShareLink, setActiveShareLink] = useState(null)
 
   useEffect(() => {
-    if (!canShare || !isFinalized || !token || !projectId) {
+    if (!canShare || !token || !projectId) {
       setActiveShareLink(null)
       return undefined
     }
@@ -53,7 +55,7 @@ export default function ProjectChrome({
     return () => {
       cancelled = true
     }
-  }, [canShare, isFinalized, token, projectId])
+  }, [canShare, token, projectId])
 
   const shareLinkActive = Boolean(activeShareLink)
   const canManageCollaborators = isProjectCreator && typeof onManageCollaborators === 'function'
@@ -65,14 +67,12 @@ export default function ProjectChrome({
       <header className="sticky top-0 z-sticky -mx-4 border-b-[1.5px] border-base-300 bg-base-100/95 px-4 backdrop-blur-md md:-mx-6 md:px-6">
         <ProjectContextBar
           projectTitle={projectTitle}
-          isFinalized={isFinalized}
-          userDisplayName={userDisplayName}
+          userEmail={userEmail}
           onLogout={onLogout}
           isProjectCreator={isProjectCreator}
           canShare={canShare}
           shareLinkActive={shareLinkActive}
           onShare={onShare}
-          onFinalize={onFinalize}
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
           viewerSelectedCount={viewerSelectedCount}
           canReviewPhotos={canReviewPhotos}
@@ -84,6 +84,10 @@ export default function ProjectChrome({
           canManageCollaborators={canManageCollaborators}
           sheetHintActive={sheetHintActive}
           onSettings={isProjectCreator ? onSettings : undefined}
+          canDownload={canDownload}
+          onSelectFullQuality={onSelectFullQuality}
+          onSelectCompressed={onSelectCompressed}
+          exportBusy={exportBusy}
         />
       </header>
       <div className="-mx-4 px-4 md:-mx-6 md:px-6">
@@ -100,17 +104,20 @@ export default function ProjectChrome({
         onClose={() => setMobileMenuOpen(false)}
         isProjectCreator={isProjectCreator}
         canShare={canShare}
-        isFinalized={isFinalized}
         shareLinkActive={activeShareLink}
         onShare={onShare}
-        onFinalize={onFinalize}
         onManageCollaborators={canManageCollaborators ? onManageCollaborators : undefined}
         onLogout={onLogout}
+        userEmail={userEmail}
         canReviewPhotos={canReviewPhotos}
         reviewScope={reviewScope}
         onReviewScopeChange={onReviewScopeChange}
         sidebarStats={sidebarStats}
         collaboratorMembers={collaboratorMembers}
+        canDownload={canDownload}
+        onSelectFullQuality={onSelectFullQuality}
+        onSelectCompressed={onSelectCompressed}
+        exportBusy={exportBusy}
       />
     </>
   )
@@ -118,8 +125,7 @@ export default function ProjectChrome({
 
 ProjectChrome.propTypes = {
   projectTitle: PropTypes.string.isRequired,
-  isFinalized: PropTypes.bool,
-  userDisplayName: PropTypes.string,
+  userEmail: PropTypes.string,
   onLogout: PropTypes.func,
   token: PropTypes.string.isRequired,
   projectId: PropTypes.string.isRequired,
@@ -135,7 +141,10 @@ ProjectChrome.propTypes = {
   collaboratorMembers: PropTypes.array.isRequired,
   onManageCollaborators: PropTypes.func,
   onShare: PropTypes.func,
-  onFinalize: PropTypes.func,
   onSettings: PropTypes.func,
+  canDownload: PropTypes.bool,
+  onSelectFullQuality: PropTypes.func,
+  onSelectCompressed: PropTypes.func,
+  exportBusy: PropTypes.bool,
   viewerSelectedCount: PropTypes.number,
 }

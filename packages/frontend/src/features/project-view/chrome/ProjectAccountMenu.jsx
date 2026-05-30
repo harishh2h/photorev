@@ -3,12 +3,12 @@ import { UserAccountMenu } from '@/components/UserAccountMenu/index.js'
 
 /**
  * Desktop-only account menu for project chrome; mobile uses bottom sheet.
- * @param {{ userDisplayName?: string; onLogout?: () => void }} props
+ * @param {{ userEmail?: string; onLogout?: () => void }} props
  */
-export default function ProjectAccountMenu({ userDisplayName = 'User', onLogout }) {
+export default function ProjectAccountMenu({ userEmail = '', onLogout }) {
   return (
     <UserAccountMenu
-      userDisplayName={userDisplayName}
+      userEmail={userEmail}
       onLogout={onLogout}
       className="hidden md:block"
     />
@@ -16,6 +16,6 @@ export default function ProjectAccountMenu({ userDisplayName = 'User', onLogout 
 }
 
 ProjectAccountMenu.propTypes = {
-  userDisplayName: PropTypes.string,
+  userEmail: PropTypes.string,
   onLogout: PropTypes.func,
 }

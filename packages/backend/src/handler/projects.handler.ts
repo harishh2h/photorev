@@ -7,9 +7,6 @@ import buildProjectsService, {
   ProjectMetadata,
   UpdateProjectParams,
 } from "../services/projects.service";
-import buildFinalizationService, {
-  FinalizeAction,
-} from "../services/finalization.service";
 import buildProjectGridService from "../services/project-grid.service";
 import {
   normalizeProjectGridFilter,
@@ -27,7 +24,6 @@ export interface ProjectsHandlerMethods {
   updateProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   archiveProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   deleteProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-  finalizeProject: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   getProjectGrid: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   getPendingPhotoStatuses: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 }
@@ -37,7 +33,6 @@ function buildProjectsHandler(
   _opts: FastifyPluginOptions,
 ): ProjectsHandlerMethods {
   const service = buildProjectsService(fastify, _opts);
-  const finalizationService = buildFinalizationService(fastify, _opts);
   const gridService = buildProjectGridService(fastify, _opts);
 
   const handler: ProjectsHandlerMethods = {
@@ -157,51 +152,6 @@ function buildProjectsHandler(
         return;
       }
       sendSuccess(reply, 200, null, "Project archived");
-    },
-    finalizeProject: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-      const userId = getAuthenticatedUserId(request);
-      const paramsRaw = request.params as { projectId: string };
-      const body = request.body as { action: FinalizeAction };
-      const outcome = await finalizationService.finalizeProject({
-        userId,
-        projectId: paramsRaw.projectId,
-        action: body.action,
-      });
-      if (!outcome.ok) {
-        if (outcome.reason === "not_found") {
-          sendFailure(reply, 404, "Project not found", null);
-          return;
-        }
-        if (outcome.reason === "forbidden") {
-          sendFailure(reply, 403, "Only the project creator can finalize", null);
-          return;
-        }
-        if (outcome.reason === "pending_conflicts") {
-          sendFailure(
-            reply,
-            409,
-            `Resolve ${outcome.pendingCount ?? 0} conflict(s) before finalizing`,
-            { pendingCount: outcome.pendingCount ?? 0 },
-          );
-          return;
-        }
-        if (outcome.reason === "already_finalized") {
-          sendFailure(reply, 409, "Project already finalized", null);
-          return;
-        }
-        sendFailure(reply, 500, "Could not finalize project", null);
-        return;
-      }
-      sendSuccess(
-        reply,
-        200,
-        {
-          finalizedAt: outcome.finalizedAt,
-          action: outcome.action,
-          affectedPhotos: outcome.affectedPhotos,
-        },
-        "Project finalized",
-      );
     },
     deleteProject: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const userId = getAuthenticatedUserId(request);

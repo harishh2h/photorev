@@ -8,23 +8,27 @@ import ProjectGridOverlays from './ProjectGridOverlays.jsx'
 import ProjectUploadStatusFloat from './ProjectUploadStatusFloat.jsx'
 import { CollaboratorsManageModal } from '@/features/project-collaborators/index.js'
 import { ProjectSettingsModal } from '@/features/project-settings/index.js'
-import { FinalizeReviewModal } from '@/features/finalize/index.js'
 import { ShareLinkModal } from '@/features/share/index.js'
+import {
+  getExportStorageKey,
+  ProjectDownloadDropdown,
+  ProjectExportResumeChip,
+  ProjectExportStatusFloat,
+  useProjectExport,
+} from '@/features/project-export/index.js'
 import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
-import { finalizeProject as finalizeProjectApi } from '@/services/projectService.js'
-import { useToast } from '@/components/Toast/index.js'
 import { REVIEW_SCOPE } from '@/utils/projectReviewFilters.js'
 import { isPhotoVirtualGridEnabled } from '@/utils/photoContentUrl.js'
 
 /**
- * @param {{ data: object; token: string; projectId: string; userDisplayName?: string; onLogout?: () => void; onRefresh: () => void; onLoadMorePhotos?: () => void; hasMorePhotos?: boolean; isLoadingMore?: boolean; isLoadingGrid?: boolean; reviewScope: string; activeFilter: string; onReviewScopeChange: (scope: string) => void; onFilterChange: (filter: string) => void }} props
+ * @param {{ data: object; token: string; projectId: string; userEmail?: string; onLogout?: () => void; onRefresh: () => void; onLoadMorePhotos?: () => void; hasMorePhotos?: boolean; isLoadingMore?: boolean; isLoadingGrid?: boolean; reviewScope: string; activeFilter: string; onReviewScopeChange: (scope: string) => void; onFilterChange: (filter: string) => void }} props
  * @returns {import('react').JSX.Element}
  */
 export default function ProjectViewScreen({
   data,
   token,
   projectId,
-  userDisplayName = 'User',
+  userEmail = '',
   onLogout,
   onRefresh,
   onLoadMorePhotos,
@@ -37,12 +41,19 @@ export default function ProjectViewScreen({
   onFilterChange,
 }) {
   const navigate = useNavigate()
-  const { show: showToast } = useToast()
   const canReviewPhotos = data.canReviewPhotos !== false
   const [collaboratorsOpen, setCollaboratorsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [finalizeOpen, setFinalizeOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const selectedDownloadCount = data.sidebarStats?.viewer?.selected ?? 0
+  const exportStorageKey = getExportStorageKey('project', projectId)
+  const exportState = useProjectExport({
+    mode: 'project',
+    token,
+    projectId,
+    projectName: data.projectTitle,
+    storageKey: exportStorageKey,
+  })
 
   const {
     fileInputRef,
@@ -69,34 +80,20 @@ export default function ProjectViewScreen({
     [onReviewScopeChange]
   )
 
-  const handleFinalize = useCallback(() => {
-    if (data.isProjectCreator) {
-      setFinalizeOpen(true)
-    }
-  }, [data.isProjectCreator])
   const handleShare = useCallback(() => {
     setShareOpen(true)
   }, [])
-  const handleFinalizeConfirm = useCallback(
-    async (action) => {
-      try {
-        await finalizeProjectApi(token, projectId, action)
-        setFinalizeOpen(false)
-        showToast('Project finalized', 'success')
-        onRefresh()
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Could not finalize'
-        showToast(msg, 'error')
-        throw err
-      }
-    },
-    [token, projectId, onRefresh, showToast]
-  )
   const handleSettings = useCallback(() => {
     if (data.isProjectCreator) {
       setSettingsOpen(true)
     }
   }, [data.isProjectCreator])
+  const handleExportFullQuality = useCallback(() => {
+    void exportState.startExport('original')
+  }, [exportState])
+  const handleExportCompressed = useCallback(() => {
+    void exportState.startExport('preview')
+  }, [exportState])
   const handleManageCollaborators = useCallback(() => {
     if (data.isProjectCreator) {
       setCollaboratorsOpen(true)
@@ -130,8 +127,7 @@ export default function ProjectViewScreen({
       />
       <ProjectChrome
         projectTitle={data.projectTitle}
-        isFinalized={Boolean(data.isFinalized)}
-        userDisplayName={userDisplayName}
+        userEmail={userEmail}
         onLogout={onLogout}
         token={token}
         projectId={projectId}
@@ -147,10 +143,41 @@ export default function ProjectViewScreen({
         collaboratorMembers={data.collaboratorMembers}
         onManageCollaborators={data.isProjectCreator ? handleManageCollaborators : undefined}
         onShare={handleShare}
-        onFinalize={handleFinalize}
         onSettings={handleSettings}
+        canDownload={selectedDownloadCount > 0}
+        onSelectFullQuality={handleExportFullQuality}
+        onSelectCompressed={handleExportCompressed}
+        exportBusy={exportState.isBusy}
         viewerSelectedCount={data.sidebarStats.viewer.selected}
       />
+      <ProjectExportStatusFloat
+        show={exportState.showPanel}
+        stackAboveUpload={showUploadPanel}
+        variantLabel={exportState.variantLabel}
+        phase={exportState.phase}
+        exportJob={exportState.exportJob}
+        progress={exportState.progress}
+        isPreparing={exportState.isPreparing}
+        downloading={exportState.downloading}
+        error={exportState.error}
+        zipName={exportState.zipName}
+        onDownload={() => {
+          void exportState.downloadZip(exportState.zipName)
+        }}
+        onDismiss={exportState.dismissPanel}
+        onClear={exportState.clearExport}
+      />
+      {exportState.showResumeChip ? (
+        <ProjectExportResumeChip
+          stackAboveUpload={showUploadPanel}
+          label={
+            exportState.isPreparing
+              ? `Download ${exportState.progress}%`
+              : 'Download ready'
+          }
+          onOpen={exportState.reopenPanel}
+        />
+      ) : null}
       {showUploadPanel ? (
         <ProjectUploadStatusFloat
           isUploading={isUploading}
@@ -218,13 +245,11 @@ export default function ProjectViewScreen({
         token={token}
         projectId={projectId}
         initialProjectName={data.projectTitle}
-        collaboratorCount={data.collaboratorMembers.length}
         onRenameSuccess={() => {
           setSettingsOpen(false)
           onRefresh()
         }}
-        onOpenTeam={() => setCollaboratorsOpen(true)}
-        onProjectDeleted={() => navigate('/projects', { replace: true })}
+        onProjectDeleted={() => navigate('/', { replace: true })}
       />
       <CollaboratorsManageModal
         isOpen={collaboratorsOpen}
@@ -233,14 +258,6 @@ export default function ProjectViewScreen({
         projectId={projectId}
         members={Array.isArray(data.collaboratorsRows) ? data.collaboratorsRows : []}
         onSaved={onRefresh}
-      />
-      <FinalizeReviewModal
-        isOpen={finalizeOpen}
-        onClose={() => setFinalizeOpen(false)}
-        onConfirm={handleFinalizeConfirm}
-        projectName={data.projectTitle}
-        pendingConflicts={data.filterCounts.pendingConflicts ?? 0}
-        isFinalized={Boolean(data.isFinalized)}
       />
       <ShareLinkModal
         isOpen={shareOpen}
@@ -278,7 +295,7 @@ const collaboratorMemberShape = PropTypes.shape({
 ProjectViewScreen.propTypes = {
   token: PropTypes.string.isRequired,
   projectId: PropTypes.string.isRequired,
-  userDisplayName: PropTypes.string,
+  userEmail: PropTypes.string,
   onLogout: PropTypes.func,
   onRefresh: PropTypes.func.isRequired,
   onLoadMorePhotos: PropTypes.func,
@@ -313,8 +330,6 @@ ProjectViewScreen.propTypes = {
     }).isRequired,
     photos: PropTypes.arrayOf(photoShape).isRequired,
     trashedPhotos: PropTypes.arrayOf(photoShape),
-    isFinalized: PropTypes.bool,
-    finalizedAt: PropTypes.string,
     projectStatus: PropTypes.string,
   }).isRequired,
 }

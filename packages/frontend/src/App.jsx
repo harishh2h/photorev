@@ -1,11 +1,8 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { ToastProvider } from '@/components/Toast/index.js'
 import ProtectedRoute from '@/components/ProtectedRoute.jsx'
 import Dashboard from '@/pages/Dashboard.jsx'
 import Login from '@/pages/Login.jsx'
-import ProjectsPage from '@/pages/ProjectsPage.jsx'
-import UploadsPage from '@/pages/UploadsPage.jsx'
-import ProfilePage from '@/pages/ProfilePage.jsx'
 import ProjectViewPage from '@/pages/ProjectViewPage.jsx'
 import PhotoViewerPage from '@/pages/PhotoViewerPage.jsx'
 import PublicSharePage from '@/pages/PublicSharePage.jsx'
@@ -24,14 +21,8 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/projects"
-          element={
-            <ProtectedRoute>
-              <ProjectsPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/projects" element={<Navigate to="/" replace />} />
+        <Route path="/uploads" element={<Navigate to="/" replace />} />
         <Route
           path="/projects/:projectId/photos/:photoId"
           element={
@@ -45,22 +36,6 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ProjectViewPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/uploads"
-          element={
-            <ProtectedRoute>
-              <UploadsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <ProfilePage />
             </ProtectedRoute>
           }
         />

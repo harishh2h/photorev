@@ -1,10 +1,9 @@
 import PropTypes from 'prop-types'
 import ProjectCard from './ProjectCard'
-import { useLazyRandomProjectCover } from '@/hooks/useLazyRandomProjectCover.js'
+import { useLazyProjectCardMeta } from '@/hooks/useLazyProjectCardMeta.js'
 
 /**
- * Dashboard project tile: uses explicit banner photo/url when set; otherwise fetches
- * a random ready preview photo id once the card enters the viewport.
+ * Dashboard project tile: lazy cover + review stats when the card enters the viewport.
  */
 export default function LazyCoverProjectCard({
   projectId,
@@ -12,11 +11,11 @@ export default function LazyCoverProjectCard({
   explicitCoverPhotoId = '',
   explicitCoverImageUrl = '',
   name,
-  status,
   subtitle,
   animationDelay = 0,
   coverContentVariant = 'thumbnail',
   ownershipBadge = '',
+  isCreator = true,
 }) {
   const hasExplicitPhoto =
     typeof explicitCoverPhotoId === 'string' &&
@@ -27,12 +26,13 @@ export default function LazyCoverProjectCard({
     typeof explicitCoverImageUrl === 'string' && explicitCoverImageUrl.length > 0
       ? explicitCoverImageUrl
       : ''
-  const skipLazy = hasExplicitPhoto || legacyUrl.length > 0
+  const skipCover = hasExplicitPhoto || legacyUrl.length > 0
 
-  const { coverPhotoId, rootRef } = useLazyRandomProjectCover({
+  const { coverPhotoId, reviewStats, rootRef } = useLazyProjectCardMeta({
     projectId,
     authToken,
-    skip: skipLazy,
+    isCreator,
+    skipCover,
   })
 
   const effectiveCoverPhotoId = hasExplicitPhoto ? explicitCoverPhotoId : coverPhotoId || ''
@@ -42,7 +42,6 @@ export default function LazyCoverProjectCard({
     <div ref={rootRef} className="block h-full min-h-0">
       <ProjectCard
         name={name}
-        status={status}
         subtitle={subtitle}
         coverPhotoId={effectiveCoverPhotoId}
         authToken={authToken}
@@ -50,6 +49,7 @@ export default function LazyCoverProjectCard({
         animationDelay={animationDelay}
         coverContentVariant={coverContentVariant}
         ownershipBadge={ownershipBadge}
+        reviewStats={reviewStats}
       />
     </div>
   )
@@ -61,9 +61,9 @@ LazyCoverProjectCard.propTypes = {
   explicitCoverPhotoId: PropTypes.string,
   explicitCoverImageUrl: PropTypes.string,
   name: PropTypes.string.isRequired,
-  status: PropTypes.string.isRequired,
   subtitle: PropTypes.string.isRequired,
   animationDelay: PropTypes.number,
   coverContentVariant: PropTypes.oneOf(['thumbnail', 'preview', 'original']),
   ownershipBadge: PropTypes.string,
+  isCreator: PropTypes.bool,
 }

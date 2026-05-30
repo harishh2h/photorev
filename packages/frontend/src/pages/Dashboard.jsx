@@ -7,15 +7,22 @@ import { AddProjectModal } from '@/features/projects'
 import { useAuth } from '@/features/auth/index.js'
 import { useProjects } from '@/hooks/useProjects.js'
 import { createProject, fetchRandomProjectCoverPhotoId } from '@/services/projectService.js'
-import { listPhotos } from '@/services/photoService.js'
+import { fetchProjectGrid } from '@/services/projectGridService.js'
 
 export default function Dashboard() {
   const { user, token, logout } = useAuth()
   const navigate = useNavigate()
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false)
-  const { projects, isLoading, error, refetch } = useProjects(token)
-  const displayName = user?.name || 'User'
-  const featured = projects[0]
+  const { projects, isLoading, isLoadingMore, hasMore, error, refetch, loadMore } = useProjects(token)
+  const userEmail = user?.email || ''
+  const featured = useMemo(() => {
+    if (projects.length === 0) return null
+    return [...projects].sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      return bTime - aTime
+    })[0]
+  }, [projects])
   const [featuredStats, setFeaturedStats] = useState(null)
   const [heroFallbackCoverPhotoId, setHeroFallbackCoverPhotoId] = useState(/** @type {string | null} */ (null))
 
@@ -32,13 +39,34 @@ export default function Dashboard() {
       return undefined
     }
     let cancelled = false
-    listPhotos(token, { projectId: featured.id, pageSize: 100 })
-      .then((result) => {
+    fetchProjectGrid(token, featured.id, { pageSize: 1 })
+      .then((grid) => {
         if (cancelled) return
-        const inProgress = result.items.filter(
-          (p) => p.status === 'pending' || p.status === 'processing'
-        ).length
-        setFeaturedStats({ total: result.total, inProgress })
+        const counts = grid.filterCounts ?? {}
+        const mine = counts.mine ?? {}
+        const team = counts.team ?? {}
+        const isCreator = featured.viewerContext?.isCreator === true
+        const total = typeof mine.all === 'number' ? mine.all : grid.total ?? 0
+        const liked = isCreator
+          ? typeof team.liked === 'number'
+            ? team.liked
+            : 0
+          : typeof mine.liked === 'number'
+            ? mine.liked
+            : 0
+        const rejected = isCreator
+          ? typeof team.rejected === 'number'
+            ? team.rejected
+            : 0
+          : typeof mine.rejected === 'number'
+            ? mine.rejected
+            : 0
+        const pendingReview = isCreator
+          ? Math.max(0, total - liked - rejected)
+          : typeof mine.unreviewed === 'number'
+            ? mine.unreviewed
+            : 0
+        setFeaturedStats({ total, liked, rejected, pendingReview })
       })
       .catch(() => {
         if (!cancelled) setFeaturedStats(null)
@@ -46,7 +74,7 @@ export default function Dashboard() {
     return () => {
       cancelled = true
     }
-  }, [token, featured?.id])
+  }, [token, featured?.id, featured?.viewerContext?.isCreator])
 
   useEffect(() => {
     if (!token || !featured?.id) {
@@ -89,10 +117,10 @@ export default function Dashboard() {
     return {
       id: featured.id,
       name: featured.name,
-      description: '',
-      status: featured.status,
       totalPhotos: featuredStats?.total ?? 0,
-      inProgressPhotos: featuredStats?.inProgress ?? 0,
+      likedPhotos: featuredStats?.liked ?? 0,
+      rejectedPhotos: featuredStats?.rejected ?? 0,
+      pendingReviewPhotos: featuredStats?.pendingReview ?? 0,
       bannerPhotoId,
       bannerUrl,
     }
@@ -116,7 +144,11 @@ export default function Dashboard() {
   )
   return (
     <div className="min-h-screen bg-base-100">
-      <MinimalHeader userDisplayName={displayName} onLogout={handleLogout} />
+      <MinimalHeader
+        userEmail={userEmail}
+        onLogout={handleLogout}
+        onNewProjectClick={handleOpenAddProject}
+      />
       <main className="mx-auto max-w-[1280px] px-4 py-6 pb-10 md:px-6 md:py-8 md:pb-10">
         {error ? (
           <p className="mb-4 font-base text-sm text-error" role="alert">
@@ -130,12 +162,13 @@ export default function Dashboard() {
           featuredProject={featuredProject}
           authToken={token || ''}
           fallbackCoverPhotoId={heroFallbackCoverPhotoId || ''}
-          recentActivity={[]}
-          onNewProjectClick={handleOpenAddProject}
         />
         <ProjectsSection
           projects={projects}
           isLoading={isLoading}
+          isLoadingMore={isLoadingMore}
+          hasMore={hasMore}
+          onLoadMore={loadMore}
           authToken={token || ''}
           coverContentVariant="preview"
         />

@@ -36,7 +36,7 @@ function buildShareLinksHandler(
           sendFailure(reply, 403, "Only the project creator can create share links", null);
           return;
         }
-        sendFailure(reply, 409, "Finalize the project before creating a share link", null);
+        sendFailure(reply, 500, "Could not create share link", null);
         return;
       }
       sendSuccess(reply, 201, outcome.link, "Share link created");

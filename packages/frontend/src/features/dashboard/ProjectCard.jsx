@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types'
 import AuthenticatedPhotoImage from '@/components/AuthenticatedPhotoImage'
+import ProjectCardReviewStats from './ProjectCardReviewStats.jsx'
 
 const placeholderClass =
   'h-full w-full min-h-0 bg-[#EDF7F2] bg-[radial-gradient(circle_at_1px_1px,rgba(110,231,183,0.42)_1px,transparent_0)] bg-[length:14px_14px] transition-transform duration-[380ms] ease-out group-hover:scale-[1.04]'
@@ -9,7 +10,6 @@ const placeholderClass =
  */
 export default function ProjectCard({
   name,
-  status,
   subtitle,
   coverPhotoId = '',
   authToken = '',
@@ -17,6 +17,7 @@ export default function ProjectCard({
   animationDelay = 0,
   coverContentVariant = 'thumbnail',
   ownershipBadge = '',
+  reviewStats = null,
 }) {
   const usePhoto =
     typeof coverPhotoId === 'string' && coverPhotoId.length > 0 && typeof authToken === 'string' && authToken.length > 0
@@ -49,17 +50,17 @@ export default function ProjectCard({
         )}
       </div>
       <div className="absolute inset-x-4 bottom-4 z-[2] text-primary-content">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="inline-flex rounded-full bg-white/20 px-3 py-1 font-base text-xs font-bold text-accent-mid">
-            {status}
-          </span>
-          {badge ? (
+        {badge ? (
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className="inline-flex rounded-full border-[1.5px] border-accent/45 bg-accent/20 px-3 py-1 font-base text-xs font-bold text-accent">
               {badge}
             </span>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
         <h3 className="my-2 mb-1 font-base text-2xl font-semibold text-primary-content">{name}</h3>
+        {reviewStats ? (
+          <ProjectCardReviewStats liked={reviewStats.liked} rejected={reviewStats.rejected} />
+        ) : null}
         <p className="m-0 font-base text-sm text-accent-mid">• {subtitle}</p>
       </div>
       <div
@@ -72,7 +73,6 @@ export default function ProjectCard({
 
 ProjectCard.propTypes = {
   name: PropTypes.string.isRequired,
-  status: PropTypes.string.isRequired,
   subtitle: PropTypes.string.isRequired,
   coverPhotoId: PropTypes.string,
   authToken: PropTypes.string,
@@ -80,4 +80,8 @@ ProjectCard.propTypes = {
   animationDelay: PropTypes.number,
   coverContentVariant: PropTypes.oneOf(['thumbnail', 'preview', 'original']),
   ownershipBadge: PropTypes.string,
+  reviewStats: PropTypes.shape({
+    liked: PropTypes.number.isRequired,
+    rejected: PropTypes.number.isRequired,
+  }),
 }

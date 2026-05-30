@@ -124,8 +124,6 @@ function buildViewData(gridPhotos, project, members, currentUser, filterCounts) 
   return {
     projectTitle: typeof project.name === 'string' ? project.name : 'Project',
     projectStatus: typeof project.status === 'string' ? project.status : 'active',
-    isFinalized: project.status === 'finalized',
-    finalizedAt: typeof project.finalizedAt === 'string' ? project.finalizedAt : null,
     collaboratingLabel: others > 0 ? `REVIEWING WITH ${others} OTHER${others === 1 ? '' : 'S'}` : 'SOLO REVIEW',
     reviewProgressPercent,
     sidebarStats: {

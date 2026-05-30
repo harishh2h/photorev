@@ -78,28 +78,6 @@ const singleProjectParamsSchema = {
   },
 };
 
-const finalizeProjectSchema = {
-  params: {
-    type: "object",
-    required: ["projectId"],
-    properties: {
-      projectId: { type: "string", format: "uuid" },
-    },
-    additionalProperties: false,
-  },
-  body: {
-    type: "object",
-    required: ["action"],
-    properties: {
-      action: {
-        type: "string",
-        enum: ["keep_all", "soft_delete_rejected", "hard_delete_rejected"],
-      },
-    },
-    additionalProperties: false,
-  },
-};
-
 const pendingStatusSchema = {
   params: singleProjectParamsSchema.params,
   querystring: {
@@ -173,11 +151,6 @@ async function projectsRoutes(
     "/:projectId/archive",
     { schema: singleProjectParamsSchema, preHandler: ensureAuthenticated },
     handler.archiveProject,
-  );
-  fastify.post(
-    "/:projectId/finalize",
-    { schema: finalizeProjectSchema, preHandler: ensureAuthenticated },
-    handler.finalizeProject,
   );
   fastify.delete(
     "/:projectId",

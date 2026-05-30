@@ -2,16 +2,93 @@ import PropTypes from 'prop-types'
 import { Link } from 'react-router-dom'
 import AuthenticatedPhotoImage from '@/components/AuthenticatedPhotoImage'
 
-const featuredPh = 'illustration-placeholder h-full w-full min-h-0'
+const coverFrameClass =
+  'relative aspect-video w-full overflow-hidden rounded-[calc(1.5rem-8px)] bg-accent/10'
+const featuredPh = 'absolute inset-0 h-full w-full min-h-0'
+const coverImgClass = 'absolute inset-0 block h-full w-full min-h-0 object-cover object-center'
 const emptyVisualPh =
-  'min-h-[180px] rounded-[calc(1.5rem-8px)] border-[1.5px] border-base-300 bg-base-200 bg-[radial-gradient(circle_at_1px_1px,rgba(16,185,129,0.28)_1px,transparent_0)] bg-[length:14px_14px]'
+  `${coverFrameClass} bg-base-200 bg-[radial-gradient(circle_at_1px_1px,rgba(16,185,129,0.28)_1px,transparent_0)] bg-[length:14px_14px]`
+
+function FeaturedCover({ usePhotoBanner, useLegacyBanner, effectivePhotoId, authToken, bannerUrl }) {
+  return (
+    <div className={coverFrameClass}>
+      {usePhotoBanner ? (
+        <AuthenticatedPhotoImage
+          photoId={effectivePhotoId}
+          token={authToken}
+          legacyImageUrl=""
+          placeholderClassName={`illustration-placeholder ${featuredPh}`}
+          imgClassName={coverImgClass}
+          contentVariant="preview"
+          alt=""
+        />
+      ) : useLegacyBanner ? (
+        <img src={bannerUrl} alt="" className={coverImgClass} />
+      ) : (
+        <div className={`illustration-placeholder ${featuredPh}`} aria-hidden />
+      )}
+    </div>
+  )
+}
+
+FeaturedCover.propTypes = {
+  usePhotoBanner: PropTypes.bool.isRequired,
+  useLegacyBanner: PropTypes.bool.isRequired,
+  effectivePhotoId: PropTypes.string.isRequired,
+  authToken: PropTypes.string.isRequired,
+  bannerUrl: PropTypes.string.isRequired,
+}
+
+function StatItem({ label, value, valueClassName = 'text-base-content' }) {
+  return (
+    <div className="min-w-0">
+      <p className={`m-0 font-base text-xl font-bold tabular-nums sm:text-2xl ${valueClassName}`}>{value}</p>
+      <p className="mt-1 font-base text-[0.6875rem] font-medium uppercase tracking-[0.06em] text-muted">{label}</p>
+    </div>
+  )
+}
+
+StatItem.propTypes = {
+  label: PropTypes.string.isRequired,
+  value: PropTypes.number.isRequired,
+  valueClassName: PropTypes.string,
+}
+
+function ReviewProgress({ total, pendingReview }) {
+  const reviewed = Math.max(0, total - pendingReview)
+  const progressPercent = total > 0 ? Math.round((reviewed / total) * 100) : 0
+  return (
+    <div className="mb-5">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <p className="m-0 font-base text-sm font-medium text-base-content">Review progress</p>
+        <p className="m-0 font-base text-sm tabular-nums text-muted">{progressPercent}%</p>
+      </div>
+      <div
+        className="h-2 overflow-hidden rounded-full bg-accent-mid/40"
+        role="progressbar"
+        aria-valuenow={progressPercent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`Review progress ${progressPercent} percent`}
+      >
+        <div
+          className="h-full rounded-full bg-accent transition-[width] duration-700 ease-out"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+ReviewProgress.propTypes = {
+  total: PropTypes.number.isRequired,
+  pendingReview: PropTypes.number.isRequired,
+}
 
 export default function DashboardHero({
   featuredProject = null,
   authToken = '',
   fallbackCoverPhotoId = '',
-  recentActivity = [],
-  onNewProjectClick = undefined,
 }) {
   const hasFeatured = featuredProject != null && featuredProject.id != null
   const bannerPhotoId =
@@ -22,118 +99,52 @@ export default function DashboardHero({
   const bannerUrl = hasFeatured && typeof featuredProject.bannerUrl === 'string' ? featuredProject.bannerUrl : ''
   const usePhotoBanner = effectivePhotoId.length > 0 && authToken.length > 0
   const useLegacyBanner = !usePhotoBanner && bannerUrl.length > 0
+
   return (
     <section className="mb-10 md:mb-12">
-      <div className="mb-6 flex flex-col items-stretch justify-end gap-4 max-md:items-start md:flex-row md:items-center">
-        <button
-          type="button"
-          className="btn btn-primary ml-auto min-h-11 rounded-full border-0 px-6 font-base text-base font-semibold text-primary-content transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus max-md:ml-0 max-md:w-full md:ml-auto"
-          onClick={() => onNewProjectClick?.()}
-        >
-          + New Project
-        </button>
-      </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr]">
-        <article className="grid grid-cols-1 gap-5 overflow-hidden rounded-card border-[1.5px] border-base-300 bg-base-100 p-4 md:grid-cols-[300px_1fr]">
-          {hasFeatured ? (
-            <>
-              <div className="relative h-[220px] w-full shrink-0 overflow-hidden rounded-[calc(1.5rem-8px)] sm:h-[240px] md:h-[260px] md:max-w-[300px]">
-                {usePhotoBanner ? (
-                  <AuthenticatedPhotoImage
-                    photoId={effectivePhotoId}
-                    token={authToken}
-                    legacyImageUrl=""
-                    placeholderClassName={featuredPh}
-                    contentVariant="preview"
-                    alt=""
-                  />
-                ) : useLegacyBanner ? (
-                  <img
-                    src={bannerUrl}
-                    alt=""
-                    className="block h-full w-full min-h-0 object-cover"
-                  />
-                ) : (
-                  <div className={featuredPh} aria-hidden />
-                )}
-                <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-2 font-base text-xs font-bold text-accent-content">
-                  {(featuredProject.status || 'active').toUpperCase()}
-                </span>
+      <article className="grid grid-cols-1 items-center gap-5 overflow-hidden rounded-card border-[1.5px] border-accent/40 bg-base-100 p-4 md:grid-cols-[minmax(0,52%)_1fr] md:gap-10 md:p-6">
+        {hasFeatured ? (
+          <>
+            <FeaturedCover
+              usePhotoBanner={usePhotoBanner}
+              useLegacyBanner={useLegacyBanner}
+              effectivePhotoId={effectivePhotoId}
+              authToken={authToken}
+              bannerUrl={bannerUrl}
+            />
+            <div className="flex min-w-0 flex-col justify-center">
+              <p className="m-0 mb-2 font-base text-sm font-semibold text-accent">Latest updated project</p>
+              <h2 className="m-0 mb-5 font-base text-3xl text-base-content md:text-4xl">{featuredProject.name}</h2>
+              <div className="mb-5 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+                <StatItem label="Photos" value={featuredProject.totalPhotos} />
+                <StatItem label="Liked" value={featuredProject.likedPhotos} valueClassName="text-accent" />
+                <StatItem label="Rejected" value={featuredProject.rejectedPhotos} />
+                <StatItem label="Pending" value={featuredProject.pendingReviewPhotos} valueClassName="text-warning" />
               </div>
-              <div className="flex flex-col justify-center">
-                <h2 className="m-0 font-base text-3xl text-base-content">{featuredProject.name}</h2>
-                <p className="my-3 mb-5 font-base text-base text-muted">
-                  {featuredProject.description ||
-                    'Open this project to upload photos, run reviews, and export selections.'}
-                </p>
-                <div className="mb-5 flex gap-10 max-md:gap-6">
-                  <div>
-                    <p className="m-0 font-base text-[2.3rem] font-bold text-base-content">{featuredProject.totalPhotos}</p>
-                    <p className="mt-1 font-base text-xs uppercase tracking-[0.06em] text-muted">TOTAL PHOTOS</p>
-                  </div>
-                  <div>
-                    <p className="m-0 font-base text-[2.3rem] font-bold text-warning">{featuredProject.inProgressPhotos}</p>
-                    <p className="mt-1 font-base text-xs uppercase tracking-[0.06em] text-muted">IN PROGRESS</p>
-                  </div>
-                </div>
-                <Link
-                  to={`/projects/${featuredProject.id}`}
-                  className="btn btn-primary inline-flex w-fit min-h-11 items-center gap-2 rounded-full border-0 px-8 font-base text-base font-semibold text-primary-content no-underline transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
-                >
-                  Open project <span aria-hidden>→</span>
-                </Link>
-              </div>
-            </>
-          ) : (
-            <div className="grid grid-cols-1 items-center gap-5 p-2 md:grid-cols-[minmax(0,200px)_1fr]">
-              <div className={emptyVisualPh} aria-hidden />
-              <div className="flex flex-col gap-3">
-                <h2 className="m-0 font-base text-3xl text-base-content">No projects yet</h2>
-                <p className="font-base text-base text-muted">
-                  Create a project to get a dedicated space for uploads and client review sessions.
-                </p>
-                <button
-                  type="button"
-                  className="btn btn-primary inline-flex w-fit min-h-11 items-center gap-2 rounded-full border-0 px-8 font-base text-base font-semibold text-primary-content transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
-                  onClick={() => onNewProjectClick?.()}
-                >
-                  Create your first project <span aria-hidden>→</span>
-                </button>
-              </div>
+              <ReviewProgress
+                total={featuredProject.totalPhotos}
+                pendingReview={featuredProject.pendingReviewPhotos}
+              />
+              <Link
+                to={`/projects/${featuredProject.id}`}
+                className="btn ml-auto inline-flex w-fit min-h-11 items-center gap-2 rounded-full border-0 bg-accent px-8 font-base text-base font-semibold text-white no-underline transition-[background-color,transform] duration-150 ease-out hover:bg-accent-hover active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
+              >
+                Open project <span aria-hidden>→</span>
+              </Link>
             </div>
-          )}
-        </article>
-        <aside className="flex flex-col rounded-card bg-[#067a4c] p-5 text-[#eafff5]">
-          <h3 className="m-0 mb-4 font-base text-2xl font-semibold">Activity</h3>
-          <div className="flex flex-1 flex-col gap-3">
-            {recentActivity.length > 0 ? (
-              recentActivity.map((entry) => (
-                <div key={entry.id} className="grid grid-cols-[30px_1fr_auto] items-center gap-3">
-                  <span className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white/20 font-base text-xs font-semibold">
-                    {entry.actorInitial}
-                  </span>
-                  <div>
-                    <p className="m-0 font-base text-sm text-[#f4fff8]">{entry.message}</p>
-                    <p className="mt-0.5 font-base text-xs text-[#b3e7cf]">{entry.timeLabel}</p>
-                  </div>
-                  <span className="h-[7px] w-[7px] rounded-full" style={{ background: entry.dotColor }} />
-                </div>
-              ))
-            ) : (
-              <p className="m-0 font-base text-sm leading-relaxed text-[#d8f5e8]">
-                No audit events yet. Uploads and review actions will show up here when the API exposes an activity feed.
+          </>
+        ) : (
+          <>
+            <div className={emptyVisualPh} aria-hidden />
+            <div className="flex min-w-0 flex-col gap-3">
+              <h2 className="m-0 font-base text-3xl text-base-content md:text-4xl">No projects yet</h2>
+              <p className="font-base text-base text-muted">
+                Use <span className="font-semibold text-base-content">+ New Project</span> above to create your first one.
               </p>
-            )}
-          </div>
-          <button
-            type="button"
-            className="btn mt-4 min-h-10 rounded-full border-[1.5px] border-white/20 bg-white/10 font-base text-sm font-semibold text-[#effff6] opacity-45"
-            disabled
-          >
-            Audit log (soon)
-          </button>
-        </aside>
-      </div>
+            </div>
+          </>
+        )}
+      </article>
     </section>
   )
 }
@@ -141,27 +152,16 @@ export default function DashboardHero({
 const featuredShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
   name: PropTypes.string.isRequired,
-  description: PropTypes.string,
-  status: PropTypes.string,
   totalPhotos: PropTypes.number.isRequired,
-  inProgressPhotos: PropTypes.number.isRequired,
+  likedPhotos: PropTypes.number.isRequired,
+  rejectedPhotos: PropTypes.number.isRequired,
+  pendingReviewPhotos: PropTypes.number.isRequired,
   bannerUrl: PropTypes.string,
   bannerPhotoId: PropTypes.string,
 })
 
 DashboardHero.propTypes = {
   authToken: PropTypes.string,
-  /** Random ready preview when project has no metadata banner (ephemeral, not saved). */
   fallbackCoverPhotoId: PropTypes.string,
   featuredProject: featuredShape,
-  recentActivity: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      actorInitial: PropTypes.string.isRequired,
-      message: PropTypes.string.isRequired,
-      timeLabel: PropTypes.string.isRequired,
-      dotColor: PropTypes.string.isRequired,
-    })
-  ),
-  onNewProjectClick: PropTypes.func,
 }
