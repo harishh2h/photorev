@@ -56,12 +56,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-      args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
     restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
+    environment:
+      # Optional — leave unset for local/Docker (auto-derives from window.location.hostname:3000).
+      # Set to your public API URL when deploying behind Cloudflare or a custom domain:
+      #   API_URL=https://api.yourdomain.com
+      API_URL: ${API_URL:-}
     ports:
       - "${WEB_PORT:-5173}:5173"
     networks:

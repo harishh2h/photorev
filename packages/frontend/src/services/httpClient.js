@@ -2,25 +2,36 @@
  * @returns {string}
  */
 export function getApiBaseUrl() {
-  let base = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+  if (typeof window === 'undefined') return ''
 
-  // Dev on LAN: phone opens Mac IP:5173 — API must use same host, not localhost
-  if (import.meta.env.DEV && typeof window !== 'undefined') {
-    if (!base) {
-      return `${window.location.protocol}//${window.location.hostname}:3000`
-    }
-    try {
-      const url = new URL(base)
-      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-        url.hostname = window.location.hostname
-        return url.origin
-      }
-    } catch {
-      // keep configured base
-    }
+  // 1. Runtime config — injected by docker/frontend-entrypoint.sh at container start.
+  //    Set API_URL env var on the container; no image rebuild needed.
+  //    Works for Cloudflare, custom domains, any deployment.
+  const runtimeUrl = window.__APP_CONFIG__?.apiUrl
+  if (runtimeUrl) return runtimeUrl.replace(/\/$/, '')
+
+  // 2. Build-time env (VITE_API_URL) — kept for explicit local overrides.
+  const buildUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
+  // 3. No URL configured — auto-derive from current hostname + default port 3000.
+  //    Works transparently for local dev, LAN, and Docker on any server.
+  if (!buildUrl) {
+    return `${window.location.protocol}//${window.location.hostname}:3000`
   }
 
-  return base
+  // 4. Build URL points at localhost but browser is on a different host
+  //    (LAN device, Docker port-mapped to remote IP) — rewrite hostname only.
+  try {
+    const url = new URL(buildUrl)
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      url.hostname = window.location.hostname
+      return url.origin
+    }
+  } catch {
+    // keep as-is
+  }
+
+  return buildUrl
 }
 
 /** @type {(() => void) | null} */

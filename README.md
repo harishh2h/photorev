@@ -127,7 +127,16 @@ Start with your env file loaded:
 docker compose --env-file packages/backend/.env up --build -d
 ```
 
-Without `--env-file`, Compose uses built-in defaults (including a dev-only `JWT_SECRET`). `docker-compose.yml` sets `DB_HOST=db` and `STORAGE_ROOT=/app/storage`. The frontend image is built with `VITE_API_URL=http://localhost:3000` so the browser on your machine reaches the mapped API port.
+Without `--env-file`, Compose uses built-in defaults (including a dev-only `JWT_SECRET`). `docker-compose.yml` sets `DB_HOST=db` and `STORAGE_ROOT=/app/storage`.
+
+**API URL — no rebuild needed.** The frontend derives the API URL at runtime:
+
+| Scenario | What to set |
+|----------|-------------|
+| Local / same server (default) | Nothing — auto-derives `hostname:3000` |
+| Cloudflare / custom domain | `API_URL=https://api.yourdomain.com` in your `.env` |
+
+The `API_URL` env var is written to `dist/config.js` by the container entrypoint on every start. You can change it and restart — no image rebuild required.
 
 ### 2. Build and start
 

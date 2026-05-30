@@ -12,9 +12,6 @@ RUN pnpm install --frozen-lockfile --filter @photorev/frontend...
 
 COPY packages/frontend ./packages/frontend
 
-ARG VITE_API_URL=http://localhost:3000
-ENV VITE_API_URL=${VITE_API_URL}
-
 WORKDIR /app/packages/frontend
 RUN pnpm run build
 
@@ -32,8 +29,11 @@ RUN pnpm install --frozen-lockfile --filter @photorev/frontend...
 COPY --from=build /app/packages/frontend/dist ./packages/frontend/dist
 COPY packages/frontend/vite.config.js ./packages/frontend/
 
+COPY docker/frontend-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 WORKDIR /app/packages/frontend
 
 EXPOSE 5173
 
-CMD ["pnpm", "exec", "vite", "preview", "--host", "0.0.0.0", "--port", "5173"]
+ENTRYPOINT ["/entrypoint.sh"]
