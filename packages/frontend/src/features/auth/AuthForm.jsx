@@ -1,27 +1,69 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PropTypes from 'prop-types'
+import { AppButton, AppInput } from '@/components/ui/index.js'
 import { useAuth } from './AuthContext.jsx'
-import { useToast } from '@/components/Toast/index.js'
 
-const BRAND_MONOGRAM = 'PR'
+function AuthModeTabs({ isSignIn, onSelectSignIn, onSelectSignUp, disabled }) {
+  const tabClass = (active) =>
+    `flex-1 min-h-11 rounded-full border-0 px-4 font-base text-sm font-semibold transition-[background-color,color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:shadow-focus max-[420px]:text-base ${
+      active
+        ? 'bg-accent text-primary-content shadow-card'
+        : 'cursor-pointer bg-transparent text-muted hover:text-base-content'
+    }`
 
-const inputClass =
-  'input input-bordered w-full min-h-11 rounded-full border-[1.5px] border-base-300 bg-[#fbfbfb] px-5 py-3 font-base text-base text-base-content transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-base-300 focus:border-accent focus:outline-none focus:shadow-[0_0_0_3px_rgba(16,185,129,0.2)] max-[420px]:px-4 max-[420px]:text-sm'
+  return (
+    <div
+      className="flex rounded-full border-[1.5px] border-base-300 bg-panel p-1"
+      role="tablist"
+      aria-label="Account mode"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={isSignIn}
+        className={tabClass(isSignIn)}
+        onClick={onSelectSignIn}
+        disabled={disabled}
+      >
+        Login
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={!isSignIn}
+        className={tabClass(!isSignIn)}
+        onClick={onSelectSignUp}
+        disabled={disabled}
+      >
+        Register
+      </button>
+    </div>
+  )
+}
 
-export default function AuthForm({ mode, onToggleMode }) {
+AuthModeTabs.propTypes = {
+  isSignIn: PropTypes.bool.isRequired,
+  onSelectSignIn: PropTypes.func.isRequired,
+  onSelectSignUp: PropTypes.func.isRequired,
+  disabled: PropTypes.bool,
+}
+
+export default function AuthForm({ mode, onToggleMode, showBranding = true, compact = false, centered = false }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
   const { login, register } = useAuth()
-  const toast = useToast()
   const navigate = useNavigate()
   const isSignIn = mode === 'signIn'
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (isSubmitting) return
+    setFormError('')
     setIsSubmitting(true)
     try {
       if (isSignIn) {
@@ -30,66 +72,69 @@ export default function AuthForm({ mode, onToggleMode }) {
           navigate('/', { replace: true })
           return
         }
-        toast.show(result.message || 'Login failed', 'error')
+        setFormError(result.message || 'Login failed')
       } else {
         const result = await register({ email, password, name })
         if (result.success) {
           navigate('/', { replace: true })
           return
         }
-        toast.show(result.message || 'Sign up failed', 'error')
+        setFormError(result.message || 'Sign up failed')
       }
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const tabClass = (active) =>
-    `border-b-2 bg-transparent px-0 pb-1 font-base text-base font-medium transition-[color,border-color] duration-150 ease-out focus-visible:rounded-md focus-visible:outline-none focus-visible:shadow-focus max-[420px]:text-lg ${
-      active ? 'border-accent text-base-content' : 'cursor-pointer border-transparent text-muted'
-    }`
+  const handleSelectSignIn = () => {
+    if (!isSignIn) {
+      setFormError('')
+      onToggleMode()
+    }
+  }
+
+  const handleSelectSignUp = () => {
+    if (isSignIn) {
+      setFormError('')
+      onToggleMode()
+    }
+  }
+
+  const formGap = compact ? 'gap-5' : 'gap-5 max-[420px]:gap-4'
+  const fieldGap = compact ? 'gap-4' : 'gap-4'
+  const fieldsMinHeight = compact ? '' : 'min-h-[176px] max-[420px]:min-h-[160px]'
+  const labelClass = 'font-base text-sm font-semibold text-muted max-[420px]:text-xs'
+  const fieldWrapClass = 'flex w-full flex-col gap-2'
+  const fieldsWrapClass = centered ? 'w-full max-w-[20rem]' : 'w-full'
 
   return (
-    <form className="flex w-full flex-col gap-4 max-[420px]:gap-3" onSubmit={handleSubmit} noValidate>
-      <div className="flex flex-col items-center gap-2">
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-accent font-base text-base font-bold text-accent-content">
-          {BRAND_MONOGRAM}
-        </span>
-        <h1 className="m-0 font-base text-3xl font-bold text-base-content max-[420px]:text-2xl">PhotoRev</h1>
-      </div>
-      <div className="mb-1 flex justify-center gap-4 max-[420px]:gap-3" role="tablist" aria-label="Account mode">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={isSignIn}
-          className={tabClass(isSignIn)}
-          onClick={() => !isSignIn && onToggleMode()}
+    <form className={`flex w-full flex-col ${formGap} ${centered ? 'items-center' : ''}`} onSubmit={handleSubmit} noValidate>
+      {showBranding ? (
+        <div className="flex flex-col items-center gap-2 text-center">
+          <h1 className="m-0 font-base text-3xl font-bold text-accent max-[420px]:text-2xl">PhotoRev</h1>
+        </div>
+      ) : null}
+
+      <div className={centered ? 'w-full max-w-[20rem]' : 'w-full'}>
+        <AuthModeTabs
+          isSignIn={isSignIn}
+          onSelectSignIn={handleSelectSignIn}
+          onSelectSignUp={handleSelectSignUp}
           disabled={isSubmitting}
-        >
-          Login
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={!isSignIn}
-          className={tabClass(!isSignIn)}
-          onClick={() => isSignIn && onToggleMode()}
-          disabled={isSubmitting}
-        >
-          Register
-        </button>
+        />
       </div>
-      <div key={mode} className="animate-fade-up motion-reduce:animate-none">
-        <div className="flex min-h-[200px] flex-col gap-4 max-[420px]:min-h-[176px]">
+
+      <div key={mode} className={`${fieldsWrapClass} ${compact ? '' : 'animate-fade-up motion-reduce:animate-none'}`}>
+        <div className={`flex flex-col ${fieldGap} ${fieldsMinHeight}`}>
           {!isSignIn && (
-            <div className="flex flex-col gap-2">
-              <label htmlFor="auth-name" className="font-base text-sm font-medium text-muted max-[420px]:text-xs">
+            <div className={fieldWrapClass}>
+              <label htmlFor="auth-name" className={labelClass}>
                 Full name
               </label>
-              <input
+              <AppInput
                 id="auth-name"
                 type="text"
-                className={inputClass}
+                className="min-h-11"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="John Doe"
@@ -99,14 +144,14 @@ export default function AuthForm({ mode, onToggleMode }) {
               />
             </div>
           )}
-          <div className="flex flex-col gap-2">
-            <label htmlFor="auth-email" className="font-base text-sm font-medium text-muted max-[420px]:text-xs">
+          <div className={fieldWrapClass}>
+            <label htmlFor="auth-email" className={labelClass}>
               Email address
             </label>
-            <input
+            <AppInput
               id="auth-email"
               type="email"
-              className={inputClass}
+              className="min-h-11"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="enter@email.com"
@@ -115,15 +160,15 @@ export default function AuthForm({ mode, onToggleMode }) {
               disabled={isSubmitting}
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="auth-password" className="font-base text-sm font-medium text-muted max-[420px]:text-xs">
+          <div className={fieldWrapClass}>
+            <label htmlFor="auth-password" className={labelClass}>
               Password
             </label>
-            <div className="relative flex items-center">
-              <input
+            <div className="relative flex w-full items-center">
+              <AppInput
                 id="auth-password"
                 type={showPassword ? 'text' : 'password'}
-                className={`${inputClass} pr-12`}
+                className="min-h-11 w-full pr-12 max-[420px]:px-4 max-[420px]:text-sm"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -151,23 +196,31 @@ export default function AuthForm({ mode, onToggleMode }) {
                 )}
               </button>
             </div>
+            {!isSignIn ? (
+              <p className="m-0 font-base text-xs text-muted">Use at least 8 characters.</p>
+            ) : null}
           </div>
         </div>
-        <div className="mt-5 flex flex-col gap-4">
-          <button
-            type="submit"
-            className="btn btn-primary inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border-0 px-8 font-base text-base font-semibold text-primary-content transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-40 max-[420px]:w-full"
-            disabled={isSubmitting}
-          >
+
+        {formError ? (
+          <p className="mt-4 m-0 font-base text-sm font-medium text-error" role="alert">
+            {formError}
+          </p>
+        ) : null}
+
+        <div className="mt-5">
+          <AppButton type="submit" variant="primary" className="group w-full gap-2" disabled={isSubmitting}>
             {isSubmitting ? (
               <span className="loading loading-spinner loading-sm text-primary-content" aria-hidden />
             ) : (
               <>
                 {isSignIn ? 'Login' : 'Create account'}
-                <span aria-hidden>→</span>
+                <span className="inline-block transition-transform duration-150 ease-out group-hover:translate-x-1" aria-hidden>
+                  →
+                </span>
               </>
             )}
-          </button>
+          </AppButton>
         </div>
       </div>
     </form>
@@ -177,4 +230,7 @@ export default function AuthForm({ mode, onToggleMode }) {
 AuthForm.propTypes = {
   mode: PropTypes.oneOf(['signIn', 'signUp']).isRequired,
   onToggleMode: PropTypes.func.isRequired,
+  showBranding: PropTypes.bool,
+  compact: PropTypes.bool,
+  centered: PropTypes.bool,
 }
