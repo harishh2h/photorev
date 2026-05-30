@@ -10,6 +10,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "${DB_PORT:-5432}:5432"
+    networks:
+      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-photorev}"]
       interval: 5s
@@ -35,11 +37,20 @@ services:
       PORT: 3000
       STORAGE_ROOT: /app/storage
       JWT_SECRET: ${JWT_SECRET:-photorev-docker-dev-secret-change-me-32}
+      AUTH_PUBLIC_REGISTRATION: ${AUTH_PUBLIC_REGISTRATION:-false}
+      NODE_ENV: ${NODE_ENV:-development}
     volumes:
-      # Persistent photo + export files (bind-mount ./docker-data/storage for host access)
       - photorev_storage:/app/storage
     ports:
       - "${API_PORT:-3000}:3000"
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
 
   web:
     build:
@@ -49,9 +60,16 @@ services:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
     restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "${WEB_PORT:-5173}:5173"
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
 
 volumes:
   postgres_data:
