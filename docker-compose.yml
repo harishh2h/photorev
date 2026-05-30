@@ -65,6 +65,9 @@ services:
       # Set to your public API URL when deploying behind Cloudflare or a custom domain:
       #   API_URL=https://api.yourdomain.com
       API_URL: ${API_URL:-}
+      # Add your domain(s) here, comma-separated. Leave empty to allow all hosts.
+      # Example: VITE_ALLOWED_HOSTS=photorev.h2hcloud.in,www.photorev.h2hcloud.in
+      VITE_ALLOWED_HOSTS: yourserver.com
     ports:
       - "${WEB_PORT:-5173}:5173"
     networks:

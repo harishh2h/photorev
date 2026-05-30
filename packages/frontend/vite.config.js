@@ -18,5 +18,8 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    allowedHosts: process.env.VITE_ALLOWED_HOSTS
+      ? process.env.VITE_ALLOWED_HOSTS.split(',').map(h => h.trim())
+      : true, // true = allow all hosts (safe behind a reverse proxy)
   },
 })
