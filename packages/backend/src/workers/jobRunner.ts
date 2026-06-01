@@ -2,6 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { db } from "../db";
 import type { ProcessingJobWithOriginalPath } from "../models/processing-job";
+import {
+  captureBackgroundError,
+  endBackgroundSpan,
+  startBackgroundSpan,
+} from "../utils/apm-spans";
 import { getStorageRoot } from "../utils/storage";
 import type { ProcessingJobWorkerSuccess } from "./tasks/runProcessingJob";
 import { WorkerPool } from "./workerPool";
@@ -54,18 +59,28 @@ export class JobRunner {
         await this.handleMaintenanceJob(job);
         continue;
       }
+      const span = startBackgroundSpan(`processing.${job.job_type}`, "worker", {
+        job_id: job.id,
+        job_type: job.job_type,
+        photo_id: job.photo_id ?? "",
+      });
       this.pool.submit({ ...job } as Record<string, unknown>, (workerResult, error) => {
         void (async (): Promise<void> => {
-          if (error) {
-            await this.handleFailure(job, error);
-          } else {
-            await this.completeSuccessfulJob(job, workerResult);
-          }
-          if (this.state === "idle") {
-            this.notify();
-          } else if (this.state === "draining" && this.pool.activeCount === 0) {
-            this.state = "stopped";
-            console.log("JobRunner: all workers finished, safe to exit");
+          try {
+            if (error) {
+              captureBackgroundError(error);
+              await this.handleFailure(job, error);
+            } else {
+              await this.completeSuccessfulJob(job, workerResult);
+            }
+            if (this.state === "idle") {
+              this.notify();
+            } else if (this.state === "draining" && this.pool.activeCount === 0) {
+              this.state = "stopped";
+              console.log("JobRunner: all workers finished, safe to exit");
+            }
+          } finally {
+            endBackgroundSpan(span);
           }
         })();
       });
@@ -73,6 +88,10 @@ export class JobRunner {
   }
 
   private async handleMaintenanceJob(job: ProcessingJobWithOriginalPath): Promise<void> {
+    const span = startBackgroundSpan(`maintenance.${job.job_type}`, "worker", {
+      job_id: job.id,
+      job_type: job.job_type,
+    });
     try {
       if (job.job_type === "hard_delete_photo") {
         await this.runHardDeletePhoto(job);
@@ -81,7 +100,11 @@ export class JobRunner {
       }
       await this.markDone(job.id);
     } catch (err) {
-      await this.handleFailure(job, err instanceof Error ? err : new Error(String(err)));
+      const error = err instanceof Error ? err : new Error(String(err));
+      captureBackgroundError(error);
+      await this.handleFailure(job, error);
+    } finally {
+      endBackgroundSpan(span);
     }
     if (this.state === "idle") {
       this.notify();

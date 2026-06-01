@@ -60,6 +60,7 @@ Paste the output into `packages/backend/.env` as `JWT_SECRET=...`.
 | `JWT_SECRET` | Auth tokens (min 16 chars, not a placeholder) |
 | `STORAGE_ROOT` | Uploaded photos and exports (default `./storage`) |
 | `PORT` / `HOST` | API listen address (default `3000` / `0.0.0.0`) |
+| `ELASTIC_APM_*` | Optional Elastic APM (see `packages/backend/.env.example`) |
 
 **Frontend** (`packages/frontend/.env`) — key variables:
 

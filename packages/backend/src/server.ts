@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./instrument";
 import fs from "fs";
 import path from "path";
 import buildApp from "./app";

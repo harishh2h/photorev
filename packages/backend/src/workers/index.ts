@@ -1,3 +1,4 @@
+import apm from "../instrument";
 import { db } from "../db";
 import { exportRunner, purgeExpiredExports } from "./exportRunner";
 import { JobRunner } from "./jobRunner";
@@ -84,6 +85,13 @@ export async function initJobSystem() {
     }
 
     await pool.shutdown();
+    if (apm.isStarted()) {
+      try {
+        await apm.flush();
+      } catch {
+        // Best-effort flush before exit
+      }
+    }
     process.exit(0);
   });
 
