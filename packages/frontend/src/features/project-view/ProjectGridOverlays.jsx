@@ -15,7 +15,7 @@ export default function ProjectGridOverlays({
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[220] pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:pr-[min(300px,100vw)]">
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[220] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       <div className="pointer-events-none relative mx-auto max-w-[1400px] px-4 md:px-6 lg:px-8">
         <button
           type="button"

@@ -9,7 +9,11 @@ import {
   type ProjectExportStatus,
   type ProjectExportVariant,
 } from "../models/project-export";
-import { computeProjectSelectionHash } from "../utils/export-selection-hash";
+import {
+  computeProjectExportHash,
+  DEFAULT_EXPORT_FILTER,
+  DEFAULT_EXPORT_SCOPE,
+} from "../utils/export-photo-query";
 import { loadProjectPermissionContext } from "../utils/project-permissions";
 import { getStorageRoot } from "../utils/storage";
 import { exportRunner } from "../workers/exportRunner";
@@ -18,6 +22,8 @@ export interface CreateProjectExportParams {
   readonly userId: string;
   readonly projectId: string;
   readonly variant: ProjectExportVariant;
+  readonly reviewScope?: string;
+  readonly photoFilter?: string;
 }
 
 export interface CreateShareExportParams {
@@ -158,6 +164,8 @@ function buildProjectExportsService(
     shareLinkId: string | null;
     photoCount: number;
     selectionHash: string;
+    reviewScope: string;
+    photoFilter: string;
   }): Promise<ProjectExportDto> {
     const [row] = await db<ProjectExportRecord>("project_exports")
       .insert({
@@ -169,6 +177,8 @@ function buildProjectExportsService(
         processed_count: 0,
         status: "queued",
         selection_hash: params.selectionHash,
+        review_scope: params.reviewScope,
+        photo_filter: params.photoFilter,
       })
       .returning("*");
     exportRunner.notify();
@@ -180,14 +190,20 @@ function buildProjectExportsService(
     variant: ProjectExportVariant;
     userId: string | null;
     shareLinkId: string | null;
+    reviewScope?: string;
+    photoFilter?: string;
   }): Promise<ProjectExportDto> {
-    const { hash, photoCount } = await computeProjectSelectionHash(
+    const scope = params.reviewScope ?? DEFAULT_EXPORT_SCOPE;
+    const filter = params.photoFilter ?? DEFAULT_EXPORT_FILTER;
+    const { hash, photoCount } = await computeProjectExportHash(
       db,
       params.projectId,
       params.userId,
+      scope,
+      filter,
     );
     if (photoCount === 0) {
-      throw new Error("No selected photos to download");
+      throw new Error("No photos to download for this filter");
     }
 
     const existing = await findReusableExport(params.projectId, params.variant, hash);
@@ -205,6 +221,8 @@ function buildProjectExportsService(
       shareLinkId: params.shareLinkId,
       photoCount,
       selectionHash: hash,
+      reviewScope: scope,
+      photoFilter: filter,
     });
   }
 
@@ -228,6 +246,8 @@ function buildProjectExportsService(
         variant: params.variant,
         userId: params.userId,
         shareLinkId: null,
+        reviewScope: params.reviewScope,
+        photoFilter: params.photoFilter,
       });
     },
 

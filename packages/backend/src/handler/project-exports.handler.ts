@@ -20,11 +20,17 @@ function buildProjectExportsHandler(
     createExport: async (request, reply) => {
       const userId = getAuthenticatedUserId(request);
       const { projectId } = request.params as { projectId: string };
-      const body = request.body as { variant?: string };
+      const body = request.body as { variant?: string; scope?: string; filter?: string };
       const variant = body.variant === "preview" ? "preview" : "original";
 
       try {
-        const created = await service.createForProject({ userId, projectId, variant });
+        const created = await service.createForProject({
+          userId,
+          projectId,
+          variant,
+          reviewScope: body.scope,
+          photoFilter: body.filter,
+        });
         if (!created) {
           sendFailure(reply, 404, "Project not found", null);
           return;

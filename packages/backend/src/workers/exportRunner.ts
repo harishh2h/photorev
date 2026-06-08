@@ -7,6 +7,11 @@ import {
   type ProjectExportVariant,
 } from "../models/project-export";
 import {
+  DEFAULT_EXPORT_FILTER,
+  DEFAULT_EXPORT_SCOPE,
+  loadExportPhotoRows,
+} from "../utils/export-photo-query";
+import {
   resolveExportPhotoAbsolutePath,
   zipEntryNamesForPhotos,
   type ExportPhotoRow,
@@ -60,33 +65,25 @@ export class ExportRunner {
 
   private async processExport(job: ProjectExportRecord): Promise<void> {
     try {
-      let photosQuery = db<ExportPhotoRow>("photos")
-        .select(
-          "photos.id",
-          "photos.original_name",
-          "photos.original_path",
-          "photos.preview_path",
-        )
-        .where("photos.project_id", job.project_id)
-        .andWhere("photos.status", "ready")
-        .andWhere("photos.final_decision", 1)
-        .orderBy("photos.created_at", "asc");
-
-      if (job.created_by_user_id) {
-        photosQuery = photosQuery
-          .leftJoin("photo_reviews", function joinCreatorReview() {
-            this.on("photo_reviews.photo_id", "photos.id").andOn(
-              "photo_reviews.user_id",
-              db.raw("?", [job.created_by_user_id]),
-            );
-          })
-          .select(db.raw("photo_reviews.renamed_to as renamed_to"));
-      }
-
-      const photos = await photosQuery;
+      const scope = job.review_scope ?? DEFAULT_EXPORT_SCOPE;
+      const filter = job.photo_filter ?? DEFAULT_EXPORT_FILTER;
+      const filteredRows = await loadExportPhotoRows(
+        db,
+        job.project_id,
+        job.created_by_user_id,
+        scope,
+        filter,
+      );
+      const photos: ExportPhotoRow[] = filteredRows.map((row) => ({
+        id: row.id,
+        original_name: row.original_name,
+        original_path: row.original_path,
+        preview_path: row.preview_path,
+        renamed_to: row.renamed_to,
+      }));
 
       if (photos.length === 0) {
-        throw new Error("No selected photos to export");
+        throw new Error("No photos to export for this filter");
       }
 
       const variant = job.variant as ProjectExportVariant;

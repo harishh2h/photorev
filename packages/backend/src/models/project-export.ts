@@ -23,6 +23,8 @@ export interface ProjectExportRecord {
   readonly started_at: Date | null;
   readonly completed_at: Date | null;
   readonly selection_hash: string | null;
+  readonly review_scope: string | null;
+  readonly photo_filter: string | null;
 }
 
 export interface ProjectExportDto {

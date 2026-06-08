@@ -26,13 +26,17 @@ import { apiFetch, getApiBaseUrl, isApiEnvelope, notifyUnauthorized } from './ht
  * @param {string} token
  * @param {string} projectId
  * @param {ExportVariant} variant
+ * @param {{ scope?: string; filter?: string }} [options]
  * @returns {Promise<ProjectExportStatus>}
  */
-export async function createProjectExport(token, projectId, variant) {
+export async function createProjectExport(token, projectId, variant, options = {}) {
+  const body = { variant }
+  if (options.scope) body.scope = options.scope
+  if (options.filter) body.filter = options.filter
   const { ok, message, data } = await apiFetch(`/projects/${encodeURIComponent(projectId)}/exports`, {
     token,
     method: 'POST',
-    body: { variant },
+    body,
   })
   if (!ok) throw new Error(message)
   return /** @type {ProjectExportStatus} */ (data)

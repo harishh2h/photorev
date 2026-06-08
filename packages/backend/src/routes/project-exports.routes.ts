@@ -30,6 +30,11 @@ const createExportSchema = {
     required: ["variant"],
     properties: {
       variant: { type: "string", enum: ["original", "preview"] },
+      scope: { type: "string", enum: ["mine", "team"] },
+      filter: {
+        type: "string",
+        enum: ["all", "liked", "rejected", "unreviewed", "conflicts", "trashed"],
+      },
     },
     additionalProperties: false,
   },

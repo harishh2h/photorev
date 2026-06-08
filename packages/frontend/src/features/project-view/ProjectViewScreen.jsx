@@ -17,7 +17,7 @@ import {
   useProjectExport,
 } from '@/features/project-export/index.js'
 import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
-import { REVIEW_SCOPE } from '@/utils/projectReviewFilters.js'
+import { countForFilter, PHOTO_FILTER, REVIEW_SCOPE } from '@/utils/projectReviewFilters.js'
 import { isPhotoVirtualGridEnabled } from '@/utils/photoContentUrl.js'
 import { mapPhotosForViewer } from '@/utils/mapPhotosForViewer.js'
 
@@ -46,14 +46,29 @@ export default function ProjectViewScreen({
   const [collaboratorsOpen, setCollaboratorsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
-  const selectedDownloadCount = data.sidebarStats?.viewer?.selected ?? 0
-  const exportStorageKey = getExportStorageKey('project', projectId)
+  const exportReviewScope = canReviewPhotos ? reviewScope : REVIEW_SCOPE.TEAM
+  const exportActiveFilter = canReviewPhotos ? activeFilter : PHOTO_FILTER.LIKED
+  const scopeCounts =
+    exportReviewScope === REVIEW_SCOPE.TEAM ? data.filterCounts.team : data.filterCounts.mine
+  const globalCounts = {
+    conflicts: data.filterCounts.conflicts ?? 0,
+    trashed: data.filterCounts.trashed ?? 0,
+  }
+  const filteredDownloadCount = canReviewPhotos
+    ? countForFilter(scopeCounts, exportActiveFilter, globalCounts)
+    : (data.sidebarStats?.viewer?.selected ?? 0)
+  const exportStorageKey = getExportStorageKey('project', projectId, {
+    reviewScope: exportReviewScope,
+    activeFilter: exportActiveFilter,
+  })
   const exportState = useProjectExport({
     mode: 'project',
     token,
     projectId,
     projectName: data.projectTitle,
     storageKey: exportStorageKey,
+    reviewScope: exportReviewScope,
+    activeFilter: exportActiveFilter,
   })
 
   const {
@@ -150,7 +165,7 @@ export default function ProjectViewScreen({
         onManageCollaborators={data.isProjectCreator ? handleManageCollaborators : undefined}
         onShare={handleShare}
         onSettings={handleSettings}
-        canDownload={selectedDownloadCount > 0}
+        canDownload={filteredDownloadCount > 0}
         onSelectFullQuality={handleExportFullQuality}
         onSelectCompressed={handleExportCompressed}
         exportBusy={exportState.isBusy}

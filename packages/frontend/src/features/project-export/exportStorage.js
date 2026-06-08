@@ -1,10 +1,15 @@
 /**
  * @param {'project' | 'share'} mode
  * @param {string} scopeId projectId or share token
+ * @param {{ reviewScope?: string; activeFilter?: string }} [filters]
  * @returns {string}
  */
-export function getExportStorageKey(mode, scopeId) {
-  return `photorev-export:${mode}:${scopeId}`
+export function getExportStorageKey(mode, scopeId, filters = {}) {
+  const base = `photorev-export:${mode}:${scopeId}`
+  if (mode !== 'project') return base
+  const reviewScope = filters.reviewScope ?? 'mine'
+  const activeFilter = filters.activeFilter ?? 'all'
+  return `${base}:${reviewScope}:${activeFilter}`
 }
 
 /**

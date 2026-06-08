@@ -46,6 +46,8 @@ function phaseFromStatus(status, downloadAvailable) {
  *   unlockToken?: string | null;
  *   projectName: string;
  *   storageKey: string;
+ *   reviewScope?: string;
+ *   activeFilter?: string;
  * }} config
  */
 export function useProjectExport({
@@ -56,6 +58,8 @@ export function useProjectExport({
   unlockToken = null,
   projectName,
   storageKey,
+  reviewScope = 'mine',
+  activeFilter = 'all',
 }) {
   const [exportJob, setExportJob] = useState(null)
   const [phase, setPhase] = useState('idle')
@@ -162,7 +166,10 @@ export function useProjectExport({
       try {
         const created =
           mode === 'project' && projectId
-            ? await createProjectExport(token, projectId, variant)
+            ? await createProjectExport(token, projectId, variant, {
+                scope: reviewScope,
+                filter: activeFilter,
+              })
             : mode === 'share' && shareToken
               ? await createShareExport(shareToken, variant, unlockToken)
               : null
@@ -187,7 +194,7 @@ export function useProjectExport({
         setPanelOpen(false)
       }
     },
-    [mode, token, projectId, shareToken, unlockToken, storageKey, projectName],
+    [mode, token, projectId, shareToken, unlockToken, storageKey, projectName, reviewScope, activeFilter],
   )
 
   const downloadZip = useCallback(
