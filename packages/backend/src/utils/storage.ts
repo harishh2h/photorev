@@ -1,12 +1,10 @@
 import fs from "fs";
 import path from "path";
-import { pipeline } from "stream";
-
-const STORAGE_ROOT =
-  process.env.STORAGE_ROOT ?? path.join(process.cwd(), "storage");
+import { extensionForDetectedMime } from "./validate-image-upload";
+import { sniffImageUploadStream } from "./stream-prefix";
 
 export function getStorageRoot(): string {
-  return STORAGE_ROOT;
+  return process.env.STORAGE_ROOT ?? path.join(process.cwd(), "storage");
 }
 
 export class RootPathValidationError extends Error {
@@ -115,14 +113,6 @@ export async function findOriginalFileAbsolute(dirAbsolute: string): Promise<str
   }
   return path.join(dirAbsolute, match);
 }
-const ALLOWED_MIME = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/tiff",
-  "image/heic",
-];
-
 export interface SavedFile {
   photoId: string;
   filePath: string;
@@ -132,43 +122,68 @@ export interface SavedFile {
   fileSize: number;
 }
 
-function getSafeExt(fileName: string): string {
-  const ext = path.extname(fileName).toLowerCase();
-  return ext || ".bin";
+async function writePrefixAndTail(
+  absolutePath: string,
+  prefix: Buffer,
+  tail: NodeJS.ReadableStream | null,
+): Promise<number> {
+  if (!tail) {
+    await fs.promises.writeFile(absolutePath, prefix);
+    return prefix.length;
+  }
+
+  let fileSize = prefix.length;
+  const writeStream = fs.createWriteStream(absolutePath);
+
+  await new Promise<void>((resolve, reject) => {
+    const onTailData = (chunk: Buffer) => {
+      fileSize += chunk.length;
+    };
+
+    writeStream.on("error", reject);
+    tail.on("error", reject);
+
+    writeStream.write(prefix, (writeErr) => {
+      if (writeErr) {
+        reject(new Error(`Failed to save file: ${writeErr.message}`));
+        return;
+      }
+
+      tail.on("data", onTailData);
+      tail.pipe(writeStream);
+      writeStream.on("finish", () => resolve());
+      if ("resume" in tail && typeof tail.resume === "function") {
+        tail.resume();
+      }
+    });
+  });
+
+  return fileSize;
 }
 
 export async function streamFileToDisk(
   fileStream: NodeJS.ReadableStream,
-  mimeType: string,
   fileName: string,
   projectId: string,
   photoId: string,
 ): Promise<SavedFile> {
-  if (!ALLOWED_MIME.includes(mimeType)) {
-    throw new Error(`Invalid mime type: ${mimeType}`);
-  }
-
-  const ext = getSafeExt(fileName);
+  const { prefix, tail, mimeType } = await sniffImageUploadStream(fileStream);
+  const ext = extensionForDetectedMime(mimeType);
   const filename = `original${ext}`;
-  const dir = path.join(STORAGE_ROOT, "photos", projectId, photoId);
+  const dir = path.join(getStorageRoot(), "photos", projectId, photoId);
   const absolutePath = path.join(dir, filename);
   const relativePath = path.posix.join("photos", projectId, photoId, filename);
 
   await fs.promises.mkdir(dir, { recursive: true });
 
-  let fileSize = 0;
-  const writeStream = fs.createWriteStream(absolutePath);
-
-  fileStream.on("data", (chunk: Buffer) => {
-    fileSize += chunk.length;
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    pipeline(fileStream, writeStream, (err) => {
-      if (err) reject(new Error(`Failed to save file: ${err.message}`));
-      else resolve();
-    });
-  });
+  let fileSize: number;
+  try {
+    fileSize = await writePrefixAndTail(absolutePath, prefix, tail);
+  } catch (err) {
+    await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    const message = err instanceof Error ? err.message : "Failed to save file";
+    throw new Error(message);
+  }
 
   return {
     photoId,

@@ -1,4 +1,9 @@
 import { apiFetch, getApiBaseUrl, isApiEnvelope, notifyUnauthorized } from './httpClient.js'
+import {
+  classifyUploadFailure,
+  messageForUploadFailure,
+  PhotoUploadError,
+} from '@/utils/uploadErrors.js'
 
 /**
  * @param {string} token
@@ -35,14 +40,19 @@ export async function uploadPhoto(token, projectId, file) {
     }
   }
   if (!isApiEnvelope(parsed)) {
-    throw new Error(`Upload failed (${res.status})`)
+    const kind = classifyUploadFailure(res.status)
+    throw new PhotoUploadError(messageForUploadFailure(kind), { kind, status: res.status })
   }
   if (!res.ok || parsed.error) {
-    throw new Error(parsed.message)
+    const kind = classifyUploadFailure(res.status, parsed.message)
+    throw new PhotoUploadError(messageForUploadFailure(kind, parsed.message), {
+      kind,
+      status: res.status,
+    })
   }
   const data = /** @type {{ photoId?: string }} */ (parsed.data)
   if (typeof data?.photoId !== 'string') {
-    throw new Error('Invalid upload response')
+    throw new PhotoUploadError('Invalid upload response', { kind: 'unknown', status: res.status })
   }
   return { photoId: data.photoId }
 }

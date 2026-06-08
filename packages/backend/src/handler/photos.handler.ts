@@ -25,6 +25,8 @@ import {
   streamFileToDisk,
   removeUploadDir,
 } from "../utils/storage";
+import { InvalidImageUploadError } from "../utils/validate-image-upload";
+import { discardRemainder } from "../utils/stream-prefix";
 
 function getMimeTypeForImagePath(filePath: string): string {
   const lower = filePath.toLowerCase();
@@ -372,12 +374,16 @@ function buildPhotosHandler(
       try {
         saved = await streamFileToDisk(
           data.file,
-          data.mimetype,
           data.filename,
           projectId,
           photoId,
         );
-      } catch (_err) {
+      } catch (err) {
+        if (err instanceof InvalidImageUploadError) {
+          discardRemainder(data.file);
+          sendFailure(reply, 400, err.message, null);
+          return;
+        }
         sendFailure(reply, 500, "Failed to save file to disk", null);
         return;
       }

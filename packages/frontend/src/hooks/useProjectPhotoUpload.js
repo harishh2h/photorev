@@ -1,5 +1,10 @@
 import { useCallback, useRef, useState } from 'react'
 import { uploadPhoto } from '@/services/photoService.js'
+import {
+  buildUploadBatchSummary,
+  PhotoUploadError,
+  UPLOAD_ERROR_KIND,
+} from '@/utils/uploadErrors.js'
 
 const DEFAULT_UPLOAD_CONCURRENCY = 2
 const MAX_UPLOAD_CONCURRENCY = 5
@@ -9,7 +14,11 @@ const MAX_UPLOAD_CONCURRENCY = 5
  */
 
 /**
- * @typedef {{ id: string; file: File; label: string; status: UploadJobStatus; errorMessage: string | null }} UploadJob
+ * @typedef {import('@/utils/uploadErrors.js').UploadErrorKind} UploadErrorKind
+ */
+
+/**
+ * @typedef {{ id: string; file: File; label: string; status: UploadJobStatus; errorMessage: string | null; errorKind: UploadErrorKind | null }} UploadJob
  */
 
 /**
@@ -68,15 +77,7 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
       total: jobs.length,
     })
     onAfterBatch()
-    if (failed > 0) {
-      setUploadMessage(
-        failed === jobs.length
-          ? 'All uploads failed. Try again or check your connection.'
-          : `${failed} of ${jobs.length} uploads failed.`,
-      )
-    } else {
-      setUploadMessage(null)
-    }
+    setUploadMessage(failed > 0 ? buildUploadBatchSummary(jobs) : null)
   }, [onAfterBatch, flushJobs])
 
   const pump = useCallback(() => {
@@ -102,7 +103,13 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
         })
         .catch((err) => {
           next.status = 'failed'
-          next.errorMessage = err instanceof Error ? err.message : 'Upload failed'
+          if (err instanceof PhotoUploadError) {
+            next.errorMessage = err.message
+            next.errorKind = err.kind
+          } else {
+            next.errorMessage = err instanceof Error ? err.message : 'Upload failed'
+            next.errorKind = UPLOAD_ERROR_KIND.UNKNOWN
+          }
         })
         .finally(() => {
           flushJobs()
@@ -147,12 +154,15 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
   const retryFailedUploads = useCallback(() => {
     if (!runFinishedRef.current || isUploading) return
     const jobs = jobsRef.current
-    const failed = jobs.filter((j) => j.status === 'failed')
-    if (failed.length === 0) return
+    const retryable = jobs.filter(
+      (j) => j.status === 'failed' && j.errorKind !== UPLOAD_ERROR_KIND.INVALID_IMAGE,
+    )
+    if (retryable.length === 0) return
 
-    failed.forEach((j) => {
+    retryable.forEach((j) => {
       j.status = 'queued'
       j.errorMessage = null
+      j.errorKind = null
     })
     runFinishedRef.current = false
     setIsUploading(true)
@@ -176,6 +186,7 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
         label: file.name || 'Photo',
         status: /** @type {UploadJobStatus} */ ('queued'),
         errorMessage: null,
+        errorKind: null,
       }))
 
       runFinishedRef.current = false
@@ -198,7 +209,10 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
   const showUploadPanel = isUploading || postBatchSummary !== null || uploadJobs.length > 0
 
   const failedCount = uploadJobs.filter((j) => j.status === 'failed').length
-  const canRetryFailed = !isUploading && failedCount > 0
+  const retryableFailedCount = jobsRef.current.filter(
+    (j) => j.status === 'failed' && j.errorKind !== UPLOAD_ERROR_KIND.INVALID_IMAGE,
+  ).length
+  const canRetryFailed = !isUploading && retryableFailedCount > 0
 
   return {
     fileInputRef,

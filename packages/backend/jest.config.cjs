@@ -4,5 +4,6 @@ module.exports = {
   testEnvironment: "node",
   testMatch: ["**/src/__tests__/**/*.test.ts"],
   moduleFileExtensions: ["ts", "js", "json"],
+  transformIgnorePatterns: ["node_modules/(?!(file-type)/)"],
 };
 

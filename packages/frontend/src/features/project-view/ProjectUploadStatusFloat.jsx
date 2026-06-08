@@ -124,7 +124,7 @@ export default function ProjectUploadStatusFloat({
           className="btn btn-outline mb-2 h-11 min-h-11 w-full rounded-full border-[1.5px] border-accent font-base text-sm font-semibold text-accent transition-[background-color,color,transform] duration-150 ease-out hover:bg-accent/10 active:scale-[0.97] focus-visible:outline-none focus-visible:shadow-focus"
           onClick={onRetryFailed}
         >
-          Retry failed ({failed})
+          Retry failed
         </button>
       ) : null}
 
