@@ -1,10 +1,11 @@
-/** @typedef {'invalid_image' | 'network' | 'server' | 'unknown'} UploadErrorKind */
+/** @typedef {'invalid_image' | 'network' | 'server' | 'unknown' | 'cancelled'} UploadErrorKind */
 
 export const UPLOAD_ERROR_KIND = {
   INVALID_IMAGE: /** @type {const} */ ('invalid_image'),
   NETWORK: /** @type {const} */ ('network'),
   SERVER: /** @type {const} */ ('server'),
   UNKNOWN: /** @type {const} */ ('unknown'),
+  CANCELLED: /** @type {const} */ ('cancelled'),
 }
 
 export const INVALID_IMAGE_MESSAGE = 'This is not a supported image'
@@ -88,7 +89,7 @@ export function buildUploadBatchSummary(jobs) {
   return `${failed.length} of ${jobs.length} uploads failed.`
 }
 
-/** @typedef {'queued' | 'uploading' | 'succeeded' | 'failed'} UploadJobStatus */
+/** @typedef {'queued' | 'uploading' | 'succeeded' | 'failed' | 'cancelled'} UploadJobStatus */
 
 export class PhotoUploadError extends Error {
   /** @type {UploadErrorKind} */

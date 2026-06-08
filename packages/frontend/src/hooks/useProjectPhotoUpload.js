@@ -5,12 +5,19 @@ import {
   PhotoUploadError,
   UPLOAD_ERROR_KIND,
 } from '@/utils/uploadErrors.js'
+import {
+  computeBatchUploadProgress,
+  createProgressThrottle,
+  createUploadSpeedState,
+  resetUploadSpeed,
+  updateUploadSpeed,
+} from '@/utils/uploadProgress.js'
 
 const DEFAULT_UPLOAD_CONCURRENCY = 2
 const MAX_UPLOAD_CONCURRENCY = 5
 
 /**
- * @typedef {'queued' | 'uploading' | 'succeeded' | 'failed'} UploadJobStatus
+ * @typedef {'queued' | 'uploading' | 'succeeded' | 'failed' | 'cancelled'} UploadJobStatus
  */
 
 /**
@@ -18,12 +25,119 @@ const MAX_UPLOAD_CONCURRENCY = 5
  */
 
 /**
- * @typedef {{ id: string; file: File; label: string; status: UploadJobStatus; errorMessage: string | null; errorKind: UploadErrorKind | null }} UploadJob
+ * @typedef {import('@/utils/uploadProgress.js').UploadSpeedState} UploadSpeedState
  */
 
 /**
- * @typedef {{ id: string; label: string; status: UploadJobStatus; errorMessage: string | null }} UploadJobView
+ * @typedef {{
+ *   id: string
+ *   file: File
+ *   label: string
+ *   status: UploadJobStatus
+ *   errorMessage: string | null
+ *   errorKind: UploadErrorKind | null
+ *   bytesTotal: number
+ *   bytesLoaded: number
+ *   progressPercent: number | null
+ *   bytesPerSecond: number
+ *   speedState: UploadSpeedState
+ *   abortController: AbortController | null
+ * }} UploadJob
  */
+
+/**
+ * @typedef {{
+ *   id: string
+ *   label: string
+ *   status: UploadJobStatus
+ *   errorMessage: string | null
+ *   bytesTotal: number
+ *   bytesLoaded: number
+ *   progressPercent: number | null
+ *   bytesPerSecond: number
+ * }} UploadJobView
+ */
+
+/**
+ * @typedef {{
+ *   bytesLoaded: number
+ *   bytesTotal: number
+ *   percent: number
+ *   batchSpeed: number
+ * }} UploadBatchProgress
+ */
+
+/**
+ * @returns {UploadBatchProgress}
+ */
+function emptyBatchProgress() {
+  return { bytesLoaded: 0, bytesTotal: 0, percent: 0, batchSpeed: 0 }
+}
+
+/**
+ * @param {UploadJob[]} jobs
+ * @returns {UploadBatchProgress}
+ */
+function deriveBatchProgress(jobs) {
+  return computeBatchUploadProgress(
+    jobs.map((j) => ({
+      status: j.status,
+      bytesTotal: j.bytesTotal,
+      bytesLoaded: j.bytesLoaded,
+      bytesPerSecond: j.bytesPerSecond,
+    })),
+  )
+}
+
+/**
+ * @param {UploadJob} job
+ * @returns {UploadJobView}
+ */
+function toJobView(job) {
+  return {
+    id: job.id,
+    label: job.label,
+    status: job.status,
+    errorMessage: job.errorMessage,
+    bytesTotal: job.bytesTotal,
+    bytesLoaded: job.bytesLoaded,
+    progressPercent: job.progressPercent,
+    bytesPerSecond: job.bytesPerSecond,
+  }
+}
+
+/**
+ * @param {File} file
+ * @param {number} idx
+ * @returns {UploadJob}
+ */
+function createUploadJob(file, idx) {
+  return {
+    id: `job-${idx}-${file.lastModified}-${file.size}`,
+    file,
+    label: file.name || 'Photo',
+    status: 'queued',
+    errorMessage: null,
+    errorKind: null,
+    bytesTotal: file.size,
+    bytesLoaded: 0,
+    progressPercent: null,
+    bytesPerSecond: 0,
+    speedState: createUploadSpeedState(),
+    abortController: null,
+  }
+}
+
+/**
+ * @param {UploadJob} job
+ */
+function resetJobProgress(job) {
+  job.bytesLoaded = 0
+  job.progressPercent = null
+  job.bytesPerSecond = 0
+  resetUploadSpeed(job.speedState)
+  job.abortController = null
+}
 
 /**
  * @param {{ token: string; projectId: string; onAfterBatch: () => void }} args
@@ -40,24 +154,35 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
   const jobsRef = useRef([])
   /** When false, a batch (initial or retry) is in progress */
   const runFinishedRef = useRef(true)
+  /** @type {import('react').MutableRefObject<ReturnType<typeof createProgressThrottle> | null>} */
+  const progressThrottleRef = useRef(null)
 
   const [uploadConcurrency, setUploadConcurrency] = useState(DEFAULT_UPLOAD_CONCURRENCY)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadJobs, setUploadJobs] = useState(/** @type {UploadJobView[]} */ ([]))
+  const [uploadBatchProgress, setUploadBatchProgress] = useState(emptyBatchProgress)
   const [uploadMessage, setUploadMessage] = useState(/** @type {string | null} */ (null))
   const [postBatchSummary, setPostBatchSummary] = useState(
     /** @type {{ succeeded: number; failed: number; total: number } | null} */ (null),
   )
 
   const flushJobs = useCallback(() => {
-    setUploadJobs(
-      jobsRef.current.map((j) => ({
-        id: j.id,
-        label: j.label,
-        status: j.status,
-        errorMessage: j.errorMessage,
-      })),
-    )
+    const jobs = jobsRef.current
+    setUploadJobs(jobs.map(toJobView))
+    setUploadBatchProgress(deriveBatchProgress(jobs))
+  }, [])
+
+  const flushJobsRef = useRef(flushJobs)
+  flushJobsRef.current = flushJobs
+
+  if (progressThrottleRef.current === null) {
+    progressThrottleRef.current = createProgressThrottle(() => {
+      flushJobsRef.current()
+    })
+  }
+
+  const scheduleProgressFlush = useCallback(() => {
+    progressThrottleRef.current?.schedule()
   }, [])
 
   const completeBatch = useCallback(() => {
@@ -65,6 +190,7 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
     const jobs = jobsRef.current
     if (jobs.some((j) => j.status === 'queued' || j.status === 'uploading')) return
 
+    progressThrottleRef.current?.flushNow()
     runFinishedRef.current = true
     const succeeded = jobs.filter((j) => j.status === 'succeeded').length
     const failed = jobs.filter((j) => j.status === 'failed').length
@@ -94,14 +220,37 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
       if (!next) break
 
       next.status = 'uploading'
+      resetJobProgress(next)
+      next.abortController = new AbortController()
       flushJobs()
 
-      uploadPhoto(tokenRef.current, projectIdRef.current, next.file)
+      uploadPhoto(tokenRef.current, projectIdRef.current, next.file, {
+        signal: next.abortController.signal,
+        onProgress: ({ loaded, total, percent }) => {
+          if (next.status !== 'uploading') return
+          next.bytesLoaded = loaded
+          next.bytesTotal = total
+          next.progressPercent = percent
+          next.bytesPerSecond = updateUploadSpeed(next.speedState, loaded)
+          scheduleProgressFlush()
+        },
+      })
         .then(() => {
+          if (next.status === 'cancelled') return
           next.status = 'succeeded'
           next.errorMessage = null
+          next.bytesLoaded = next.bytesTotal
+          next.progressPercent = 100
+          next.bytesPerSecond = 0
         })
         .catch((err) => {
+          next.bytesPerSecond = 0
+          if (err instanceof PhotoUploadError && err.kind === UPLOAD_ERROR_KIND.CANCELLED) {
+            next.status = 'cancelled'
+            next.errorMessage = null
+            next.errorKind = UPLOAD_ERROR_KIND.CANCELLED
+            return
+          }
           next.status = 'failed'
           if (err instanceof PhotoUploadError) {
             next.errorMessage = err.message
@@ -112,6 +261,8 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
           }
         })
         .finally(() => {
+          next.abortController = null
+          progressThrottleRef.current?.flushNow()
           flushJobs()
           pump()
           const stillActive = jobsRef.current.some((j) => j.status === 'queued' || j.status === 'uploading')
@@ -120,7 +271,32 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
           }
         })
     }
-  }, [flushJobs, completeBatch])
+  }, [flushJobs, completeBatch, scheduleProgressFlush])
+
+  const cancelUploadJob = useCallback(
+    (jobId) => {
+      if (runFinishedRef.current) return
+      const job = jobsRef.current.find((j) => j.id === jobId)
+      if (!job || (job.status !== 'queued' && job.status !== 'uploading')) return
+
+      if (job.status === 'queued') {
+        job.status = 'cancelled'
+        job.errorMessage = null
+        job.errorKind = UPLOAD_ERROR_KIND.CANCELLED
+        progressThrottleRef.current?.flushNow()
+        flushJobs()
+        pump()
+        const stillActive = jobsRef.current.some((j) => j.status === 'queued' || j.status === 'uploading')
+        if (!stillActive) {
+          completeBatch()
+        }
+        return
+      }
+
+      job.abortController?.abort()
+    },
+    [flushJobs, pump, completeBatch],
+  )
 
   const openFilePicker = useCallback(() => {
     if (!runFinishedRef.current) return
@@ -144,8 +320,10 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
   )
 
   const dismissUploadPanel = useCallback(() => {
+    progressThrottleRef.current?.clear()
     jobsRef.current = []
     setUploadJobs([])
+    setUploadBatchProgress(emptyBatchProgress())
     setPostBatchSummary(null)
     setUploadMessage(null)
     runFinishedRef.current = true
@@ -163,6 +341,7 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
       j.status = 'queued'
       j.errorMessage = null
       j.errorKind = null
+      resetJobProgress(j)
     })
     runFinishedRef.current = false
     setIsUploading(true)
@@ -180,14 +359,7 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
       if (files.length === 0) return
       if (!runFinishedRef.current) return
 
-      jobsRef.current = files.map((file, idx) => ({
-        id: `job-${idx}-${file.lastModified}-${file.size}`,
-        file,
-        label: file.name || 'Photo',
-        status: /** @type {UploadJobStatus} */ ('queued'),
-        errorMessage: null,
-        errorKind: null,
-      }))
+      jobsRef.current = files.map((file, idx) => createUploadJob(file, idx))
 
       runFinishedRef.current = false
       const clampedConcurrency = Math.min(
@@ -208,7 +380,6 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
 
   const showUploadPanel = isUploading || postBatchSummary !== null || uploadJobs.length > 0
 
-  const failedCount = uploadJobs.filter((j) => j.status === 'failed').length
   const retryableFailedCount = jobsRef.current.filter(
     (j) => j.status === 'failed' && j.errorKind !== UPLOAD_ERROR_KIND.INVALID_IMAGE,
   ).length
@@ -220,6 +391,7 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
     handleConcurrencyChange,
     isUploading,
     uploadJobs,
+    uploadBatchProgress,
     uploadMessage,
     showUploadPanel,
     canRetryFailed,
@@ -227,6 +399,7 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
     handleFileInputChange,
     dismissUploadPanel,
     retryFailedUploads,
+    cancelUploadJob,
     maxUploadConcurrency: MAX_UPLOAD_CONCURRENCY,
   }
 }

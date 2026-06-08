@@ -62,6 +62,7 @@ export default function ProjectViewScreen({
     handleConcurrencyChange,
     isUploading,
     uploadJobs,
+    uploadBatchProgress,
     uploadMessage,
     showUploadPanel,
     canRetryFailed,
@@ -69,6 +70,7 @@ export default function ProjectViewScreen({
     handleFileInputChange,
     dismissUploadPanel,
     retryFailedUploads,
+    cancelUploadJob,
     maxUploadConcurrency,
   } = useProjectPhotoUpload({ token, projectId, onAfterBatch: onRefresh })
 
@@ -186,6 +188,7 @@ export default function ProjectViewScreen({
         <ProjectUploadStatusFloat
           isUploading={isUploading}
           uploadJobs={uploadJobs}
+          uploadBatchProgress={uploadBatchProgress}
           uploadMessage={uploadMessage}
           uploadConcurrency={uploadConcurrency}
           maxConcurrency={maxUploadConcurrency}
@@ -193,6 +196,7 @@ export default function ProjectViewScreen({
           onDismiss={dismissUploadPanel}
           canRetryFailed={canRetryFailed}
           onRetryFailed={retryFailedUploads}
+          onCancelJob={cancelUploadJob}
         />
       ) : null}
       <div className={`relative flex flex-col gap-6 pb-28 pt-4 ${canReviewPhotos ? 'lg:pb-16' : 'lg:pb-10'}`}>
