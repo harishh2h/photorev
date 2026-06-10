@@ -8,6 +8,7 @@ import PhotoViewerPhotoCounter from '@/features/photo-viewer/PhotoViewerPhotoCou
 import PhotoViewerReviewControls from '@/features/photo-viewer/PhotoViewerReviewControls.jsx'
 import PhotoViewerRenameControl from '@/features/photo-viewer/PhotoViewerRenameControl.jsx'
 import PhotoViewerDownloadControl from '@/features/photo-viewer/PhotoViewerDownloadControl.jsx'
+import PhotoViewerShortcutsModal from '@/features/photo-viewer/PhotoViewerShortcutsModal.jsx'
 import { exportDownloadFilename } from '@/utils/exportDownloadFilename.js'
 import { usePhotoViewerShortcuts } from '@/features/photo-viewer/usePhotoViewerShortcuts.js'
 import { useAdjacentPhotoPrefetch } from '@/features/photo-viewer/useAdjacentPhotoPrefetch.js'
@@ -49,6 +50,7 @@ export default function PhotoViewerScreen({
   const { show: showToast } = useToast()
   const { isMobile } = useBreakpoint()
   const [detailOpen, setDetailOpen] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [renameDraft, setRenameDraft] = useState('')
   const [renameFocused, setRenameFocused] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -57,6 +59,8 @@ export default function PhotoViewerScreen({
   const [liveMessage, setLiveMessage] = useState('')
   const isSavingRef = useRef(false)
   const lastPhotoRef = useRef(null)
+  const imageRef = useRef(/** @type {{ toggleZoom?: () => void } | null} */ (null))
+  const renameRef = useRef(/** @type {{ open?: () => void } | null} */ (null))
 
   useEffect(() => {
     if (photos.length > 0) setLocalPhotos(photos)
@@ -193,6 +197,22 @@ export default function PhotoViewerScreen({
     navigate(`/projects/${projectId}`, { state: navState })
   }, [navigate, projectId, navState])
 
+  const onToggleShortcuts = useCallback(() => {
+    setShortcutsOpen((prev) => !prev)
+  }, [])
+
+  const onToggleInfo = useCallback(() => {
+    setDetailOpen((prev) => !prev)
+  }, [])
+
+  const onOpenRename = useCallback(() => {
+    renameRef.current?.open?.()
+  }, [])
+
+  const onToggleZoom = useCallback(() => {
+    imageRef.current?.toggleZoom?.()
+  }, [])
+
   useEffect(() => {
     if (localPhotos.length === 0 || !projectId) return
     if (index === -1) {
@@ -203,11 +223,16 @@ export default function PhotoViewerScreen({
   usePhotoViewerShortcuts({
     detailOpen,
     setDetailOpen,
+    shortcutsOpen,
+    onToggleShortcuts,
     onExit,
     goPrev,
     goNext,
     onLike,
     onReject,
+    onToggleInfo,
+    onOpenRename,
+    onToggleZoom,
     enabled: Boolean(photoId && displayPhoto) && !isMobile,
     canReview: canReviewPhotos,
   })
@@ -243,6 +268,7 @@ export default function PhotoViewerScreen({
 
   const imageNode = (
     <PhotoViewerProgressiveImage
+      ref={imageRef}
       key={displayPhoto.id}
       photoId={displayPhoto.id}
       token={token}
@@ -276,6 +302,7 @@ export default function PhotoViewerScreen({
       <div className="absolute right-2 top-[max(0.5rem,env(safe-area-inset-top))] z-10 flex items-center gap-2 md:right-4">
         {canReviewPhotos ? (
           <PhotoViewerRenameControl
+            ref={renameRef}
             photoId={displayPhoto.id}
             renameDraft={renameDraft}
             savedRename={displayPhoto.renamedTo ?? ''}
@@ -299,13 +326,25 @@ export default function PhotoViewerScreen({
           type="button"
           onClick={() => setDetailOpen(true)}
           className={topChromeBtnClass}
-          aria-label="Photo details"
+          aria-label="Photo details — keyboard: I"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
             <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="1.5" />
             <path d="M12 10v6M11 8.5h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </button>
+        {!isMobile ? (
+          <button
+            type="button"
+            onClick={onToggleShortcuts}
+            className={topChromeBtnClass}
+            aria-label="Keyboard shortcuts — press ? or /"
+          >
+            <span className="font-mono text-sm font-semibold leading-none" aria-hidden>
+              ?
+            </span>
+          </button>
+        ) : null}
       </div>
 
       <div className="absolute inset-0 z-0 min-h-0 min-w-0">
@@ -364,6 +403,10 @@ export default function PhotoViewerScreen({
         canReviewPhotos={canReviewPhotos}
         onClose={() => setDetailOpen(false)}
       />
+
+      {!isMobile ? (
+        <PhotoViewerShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      ) : null}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { viewerChromePillClass } from '@/features/photo-viewer/viewerChromeStyles.js'
 
@@ -10,14 +10,17 @@ const toggleBtnClass =
 /**
  * Top-bar rename: subtle icon pill that expands into an input + save control.
  */
-export default function PhotoViewerRenameControl({
-  photoId,
-  renameDraft,
-  savedRename = '',
-  onRenameChange,
-  onRenameSubmit,
-  onFocusChange,
-}) {
+const PhotoViewerRenameControl = forwardRef(function PhotoViewerRenameControl(
+  {
+    photoId,
+    renameDraft,
+    savedRename = '',
+    onRenameChange,
+    onRenameSubmit,
+    onFocusChange,
+  },
+  ref,
+) {
   const inputId = useId()
   const inputRef = useRef(null)
   const [expanded, setExpanded] = useState(false)
@@ -56,6 +59,8 @@ export default function PhotoViewerRenameControl({
     setExpanded(true)
     setFocused(true)
   }, [setFocused])
+
+  useImperativeHandle(ref, () => ({ open }), [open])
 
   const handleSubmit = useCallback(() => {
     if (!canSubmit) return
@@ -162,7 +167,9 @@ export default function PhotoViewerRenameControl({
       )}
     </div>
   )
-}
+})
+
+PhotoViewerRenameControl.displayName = 'PhotoViewerRenameControl'
 
 PhotoViewerRenameControl.propTypes = {
   photoId: PropTypes.string.isRequired,
@@ -172,3 +179,5 @@ PhotoViewerRenameControl.propTypes = {
   onRenameSubmit: PropTypes.func.isRequired,
   onFocusChange: PropTypes.func,
 }
+
+export default PhotoViewerRenameControl

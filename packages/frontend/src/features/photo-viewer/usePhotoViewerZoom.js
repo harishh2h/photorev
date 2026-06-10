@@ -234,6 +234,21 @@ export function usePhotoViewerZoom({ enabled = true, onInteraction } = {}) {
     }
   }, [])
 
+  const toggleZoom = useCallback(() => {
+    if (!enabled) return
+
+    const container = containerRef.current
+    const zoomed = scaleRef.current > MIN_SCALE + ZOOMED_EPSILON
+    if (zoomed) {
+      resetZoom()
+      return
+    }
+
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    zoomAtPoint(rect.left + rect.width / 2, rect.top + rect.height / 2, CLICK_ZOOM_SCALE)
+  }, [enabled, resetZoom, zoomAtPoint])
+
   const isZoomed = scale > MIN_SCALE + ZOOMED_EPSILON
 
   const cursor = useMemo(() => {
@@ -271,6 +286,7 @@ export function usePhotoViewerZoom({ enabled = true, onInteraction } = {}) {
     contentRef,
     isZoomed,
     resetZoom,
+    toggleZoom,
     cursor,
     innerStyle,
     handlers: {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import PropTypes from 'prop-types'
 import { getViewerImagePresentation } from '@/features/photo-viewer/viewerImageLayout.js'
 import { usePhotoViewerZoom } from '@/features/photo-viewer/usePhotoViewerZoom.js'
@@ -20,17 +20,20 @@ function releaseBlobVariant(photoId, variant) {
 /**
  * Fullscreen viewer: preview first, upgrade to original after delay or on zoom / multi-touch / double-click.
  */
-export default function PhotoViewerProgressiveImage({
-  photoId,
-  token,
-  alt,
-  status = 'ready',
-  width = null,
-  height = null,
-  className = '',
-  zoomEnabled = true,
-  onZoomChange,
-}) {
+const PhotoViewerProgressiveImage = forwardRef(function PhotoViewerProgressiveImage(
+  {
+    photoId,
+    token,
+    alt,
+    status = 'ready',
+    width = null,
+    height = null,
+    className = '',
+    zoomEnabled = true,
+    onZoomChange,
+  },
+  ref,
+) {
   const [displayUrl, setDisplayUrl] = useState(null)
   const [hasError, setHasError] = useState(false)
   const [isImageVisible, setIsImageVisible] = useState(false)
@@ -59,6 +62,7 @@ export default function PhotoViewerProgressiveImage({
     contentRef,
     isZoomed,
     resetZoom,
+    toggleZoom,
     cursor,
     innerStyle,
     handlers: zoomHandlers,
@@ -66,6 +70,8 @@ export default function PhotoViewerProgressiveImage({
     enabled: zoomEnabled && status === 'ready' && !hasError && Boolean(displayUrl),
     onInteraction: scheduleOriginalFromInteraction,
   })
+
+  useImperativeHandle(ref, () => ({ toggleZoom }), [toggleZoom])
 
   useEffect(() => {
     onZoomChange?.(isZoomed)
@@ -226,7 +232,9 @@ export default function PhotoViewerProgressiveImage({
       onLoad={() => setIsImageVisible(true)}
     />,
   )
-}
+})
+
+PhotoViewerProgressiveImage.displayName = 'PhotoViewerProgressiveImage'
 
 PhotoViewerProgressiveImage.propTypes = {
   photoId: PropTypes.string.isRequired,
@@ -239,3 +247,5 @@ PhotoViewerProgressiveImage.propTypes = {
   zoomEnabled: PropTypes.bool,
   onZoomChange: PropTypes.func,
 }
+
+export default PhotoViewerProgressiveImage
