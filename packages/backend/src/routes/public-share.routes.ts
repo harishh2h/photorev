@@ -6,6 +6,7 @@ import buildPublicShareService, {
 } from "../services/public-share.service";
 import buildProjectExportsService from "../services/project-exports.service";
 import { sendFailure, sendSuccess } from "../utils/api-response";
+import { toClientErrorMessage } from "../utils/api-error";
 
 const SHARE_TOKEN_TTL = "12h";
 
@@ -351,7 +352,7 @@ async function publicShareRoutes(
         }
         sendSuccess(reply, 201, created, "Export queued");
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Could not start export";
+        const message = toClientErrorMessage(err, "Could not start export");
         const code = message.includes("disabled") ? 403 : 400;
         sendFailure(reply, code, message, null);
       }

@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import bcrypt from 'bcrypt';
 import { normalizeEmail } from '../utils/email';
+import { toClientErrorMessage } from '../utils/api-error';
 import { UserRole } from '../models/user';
 
 interface AdminUserDto {
@@ -48,7 +49,7 @@ function buildAdminService(fastify: FastifyInstance, _opts: FastifyPluginOptions
                 return { success: true, data: users, message: 'ok' };
             } catch (error) {
                 fastify.log.error(error);
-                return { success: false, data: null, message: 'Failed to list users' };
+                return { success: false, data: null, message: toClientErrorMessage(error, 'Failed to list users') };
             }
         },
 
@@ -76,7 +77,7 @@ function buildAdminService(fastify: FastifyInstance, _opts: FastifyPluginOptions
                 if (pgError?.code === '23505') {
                     return { success: false, data: null, message: 'Email already in use' };
                 }
-                return { success: false, data: null, message: 'Failed to create user' };
+                return { success: false, data: null, message: toClientErrorMessage(error, 'Failed to create user') };
             }
         },
 
@@ -102,7 +103,7 @@ function buildAdminService(fastify: FastifyInstance, _opts: FastifyPluginOptions
                 return { success: true, data: updated, message: 'User updated' };
             } catch (error) {
                 fastify.log.error(error);
-                return { success: false, data: null, message: 'Failed to update user' };
+                return { success: false, data: null, message: toClientErrorMessage(error, 'Failed to update user') };
             }
         },
 
@@ -116,7 +117,7 @@ function buildAdminService(fastify: FastifyInstance, _opts: FastifyPluginOptions
                 return { success: true, data: null, message: 'User deactivated' };
             } catch (error) {
                 fastify.log.error(error);
-                return { success: false, data: null, message: 'Failed to deactivate user' };
+                return { success: false, data: null, message: toClientErrorMessage(error, 'Failed to deactivate user') };
             }
         },
     };

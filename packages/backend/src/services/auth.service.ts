@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { normalizeEmail } from '../utils/email';
+import { toClientErrorMessage } from '../utils/api-error';
 
 interface RegisterUserParams {
     readonly email: string;
@@ -108,7 +109,7 @@ function buildAuthService(fastify: FastifyInstance, _opts: FastifyPluginOptions)
                 };
             } catch (error) {
                 fastify.log.error(error);
-                return { success: false, data: null, message: 'Failed to create admin account' };
+                return { success: false, data: null, message: toClientErrorMessage(error, 'Failed to create admin account') };
             }
         },
 
@@ -134,7 +135,7 @@ function buildAuthService(fastify: FastifyInstance, _opts: FastifyPluginOptions)
                 return { success: true, data: null, message: 'User registered successfully' };
             } catch (error) {
                 fastify.log.error(error);
-                return { success: false, data: null, message: 'Failed to register user' };
+                return { success: false, data: null, message: toClientErrorMessage(error, 'Failed to register user') };
             }
         },
 
@@ -175,7 +176,7 @@ function buildAuthService(fastify: FastifyInstance, _opts: FastifyPluginOptions)
                 };
             } catch (error) {
                 fastify.log.error(error);
-                return { success: false, data: null, message: 'Failed to login user' };
+                return { success: false, data: null, message: toClientErrorMessage(error, 'Failed to login user') };
             }
         },
     };

@@ -53,11 +53,11 @@ export function messageForUploadFailure(kind, serverMessage) {
   if (kind === UPLOAD_ERROR_KIND.NETWORK) {
     return 'Could not reach the server. Check your connection and try again.'
   }
-  if (kind === UPLOAD_ERROR_KIND.SERVER) {
-    return 'The server could not save this file. Try again in a moment.'
-  }
   if (typeof serverMessage === 'string' && serverMessage.trim().length > 0) {
     return serverMessage
+  }
+  if (kind === UPLOAD_ERROR_KIND.SERVER) {
+    return 'The server could not save this file. Try again in a moment.'
   }
   return 'Upload failed. Try again.'
 }

@@ -9,16 +9,7 @@ import { db } from "./db";
 import jwtPlugin from "./plugins/jwt";
 import multipart from "@fastify/multipart";
 import { sendFailure } from "./utils/api-response";
-
-const CLIENT_ERROR_MESSAGES: Record<number, string> = {
-  400: "Bad request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not found",
-  409: "Conflict",
-  422: "Invalid input",
-  429: "Too many requests",
-};
+import { toClientErrorMessage } from "./utils/api-error";
 
 /**
  * `CORS_ORIGIN` may be a comma-separated allowlist (locked-down, recommended for production).
@@ -50,11 +41,8 @@ function buildApp(opts: BuildOptions = {}): FastifyInstance {
       sendFailure(reply, 400, "Validation failed", { validation: error.validation });
       return;
     }
-    if (statusCode >= 500) {
-      sendFailure(reply, statusCode, "Something went wrong", null);
-      return;
-    }
-    const message = CLIENT_ERROR_MESSAGES[statusCode] ?? "Request failed";
+    const fallback = statusCode >= 500 ? "Something went wrong" : "Request failed";
+    const message = toClientErrorMessage(error, fallback);
     sendFailure(reply, statusCode, message, null);
   });
 

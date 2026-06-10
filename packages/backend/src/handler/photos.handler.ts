@@ -11,6 +11,7 @@ import buildPhotosService, {
 } from "../services/photos.service";
 import { exportDisplayNameForPhoto } from "../utils/export-photo-paths";
 import { sendFailure, sendSuccess } from "../utils/api-response";
+import { toClientErrorMessage } from "../utils/api-error";
 import { sanitizeZipEntryName } from "../utils/zip-entry-name";
 import { getAuthenticatedUserId } from "../utils/auth";
 import {
@@ -384,7 +385,7 @@ function buildPhotosHandler(
           sendFailure(reply, 400, err.message, null);
           return;
         }
-        sendFailure(reply, 500, "Failed to save file to disk", null);
+        sendFailure(reply, 500, toClientErrorMessage(err, "Failed to save file to disk"), null);
         return;
       }
 
@@ -406,9 +407,9 @@ function buildPhotosHandler(
           sendFailure(reply, 500, "Failed to insert photo into database", null);
           return;
         }
-      } catch (_err) {
+      } catch (err) {
         await removeUploadDir(projectId, photoId);
-        sendFailure(reply, 500, "Failed to insert photo into database", null);
+        sendFailure(reply, 500, toClientErrorMessage(err, "Failed to insert photo into database"), null);
         return;
       }
 

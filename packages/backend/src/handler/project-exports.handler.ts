@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from "fastify";
 import buildProjectExportsService from "../services/project-exports.service";
 import { sendFailure, sendSuccess } from "../utils/api-response";
+import { toClientErrorMessage } from "../utils/api-error";
 import { getAuthenticatedUserId } from "../utils/auth";
 
 export interface ProjectExportsHandlerMethods {
@@ -43,7 +44,7 @@ function buildProjectExportsHandler(
         }
         sendSuccess(reply, 201, created, "Export queued");
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Could not start export";
+        const message = toClientErrorMessage(err, "Could not start export");
         sendFailure(reply, 400, message, null);
       }
     },
