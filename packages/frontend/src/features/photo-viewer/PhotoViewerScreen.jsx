@@ -9,6 +9,7 @@ import PhotoViewerReviewControls from '@/features/photo-viewer/PhotoViewerReview
 import PhotoViewerRenameControl from '@/features/photo-viewer/PhotoViewerRenameControl.jsx'
 import PhotoViewerDownloadControl from '@/features/photo-viewer/PhotoViewerDownloadControl.jsx'
 import PhotoViewerShortcutsModal from '@/features/photo-viewer/PhotoViewerShortcutsModal.jsx'
+import { copyPhotoToClipboard, downloadPhotoOriginal } from '@/features/photo-viewer/photoDownload.js'
 import { exportDownloadFilename } from '@/utils/exportDownloadFilename.js'
 import { usePhotoViewerShortcuts } from '@/features/photo-viewer/usePhotoViewerShortcuts.js'
 import { useAdjacentPhotoPrefetch } from '@/features/photo-viewer/useAdjacentPhotoPrefetch.js'
@@ -58,6 +59,7 @@ export default function PhotoViewerScreen({
   const [localPhotos, setLocalPhotos] = useState(photos)
   const [liveMessage, setLiveMessage] = useState('')
   const isSavingRef = useRef(false)
+  const mediaActionBusyRef = useRef(false)
   const lastPhotoRef = useRef(null)
   const imageRef = useRef(/** @type {{ toggleZoom?: () => void } | null} */ (null))
   const renameRef = useRef(/** @type {{ open?: () => void } | null} */ (null))
@@ -186,12 +188,47 @@ export default function PhotoViewerScreen({
     void saveReview({ renamedTo: trimmed.length > 0 ? trimmed : null })
   }, [renameDraft, saveReview])
 
+  const downloadFilename = useMemo(() => {
+    if (!displayPhoto) return undefined
+    return (
+      exportDownloadFilename({
+        originalName: displayPhoto.alt,
+        renamedTo: displayPhoto.renamedTo,
+      }) ?? displayPhoto.alt
+    )
+  }, [displayPhoto])
+
   const handleDownloadError = useCallback(
     (err) => {
       showToast(err instanceof Error ? err.message : 'Could not download photo', 'error')
     },
     [showToast]
   )
+
+  const onCopyPhoto = useCallback(async () => {
+    if (!photoId || mediaActionBusyRef.current) return
+    mediaActionBusyRef.current = true
+    try {
+      await copyPhotoToClipboard({ token, photoId })
+      showToast('Photo copied to clipboard', 'success')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not copy photo', 'error')
+    } finally {
+      mediaActionBusyRef.current = false
+    }
+  }, [photoId, showToast, token])
+
+  const onDownloadPhoto = useCallback(async () => {
+    if (!photoId || mediaActionBusyRef.current) return
+    mediaActionBusyRef.current = true
+    try {
+      await downloadPhotoOriginal({ token, photoId, filename: downloadFilename })
+    } catch (err) {
+      handleDownloadError(err)
+    } finally {
+      mediaActionBusyRef.current = false
+    }
+  }, [downloadFilename, handleDownloadError, photoId, token])
 
   const onExit = useCallback(() => {
     navigate(`/projects/${projectId}`, { state: navState })
@@ -233,6 +270,12 @@ export default function PhotoViewerScreen({
     onToggleInfo,
     onOpenRename,
     onToggleZoom,
+    onCopyPhoto: () => {
+      void onCopyPhoto()
+    },
+    onDownloadPhoto: () => {
+      void onDownloadPhoto()
+    },
     enabled: Boolean(photoId && displayPhoto) && !isMobile,
     canReview: canReviewPhotos,
   })
@@ -313,12 +356,7 @@ export default function PhotoViewerScreen({
         ) : null}
         <PhotoViewerDownloadControl
           photoId={displayPhoto.id}
-          filename={
-            exportDownloadFilename({
-              originalName: displayPhoto.alt,
-              renamedTo: displayPhoto.renamedTo,
-            }) ?? displayPhoto.alt
-          }
+          filename={downloadFilename}
           token={token}
           onError={handleDownloadError}
         />

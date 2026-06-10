@@ -28,6 +28,8 @@ export const PHOTO_VIEWER_SHORTCUT_SECTIONS = [
       { keys: ['I'], label: 'Toggle info panel' },
       { keys: ['R'], label: 'Open rename' },
       { keys: ['Z'], label: 'Toggle zoom' },
+      { keys: ['⌘', 'C'], label: 'Copy photo to clipboard', detail: 'Ctrl + C on Windows' },
+      { keys: ['⌘', 'D'], label: 'Download photo', detail: 'Ctrl + D on Windows' },
       { keys: ['Scroll'], label: 'Zoom in / out', detail: 'Pinch or Ctrl + scroll' },
     ],
   },

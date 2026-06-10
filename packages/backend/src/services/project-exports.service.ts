@@ -171,11 +171,6 @@ function buildProjectExportsService(
     photoFilter: string | null;
     photoIds: string[] | null;
   }): Promise<ProjectExportDto> {
-    const photoIdsJson =
-      params.photoIds != null && params.photoIds.length > 0
-        ? JSON.stringify(params.photoIds)
-        : null;
-
     const [row] = await db<ProjectExportRecord>("project_exports")
       .insert({
         project_id: params.projectId,
@@ -188,7 +183,10 @@ function buildProjectExportsService(
         selection_hash: params.selectionHash,
         review_scope: params.reviewScope,
         photo_filter: params.photoFilter,
-        photo_ids: photoIdsJson == null ? null : db.raw("?::jsonb", [photoIdsJson]),
+        photo_ids:
+          params.photoIds != null && params.photoIds.length > 0
+            ? db.raw("?::jsonb", [JSON.stringify(params.photoIds)])
+            : null,
       })
       .returning("*");
     exportRunner.notify();

@@ -34,7 +34,7 @@ export default function PhotoViewerDownloadControl({ photoId, filename, token, o
       }}
       disabled={busy}
       className={btnClass}
-      aria-label={busy ? 'Preparing download…' : 'Download photo'}
+      aria-label={busy ? 'Preparing download…' : 'Download photo — keyboard: Cmd or Ctrl + D'}
       aria-busy={busy}
     >
       {busy ? (

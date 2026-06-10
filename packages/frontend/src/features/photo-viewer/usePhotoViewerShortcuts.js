@@ -22,6 +22,8 @@ function isShortcutsHelpKey(e) {
  *   onToggleInfo: () => void;
  *   onOpenRename: () => void;
  *   onToggleZoom: () => void;
+ *   onCopyPhoto: () => void;
+ *   onDownloadPhoto: () => void;
  *   enabled: boolean;
  *   canReview?: boolean;
  * }} opts
@@ -39,6 +41,8 @@ export function usePhotoViewerShortcuts({
   onToggleInfo,
   onOpenRename,
   onToggleZoom,
+  onCopyPhoto,
+  onDownloadPhoto,
   enabled,
   canReview = true,
 }) {
@@ -101,6 +105,19 @@ export function usePhotoViewerShortcuts({
       }
 
       const key = e.key.toLowerCase()
+      const mod = e.metaKey || e.ctrlKey
+
+      if (mod && key === 'c') {
+        onCopyPhoto()
+        e.preventDefault()
+        return
+      }
+
+      if (mod && key === 'd') {
+        onDownloadPhoto()
+        e.preventDefault()
+        return
+      }
 
       if (key === 'i') {
         onToggleInfo()
@@ -146,6 +163,8 @@ export function usePhotoViewerShortcuts({
     goPrev,
     onExit,
     onLike,
+    onCopyPhoto,
+    onDownloadPhoto,
     onOpenRename,
     onReject,
     onToggleInfo,
