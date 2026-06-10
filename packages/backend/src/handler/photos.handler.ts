@@ -28,6 +28,13 @@ import {
 } from "../utils/storage";
 import { InvalidImageUploadError } from "../utils/validate-image-upload";
 import { discardRemainder } from "../utils/stream-prefix";
+import {
+  getProjectOwnerId,
+  loadUserQuotaSnapshot,
+  QUOTA_EXCEEDED_CODE,
+  QUOTA_EXCEEDED_MESSAGE,
+  StorageQuotaExceededError,
+} from "../utils/storage-quota";
 
 function getMimeTypeForImagePath(filePath: string): string {
   const lower = filePath.toLowerCase();
@@ -174,6 +181,8 @@ export interface PhotosHandlerMethods {
   downloadPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   updatePhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   uploadPhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  deletePhoto: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  deletePhotos: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
 }
 
 function buildPhotosHandler(
@@ -370,6 +379,23 @@ function buildPhotosHandler(
         return;
       }
 
+      const ownerId = await getProjectOwnerId(db, projectId);
+      if (!ownerId) {
+        sendFailure(reply, 404, "Project not found", null);
+        return;
+      }
+
+      const quotaSnapshot = await loadUserQuotaSnapshot(db, ownerId);
+      if (quotaSnapshot && !quotaSnapshot.canUpload) {
+        sendFailure(reply, 413, QUOTA_EXCEEDED_MESSAGE, {
+          code: QUOTA_EXCEEDED_CODE,
+          quotaBytes: quotaSnapshot.quotaBytes,
+          usageBytes: quotaSnapshot.usageBytes,
+          remainingBytes: quotaSnapshot.remainingBytes,
+        });
+        return;
+      }
+
       const photoId = randomUUID();
       let saved;
       try {
@@ -391,17 +417,20 @@ function buildPhotosHandler(
 
       let photo;
       try {
-        photo = await service.insertPhoto({
-          id: photoId,
-          project_id: projectId,
-          original_path: saved.filePath,
-          original_name: saved.originalName,
-          mime_type: saved.mimeType,
-          file_size: saved.fileSize,
-          status: "pending",
-          width: 0,
-          height: 0,
-        });
+        photo = await service.insertPhoto(
+          {
+            id: photoId,
+            project_id: projectId,
+            original_path: saved.filePath,
+            original_name: saved.originalName,
+            mime_type: saved.mimeType,
+            file_size: saved.fileSize,
+            status: "pending",
+            width: 0,
+            height: 0,
+          },
+          ownerId,
+        );
         if (!photo) {
           await removeUploadDir(projectId, photoId);
           sendFailure(reply, 500, "Failed to insert photo into database", null);
@@ -409,11 +438,59 @@ function buildPhotosHandler(
         }
       } catch (err) {
         await removeUploadDir(projectId, photoId);
+        if (err instanceof StorageQuotaExceededError) {
+          const latestQuota = await loadUserQuotaSnapshot(db, ownerId);
+          sendFailure(reply, 413, QUOTA_EXCEEDED_MESSAGE, {
+            code: QUOTA_EXCEEDED_CODE,
+            quotaBytes: latestQuota?.quotaBytes ?? null,
+            usageBytes: latestQuota?.usageBytes ?? 0,
+            remainingBytes: latestQuota?.remainingBytes ?? 0,
+          });
+          return;
+        }
         sendFailure(reply, 500, toClientErrorMessage(err, "Failed to insert photo into database"), null);
         return;
       }
 
       sendSuccess(reply, 201, { photoId: photo.id }, "Photo uploaded successfully");
+    },
+    deletePhoto: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const userId = getAuthenticatedUserId(request);
+      const paramsRaw = request.params as { photoId: string };
+      const result = await service.deletePhoto({
+        userId,
+        photoId: paramsRaw.photoId,
+      });
+      if (!result.ok) {
+        sendFailure(
+          reply,
+          result.reason === "forbidden" ? 403 : 404,
+          result.reason === "forbidden" ? "Not allowed to delete this photo" : "Photo not found",
+          null,
+        );
+        return;
+      }
+      sendSuccess(reply, 200, { photoId: paramsRaw.photoId, projectId: result.projectId }, "Photo deleted");
+    },
+    deletePhotos: async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const userId = getAuthenticatedUserId(request);
+      const body = request.body as { photoIds?: unknown };
+      const rawIds = Array.isArray(body?.photoIds) ? body.photoIds : [];
+      const photoIds = rawIds.filter((id): id is string => typeof id === "string");
+      if (photoIds.length === 0) {
+        sendFailure(reply, 400, "photoIds must be a non-empty array", null);
+        return;
+      }
+      if (photoIds.length > 100) {
+        sendFailure(reply, 400, "Cannot delete more than 100 photos at once", null);
+        return;
+      }
+      const result = await service.deletePhotos({ userId, photoIds });
+      if (result.deletedIds.length === 0) {
+        sendFailure(reply, 404, "No photos were deleted", result);
+        return;
+      }
+      sendSuccess(reply, 200, result, "Photos deleted");
     },
   };
 

@@ -94,6 +94,10 @@ function buildViewData(gridPhotos, project, members, currentUser, filterCounts) 
   const vc = project.viewerContext
   const canReviewPhotos = vc == null ? true : Boolean(vc.isCreator === true || vc.role !== 'viewer')
   const canUploadPhotos = vc == null ? true : Boolean(vc.isCreator === true || vc.role === 'contributor')
+  const canDeletePhotos = canUploadPhotos
+  const storageQuota = project.storageQuota ?? null
+  const isStorageQuotaBlocked = Boolean(storageQuota && storageQuota.canUpload === false)
+  const canUploadPhotosEffective = canUploadPhotos && !isStorageQuotaBlocked
   const isProjectCreator = Boolean(vc?.isCreator)
 
   let collaboratorMembers = members.map((m) => ({
@@ -151,7 +155,10 @@ function buildViewData(gridPhotos, project, members, currentUser, filterCounts) 
     collaboratorsRows: members,
     viewerContext: vc ?? null,
     canReviewPhotos,
-    canUploadPhotos,
+    canUploadPhotos: canUploadPhotosEffective,
+    canDeletePhotos,
+    storageQuota,
+    isStorageQuotaBlocked,
     isProjectCreator,
     filterCounts: {
       mine: counts.mine,

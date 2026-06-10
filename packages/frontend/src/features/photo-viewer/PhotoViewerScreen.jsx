@@ -9,7 +9,9 @@ import PhotoViewerReviewControls from '@/features/photo-viewer/PhotoViewerReview
 import PhotoViewerRenameControl from '@/features/photo-viewer/PhotoViewerRenameControl.jsx'
 import PhotoViewerDownloadControl from '@/features/photo-viewer/PhotoViewerDownloadControl.jsx'
 import PhotoViewerShortcutsModal from '@/features/photo-viewer/PhotoViewerShortcutsModal.jsx'
+import PhotoDeleteConfirmModal from '@/features/project-view/PhotoDeleteConfirmModal.jsx'
 import { copyPhotoToClipboard, downloadPhotoOriginal } from '@/features/photo-viewer/photoDownload.js'
+import { deletePhoto } from '@/services/photoService.js'
 import { exportDownloadFilename } from '@/utils/exportDownloadFilename.js'
 import { usePhotoViewerShortcuts } from '@/features/photo-viewer/usePhotoViewerShortcuts.js'
 import { useAdjacentPhotoPrefetch } from '@/features/photo-viewer/useAdjacentPhotoPrefetch.js'
@@ -36,7 +38,7 @@ const photoPropShape = PropTypes.shape({
 })
 
 /**
- * @param {{ photos: object[]; token: string; onRefresh: () => void; collaboratorMembers: Array<{ id: string; name: string }>; canReviewPhotos?: boolean }} props
+ * @param {{ photos: object[]; token: string; onRefresh: () => void; collaboratorMembers: Array<{ id: string; name: string }>; canReviewPhotos?: boolean; canDeletePhotos?: boolean }} props
  */
 export default function PhotoViewerScreen({
   photos,
@@ -44,6 +46,7 @@ export default function PhotoViewerScreen({
   onRefresh,
   collaboratorMembers,
   canReviewPhotos = true,
+  canDeletePhotos = false,
 }) {
   const { projectId, photoId } = useParams()
   const navigate = useNavigate()
@@ -56,6 +59,8 @@ export default function PhotoViewerScreen({
   const [renameFocused, setRenameFocused] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isPhotoZoomed, setIsPhotoZoomed] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const [localPhotos, setLocalPhotos] = useState(photos)
   const [liveMessage, setLiveMessage] = useState('')
   const isSavingRef = useRef(false)
@@ -234,6 +239,42 @@ export default function PhotoViewerScreen({
     navigate(`/projects/${projectId}`, { state: navState })
   }, [navigate, projectId, navState])
 
+  const handleConfirmDelete = useCallback(async () => {
+    if (!photoId || deleteBusy) return
+    setDeleteBusy(true)
+    try {
+      await deletePhoto(token, photoId)
+      const nextPhotos = localPhotos.filter((p) => p.id !== photoId)
+      setLocalPhotos(nextPhotos)
+      setDeleteModalOpen(false)
+      showToast('Photo deleted', 'success')
+      onRefresh()
+      if (nextPhotos.length === 0) {
+        onExit()
+        return
+      }
+      if (index >= 0 && index < nextPhotos.length) {
+        goPhoto(nextPhotos[index].id)
+      } else if (index > 0) {
+        goPhoto(nextPhotos[index - 1].id)
+      } else {
+        goPhoto(nextPhotos[0].id)
+      }
+    } finally {
+      setDeleteBusy(false)
+    }
+  }, [
+    deleteBusy,
+    goPhoto,
+    index,
+    localPhotos,
+    onExit,
+    onRefresh,
+    photoId,
+    showToast,
+    token,
+  ])
+
   const onToggleShortcuts = useCallback(() => {
     setShortcutsOpen((prev) => !prev)
   }, [])
@@ -249,6 +290,16 @@ export default function PhotoViewerScreen({
   const onToggleZoom = useCallback(() => {
     imageRef.current?.toggleZoom?.()
   }, [])
+
+  const onOpenDelete = useCallback(() => {
+    if (!canDeletePhotos || deleteBusy) return
+    setDeleteModalOpen(true)
+  }, [canDeletePhotos, deleteBusy])
+
+  const onCloseDeleteModal = useCallback(() => {
+    if (deleteBusy) return
+    setDeleteModalOpen(false)
+  }, [deleteBusy])
 
   useEffect(() => {
     if (localPhotos.length === 0 || !projectId) return
@@ -276,8 +327,12 @@ export default function PhotoViewerScreen({
     onDownloadPhoto: () => {
       void onDownloadPhoto()
     },
+    onOpenDelete,
+    deleteModalOpen,
+    onCloseDeleteModal,
     enabled: Boolean(photoId && displayPhoto) && !isMobile,
     canReview: canReviewPhotos,
+    canDelete: canDeletePhotos,
   })
 
   useAdjacentPhotoPrefetch({
@@ -360,6 +415,18 @@ export default function PhotoViewerScreen({
           token={token}
           onError={handleDownloadError}
         />
+        {canDeletePhotos ? (
+          <button
+            type="button"
+            onClick={() => setDeleteModalOpen(true)}
+            className={`${topChromeBtnClass} text-error/85 hover:border-error/40 hover:bg-error/10 hover:text-error`}
+            aria-label="Delete photo — keyboard: Delete"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M10 11v6M14 11v6M6 7l1 12a1 1 0 001 1h8a1 1 0 001-1l1-12" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => setDetailOpen(true)}
@@ -443,8 +510,22 @@ export default function PhotoViewerScreen({
       />
 
       {!isMobile ? (
-        <PhotoViewerShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+        <PhotoViewerShortcutsModal
+          open={shortcutsOpen}
+          onClose={() => setShortcutsOpen(false)}
+          canDeletePhotos={canDeletePhotos}
+        />
       ) : null}
+
+      <PhotoDeleteConfirmModal
+        isOpen={deleteModalOpen}
+        photoCount={1}
+        busy={deleteBusy}
+        onClose={() => {
+          if (!deleteBusy) setDeleteModalOpen(false)
+        }}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   )
 }
@@ -454,6 +535,7 @@ PhotoViewerScreen.propTypes = {
   token: PropTypes.string.isRequired,
   onRefresh: PropTypes.func.isRequired,
   canReviewPhotos: PropTypes.bool,
+  canDeletePhotos: PropTypes.bool,
   collaboratorMembers: PropTypes.arrayOf(
     PropTypes.shape({ id: PropTypes.string.isRequired, name: PropTypes.string.isRequired })
   ).isRequired,

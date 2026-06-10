@@ -48,7 +48,7 @@ ShortcutRow.propTypes = {
 /**
  * Desktop keyboard shortcuts reference for photo review.
  */
-export default function PhotoViewerShortcutsModal({ open, onClose }) {
+export default function PhotoViewerShortcutsModal({ open, onClose, canDeletePhotos = false }) {
   return (
     <AppModal
       open={open}
@@ -77,9 +77,11 @@ export default function PhotoViewerShortcutsModal({ open, onClose }) {
                 {section.title}
               </h3>
               <div className="divide-y divide-base-300/80">
-                {section.entries.map((entry) => (
-                  <ShortcutRow key={`${section.id}-${entry.label}`} entry={entry} />
-                ))}
+                {section.entries
+                  .filter((entry) => !entry.requiresCanDelete || canDeletePhotos)
+                  .map((entry) => (
+                    <ShortcutRow key={`${section.id}-${entry.label}`} entry={entry} />
+                  ))}
               </div>
             </section>
           ))}
@@ -92,4 +94,5 @@ export default function PhotoViewerShortcutsModal({ open, onClose }) {
 PhotoViewerShortcutsModal.propTypes = {
   open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
+  canDeletePhotos: PropTypes.bool,
 }

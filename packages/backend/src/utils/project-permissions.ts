@@ -60,6 +60,10 @@ export function canUploadPhotos(ctx: ProjectPermissionContext): boolean {
   return ctx.isCreator || ctx.role === "contributor";
 }
 
+export function canDeletePhotos(ctx: ProjectPermissionContext): boolean {
+  return ctx.isCreator || ctx.role === "contributor";
+}
+
 export function canEditPhotoMetadata(ctx: ProjectPermissionContext): boolean {
   return ctx.isCreator || ctx.role === "contributor";
 }

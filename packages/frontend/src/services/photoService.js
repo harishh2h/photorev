@@ -230,3 +230,36 @@ export async function fetchPhotoDownloadBlob(token, photoId, options = {}) {
   }
   return res.blob()
 }
+
+/**
+ * @param {string} token
+ * @param {string} photoId
+ * @returns {Promise<{ photoId: string; projectId: string }>}
+ */
+export async function deletePhoto(token, photoId) {
+  const { ok, message, data } = await apiFetch(`/photos/${encodeURIComponent(photoId)}`, {
+    token,
+    method: 'DELETE',
+  })
+  if (!ok) {
+    throw new Error(message)
+  }
+  return /** @type {{ photoId: string; projectId: string }} */ (data)
+}
+
+/**
+ * @param {string} token
+ * @param {string[]} photoIds
+ * @returns {Promise<{ deletedIds: string[]; failedIds: string[] }>}
+ */
+export async function deletePhotos(token, photoIds) {
+  const { ok, message, data } = await apiFetch('/photos/bulk-delete', {
+    token,
+    method: 'POST',
+    body: { photoIds },
+  })
+  if (!ok) {
+    throw new Error(message)
+  }
+  return /** @type {{ deletedIds: string[]; failedIds: string[] }} */ (data)
+}

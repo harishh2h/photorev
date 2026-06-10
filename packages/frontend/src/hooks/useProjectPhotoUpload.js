@@ -3,8 +3,10 @@ import { uploadPhoto } from '@/services/photoService.js'
 import {
   buildUploadBatchSummary,
   PhotoUploadError,
+  QUOTA_EXCEEDED_MESSAGE,
   UPLOAD_ERROR_KIND,
 } from '@/utils/uploadErrors.js'
+import { isStorageUploadBlocked } from '@/utils/storageQuota.js'
 import {
   computeBatchUploadProgress,
   createProgressThrottle,
@@ -140,9 +142,9 @@ function resetJobProgress(job) {
 }
 
 /**
- * @param {{ token: string; projectId: string; onAfterBatch: () => void }} args
+ * @param {{ token: string; projectId: string; onAfterBatch: () => void; storageQuota?: { quotaBytes?: number | null; usageBytes?: number; canUpload?: boolean } | null }} args
  */
-export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
+export function useProjectPhotoUpload({ token, projectId, onAfterBatch, storageQuota = null }) {
   const fileInputRef = useRef(/** @type {HTMLInputElement | null} */ (null))
   const tokenRef = useRef(token)
   const projectIdRef = useRef(projectId)
@@ -300,10 +302,14 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
 
   const openFilePicker = useCallback(() => {
     if (!runFinishedRef.current) return
+    if (isStorageUploadBlocked(storageQuota)) {
+      setUploadMessage(QUOTA_EXCEEDED_MESSAGE)
+      return
+    }
     setUploadMessage(null)
     setPostBatchSummary(null)
     fileInputRef.current?.click()
-  }, [])
+  }, [storageQuota])
 
   const handleConcurrencyChange = useCallback(
     (value) => {
@@ -333,7 +339,10 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
     if (!runFinishedRef.current || isUploading) return
     const jobs = jobsRef.current
     const retryable = jobs.filter(
-      (j) => j.status === 'failed' && j.errorKind !== UPLOAD_ERROR_KIND.INVALID_IMAGE,
+      (j) =>
+        j.status === 'failed' &&
+        j.errorKind !== UPLOAD_ERROR_KIND.INVALID_IMAGE &&
+        j.errorKind !== UPLOAD_ERROR_KIND.QUOTA_EXCEEDED,
     )
     if (retryable.length === 0) return
 
@@ -358,6 +367,10 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
       input.value = ''
       if (files.length === 0) return
       if (!runFinishedRef.current) return
+      if (isStorageUploadBlocked(storageQuota)) {
+        setUploadMessage(QUOTA_EXCEEDED_MESSAGE)
+        return
+      }
 
       jobsRef.current = files.map((file, idx) => createUploadJob(file, idx))
 
@@ -375,13 +388,16 @@ export function useProjectPhotoUpload({ token, projectId, onAfterBatch }) {
       flushJobs()
       pump()
     },
-    [pump, flushJobs],
+    [pump, flushJobs, storageQuota],
   )
 
   const showUploadPanel = isUploading || postBatchSummary !== null || uploadJobs.length > 0
 
   const retryableFailedCount = jobsRef.current.filter(
-    (j) => j.status === 'failed' && j.errorKind !== UPLOAD_ERROR_KIND.INVALID_IMAGE,
+    (j) =>
+      j.status === 'failed' &&
+      j.errorKind !== UPLOAD_ERROR_KIND.INVALID_IMAGE &&
+      j.errorKind !== UPLOAD_ERROR_KIND.QUOTA_EXCEEDED,
   ).length
   const canRetryFailed = !isUploading && retryableFailedCount > 0
 

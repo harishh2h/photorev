@@ -9,6 +9,8 @@ export interface User {
   password_hash: string
   role: UserRole
   is_active: boolean
+  quota_bytes: number | null
+  quota_usage_bytes: number
   created_at: Date
 }
 

@@ -24,8 +24,12 @@ function isShortcutsHelpKey(e) {
  *   onToggleZoom: () => void;
  *   onCopyPhoto: () => void;
  *   onDownloadPhoto: () => void;
+ *   onOpenDelete?: () => void;
+ *   deleteModalOpen?: boolean;
+ *   onCloseDeleteModal?: () => void;
  *   enabled: boolean;
  *   canReview?: boolean;
+ *   canDelete?: boolean;
  * }} opts
  */
 export function usePhotoViewerShortcuts({
@@ -43,14 +47,26 @@ export function usePhotoViewerShortcuts({
   onToggleZoom,
   onCopyPhoto,
   onDownloadPhoto,
+  onOpenDelete,
+  deleteModalOpen = false,
+  onCloseDeleteModal,
   enabled,
   canReview = true,
+  canDelete = false,
 }) {
   useEffect(() => {
     if (!enabled) return undefined
 
     function handleKeyDown(e) {
       const el = e.target
+
+      if (deleteModalOpen) {
+        if (e.key === 'Escape') {
+          onCloseDeleteModal?.()
+          e.preventDefault()
+        }
+        return
+      }
 
       if (shortcutsOpen) {
         if (!isTypingTarget(el) && isShortcutsHelpKey(e)) {
@@ -119,6 +135,12 @@ export function usePhotoViewerShortcuts({
         return
       }
 
+      if (canDelete && (e.key === 'Delete' || e.key === 'Backspace')) {
+        onOpenDelete?.()
+        e.preventDefault()
+        return
+      }
+
       if (key === 'i') {
         onToggleInfo()
         e.preventDefault()
@@ -156,15 +178,19 @@ export function usePhotoViewerShortcuts({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [
+    canDelete,
     canReview,
+    deleteModalOpen,
     detailOpen,
     enabled,
     goNext,
     goPrev,
+    onCloseDeleteModal,
     onExit,
     onLike,
     onCopyPhoto,
     onDownloadPhoto,
+    onOpenDelete,
     onOpenRename,
     onReject,
     onToggleInfo,

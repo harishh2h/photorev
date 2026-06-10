@@ -74,6 +74,7 @@ export default function PhotoViewerPage() {
       onRefresh={refetch}
       collaboratorMembers={collaboratorMembers}
       canReviewPhotos={data?.canReviewPhotos !== false}
+      canDeletePhotos={Boolean(data?.canDeletePhotos)}
     />
   )
 }

@@ -2,7 +2,7 @@ import { apiFetch } from './httpClient.js'
 
 /**
  * @param {string} token
- * @returns {Promise<{ success: boolean, data?: Array<{ id: string, email: string, name: string, role: string, is_active: boolean, created_at: string }>, message?: string }>}
+ * @returns {Promise<{ success: boolean, data?: Array<{ id: string, email: string, name: string, role: string, is_active: boolean, quota_bytes: number | null, quota_usage_bytes: number, created_at: string }>, message?: string }>}
  */
 export async function listUsers(token) {
   const r = await apiFetch('/admin/users', { token })
@@ -14,7 +14,7 @@ export async function listUsers(token) {
 
 /**
  * @param {string} token
- * @param {{ email: string, password: string, name: string, role: string }} payload
+ * @param {{ email: string, password: string, name: string, role: string, quotaBytes?: number | null }} payload
  */
 export async function createUser(token, payload) {
   const r = await apiFetch('/admin/users', { token, method: 'POST', body: payload })
@@ -27,7 +27,7 @@ export async function createUser(token, payload) {
 /**
  * @param {string} token
  * @param {string} userId
- * @param {{ name?: string, role?: string, password?: string }} payload
+ * @param {{ name?: string, role?: string, password?: string, quotaBytes?: number | null }} payload
  */
 export async function updateUser(token, userId, payload) {
   const r = await apiFetch(`/admin/users/${userId}`, { token, method: 'PATCH', body: payload })

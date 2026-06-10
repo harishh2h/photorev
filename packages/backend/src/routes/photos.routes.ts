@@ -64,6 +64,22 @@ const updatePhotoSchema = {
   },
 };
 
+const bulkDeletePhotosSchema = {
+  body: {
+    type: "object",
+    required: ["photoIds"],
+    properties: {
+      photoIds: {
+        type: "array",
+        minItems: 1,
+        maxItems: 100,
+        items: { type: "string", format: "uuid" },
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
 async function photosRoutes(
   fastify: FastifyInstance,
   opts: FastifyPluginOptions,
@@ -107,6 +123,16 @@ async function photosRoutes(
     "/:photoId",
     { schema: updatePhotoSchema, preHandler: ensureAuthenticated },
     handler.updatePhoto,
+  );
+  fastify.delete(
+    "/:photoId",
+    { schema: photoIdParamsSchema, preHandler: ensureAuthenticated },
+    handler.deletePhoto,
+  );
+  fastify.post(
+    "/bulk-delete",
+    { schema: bulkDeletePhotosSchema, preHandler: ensureAuthenticated },
+    handler.deletePhotos,
   );
 
   fastify.post(

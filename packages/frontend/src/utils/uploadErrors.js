@@ -1,12 +1,15 @@
-/** @typedef {'invalid_image' | 'network' | 'server' | 'unknown' | 'cancelled'} UploadErrorKind */
+/** @typedef {'invalid_image' | 'network' | 'server' | 'quota_exceeded' | 'unknown' | 'cancelled'} UploadErrorKind */
 
 export const UPLOAD_ERROR_KIND = {
   INVALID_IMAGE: /** @type {const} */ ('invalid_image'),
   NETWORK: /** @type {const} */ ('network'),
   SERVER: /** @type {const} */ ('server'),
+  QUOTA_EXCEEDED: /** @type {const} */ ('quota_exceeded'),
   UNKNOWN: /** @type {const} */ ('unknown'),
   CANCELLED: /** @type {const} */ ('cancelled'),
 }
+
+export const QUOTA_EXCEEDED_MESSAGE = 'Storage quota exceeded'
 
 export const INVALID_IMAGE_MESSAGE = 'This is not a supported image'
 
@@ -30,6 +33,9 @@ export function isInvalidImageServerMessage(message) {
  * @returns {UploadErrorKind}
  */
 export function classifyUploadFailure(status, serverMessage) {
+  if (status === 413) {
+    return UPLOAD_ERROR_KIND.QUOTA_EXCEEDED
+  }
   if (status === 400 && isInvalidImageServerMessage(serverMessage)) {
     return UPLOAD_ERROR_KIND.INVALID_IMAGE
   }
@@ -47,6 +53,11 @@ export function classifyUploadFailure(status, serverMessage) {
  * @param {string | undefined} serverMessage
  */
 export function messageForUploadFailure(kind, serverMessage) {
+  if (kind === UPLOAD_ERROR_KIND.QUOTA_EXCEEDED) {
+    return typeof serverMessage === 'string' && serverMessage.trim().length > 0
+      ? serverMessage
+      : QUOTA_EXCEEDED_MESSAGE
+  }
   if (kind === UPLOAD_ERROR_KIND.INVALID_IMAGE) {
     return INVALID_IMAGE_MESSAGE
   }
@@ -71,7 +82,12 @@ export function buildUploadBatchSummary(jobs) {
   if (failed.length === 0) return null
 
   const invalidCount = failed.filter((j) => j.errorKind === UPLOAD_ERROR_KIND.INVALID_IMAGE).length
-  const retryableCount = failed.length - invalidCount
+  const quotaCount = failed.filter((j) => j.errorKind === UPLOAD_ERROR_KIND.QUOTA_EXCEEDED).length
+  const retryableCount = failed.length - invalidCount - quotaCount
+
+  if (quotaCount > 0) {
+    return QUOTA_EXCEEDED_MESSAGE
+  }
 
   if (failed.length === jobs.length) {
     if (invalidCount === failed.length) {

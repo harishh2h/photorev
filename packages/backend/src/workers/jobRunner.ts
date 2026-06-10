@@ -8,6 +8,7 @@ import {
   startBackgroundSpan,
 } from "../utils/apm-spans";
 import { getStorageRoot } from "../utils/storage";
+import { getProjectOwnerId, releaseQuota } from "../utils/storage-quota";
 import type { ProcessingJobWorkerSuccess } from "./tasks/runProcessingJob";
 import { WorkerPool } from "./workerPool";
 
@@ -119,17 +120,19 @@ export class JobRunner {
     if (!job.photo_id || !job.project_id) {
       return;
     }
+    const photoRow = await db<{ file_size: string | number | null }>("photos")
+      .select("file_size")
+      .where("id", job.photo_id)
+      .first();
+    const ownerId = await getProjectOwnerId(db, job.project_id);
     const storageRoot = getStorageRoot();
     const dir = path.join(storageRoot, "photos", job.project_id, job.photo_id);
     await fs.promises.rm(dir, { recursive: true, force: true });
-    await db("photos").where("id", job.photo_id).update({
-      status: "deleted",
-      original_path: "",
-      original_name: null,
-      thumbnail_path: null,
-      preview_path: null,
-      trashed_at: null,
-    });
+    const fileSize = Number(photoRow?.file_size ?? 0);
+    if (ownerId && Number.isFinite(fileSize) && fileSize > 0) {
+      await releaseQuota(db, ownerId, fileSize);
+    }
+    await db("photos").where("id", job.photo_id).delete();
   }
 
   private async runPurgeTrashed(_job: ProcessingJobWithOriginalPath): Promise<void> {

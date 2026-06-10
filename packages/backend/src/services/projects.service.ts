@@ -8,9 +8,17 @@ import {
 } from "../utils/storage";
 import { applyPagination, buildPaginatedResult, PaginatedResult, PaginationParams } from "../utils/pagination";
 import {
+  canUploadPhotos,
+  loadProjectPermissionContext,
   type CollaboratorRole,
   parseCollaboratorRole,
 } from "../utils/project-permissions";
+import {
+  loadUserQuotaSnapshot,
+  releaseQuota,
+  sumProjectPhotoBytes,
+  type StorageQuotaSnapshot,
+} from "../utils/storage-quota";
 
 function isPersistableBannerUrl(value: unknown): boolean {
   if (typeof value !== "string") {
@@ -81,6 +89,7 @@ export interface ProjectDto {
   readonly finalizedBy: string | null;
   readonly finalizeAction: string | null;
   readonly viewerContext: ProjectViewerContextDto;
+  readonly storageQuota?: StorageQuotaSnapshot;
 }
 
 export interface ListProjectsFilters extends PaginationParams {
@@ -373,7 +382,16 @@ function buildProjectsService(
       row.owner_name,
       row.owner_email,
     );
-    return mapProjectRecordToDto(row, viewerContext);
+    const project = mapProjectRecordToDto(row, viewerContext);
+    const permCtx = await loadProjectPermissionContext(db, params.userId, params.projectId);
+    if (!permCtx || !canUploadPhotos(permCtx)) {
+      return project;
+    }
+    const storageQuota = await loadUserQuotaSnapshot(db, row.created_by);
+    if (!storageQuota) {
+      return project;
+    }
+    return { ...project, storageQuota };
   }
 
   async function getRandomCoverPhotoId(params: GetProjectParams): Promise<RandomCoverPhotoResult> {
@@ -499,6 +517,10 @@ function buildProjectsService(
       return { ok: true };
     }
     await db.transaction(async (trx: Knex.Transaction) => {
+      const totalBytes = await sumProjectPhotoBytes(trx, params.projectId);
+      if (totalBytes > 0) {
+        await releaseQuota(trx, row.created_by, totalBytes);
+      }
       await trx("photos").where("project_id", params.projectId).delete();
       const updated = await trx<ProjectRecord>("projects")
         .where("id", params.projectId)

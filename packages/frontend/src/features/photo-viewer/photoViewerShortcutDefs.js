@@ -1,4 +1,4 @@
-/** @typedef {{ keys: string[]; label: string; detail?: string }} ShortcutEntry */
+/** @typedef {{ keys: string[]; label: string; detail?: string; requiresCanDelete?: boolean }} ShortcutEntry */
 /** @typedef {{ id: string; title: string; entries: ShortcutEntry[] }} ShortcutSection */
 
 /** @type {ShortcutSection[]} */
@@ -30,6 +30,12 @@ export const PHOTO_VIEWER_SHORTCUT_SECTIONS = [
       { keys: ['Z'], label: 'Toggle zoom' },
       { keys: ['⌘', 'C'], label: 'Copy photo to clipboard', detail: 'Ctrl + C on Windows' },
       { keys: ['⌘', 'D'], label: 'Download photo', detail: 'Ctrl + D on Windows' },
+      {
+        keys: ['Delete'],
+        label: 'Delete photo',
+        detail: 'Backspace on some keyboards',
+        requiresCanDelete: true,
+      },
       { keys: ['Scroll'], label: 'Zoom in / out', detail: 'Pinch or Ctrl + scroll' },
     ],
   },

@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { normalizeEmail } from '../utils/email';
 import { toClientErrorMessage } from '../utils/api-error';
 import { UserRole } from '../models/user';
+import { parseAdminQuotaBytes } from '../utils/storage-quota';
 
 interface AdminUserDto {
     readonly id: string;
@@ -10,6 +11,8 @@ interface AdminUserDto {
     readonly name: string;
     readonly role: string;
     readonly is_active: boolean;
+    readonly quota_bytes: number | null;
+    readonly quota_usage_bytes: number;
     readonly created_at: string;
 }
 
@@ -18,12 +21,14 @@ interface CreateUserParams {
     readonly password: string;
     readonly name: string;
     readonly role: UserRole;
+    readonly quotaBytes?: number | null;
 }
 
 interface UpdateUserParams {
     readonly name?: string;
     readonly role?: UserRole;
     readonly password?: string;
+    readonly quotaBytes?: number | null;
 }
 
 interface AdminResult<TData> {
@@ -39,14 +44,22 @@ interface AdminServiceMethods {
     deactivateUser: (userId: string, requestingUserId: string) => Promise<AdminResult<null>>;
 }
 
-const USER_COLUMNS = ['id', 'email', 'name', 'role', 'is_active', 'created_at'] as const;
+const USER_COLUMNS = ['id', 'email', 'name', 'role', 'is_active', 'quota_bytes', 'quota_usage_bytes', 'created_at'] as const;
+
+function mapAdminUserDto(row: AdminUserDto): AdminUserDto {
+    return {
+        ...row,
+        quota_bytes: row.quota_bytes == null ? null : Number(row.quota_bytes),
+        quota_usage_bytes: Number(row.quota_usage_bytes ?? 0),
+    };
+}
 
 function buildAdminService(fastify: FastifyInstance, _opts: FastifyPluginOptions): AdminServiceMethods {
     const service: AdminServiceMethods = {
         listUsers: async () => {
             try {
                 const users = await fastify.db('users').select(...USER_COLUMNS).orderBy('created_at', 'desc');
-                return { success: true, data: users, message: 'ok' };
+                return { success: true, data: users.map(mapAdminUserDto), message: 'ok' };
             } catch (error) {
                 fastify.log.error(error);
                 return { success: false, data: null, message: toClientErrorMessage(error, 'Failed to list users') };
@@ -57,6 +70,12 @@ function buildAdminService(fastify: FastifyInstance, _opts: FastifyPluginOptions
             try {
                 const emailNormalized = normalizeEmail(params.email);
                 const hashedPassword = await bcrypt.hash(params.password, 10);
+                if (params.quotaBytes !== undefined) {
+                    const parsed = parseAdminQuotaBytes(params.quotaBytes);
+                    if (parsed === 'invalid') {
+                        return { success: false, data: null, message: 'Invalid storage quota' };
+                    }
+                }
                 const user = await fastify
                     .db('users')
                     .insert(
@@ -66,11 +85,14 @@ function buildAdminService(fastify: FastifyInstance, _opts: FastifyPluginOptions
                             name: params.name,
                             role: params.role,
                             is_active: true,
+                            ...(params.quotaBytes !== undefined
+                                ? { quota_bytes: parseAdminQuotaBytes(params.quotaBytes) }
+                                : {}),
                         },
                         [...USER_COLUMNS],
                     )
                     .then((rows: AdminUserDto[]) => rows[0]);
-                return { success: true, data: user, message: 'User created' };
+                return { success: true, data: mapAdminUserDto(user), message: 'User created' };
             } catch (error: unknown) {
                 fastify.log.error(error);
                 const pgError = error as { code?: string };
@@ -89,10 +111,17 @@ function buildAdminService(fastify: FastifyInstance, _opts: FastifyPluginOptions
                 if (params.password !== undefined) {
                     updates.password_hash = await bcrypt.hash(params.password, 10);
                 }
+                if (params.quotaBytes !== undefined) {
+                    const parsed = parseAdminQuotaBytes(params.quotaBytes);
+                    if (parsed === 'invalid') {
+                        return { success: false, data: null, message: 'Invalid storage quota' };
+                    }
+                    updates.quota_bytes = parsed;
+                }
                 if (Object.keys(updates).length === 0) {
                     const user = await fastify.db('users').where({ id: userId }).select(...USER_COLUMNS).first<AdminUserDto>();
                     if (!user) return { success: false, data: null, message: 'User not found' };
-                    return { success: true, data: user, message: 'No changes' };
+                    return { success: true, data: mapAdminUserDto(user), message: 'No changes' };
                 }
                 const updated = await fastify
                     .db('users')
@@ -100,7 +129,7 @@ function buildAdminService(fastify: FastifyInstance, _opts: FastifyPluginOptions
                     .update(updates, [...USER_COLUMNS])
                     .then((rows: AdminUserDto[]) => rows[0]);
                 if (!updated) return { success: false, data: null, message: 'User not found' };
-                return { success: true, data: updated, message: 'User updated' };
+                return { success: true, data: mapAdminUserDto(updated), message: 'User updated' };
             } catch (error) {
                 fastify.log.error(error);
                 return { success: false, data: null, message: toClientErrorMessage(error, 'Failed to update user') };

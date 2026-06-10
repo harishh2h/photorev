@@ -14,10 +14,13 @@ export default function PhotoSelectionControlBar({
   selectedCount,
   allVisibleSelected,
   exportBusy = false,
+  canDeletePhotos = false,
+  deleteBusy = false,
   onClear,
   onSelectAll,
   onSelectFullQuality,
   onSelectCompressed,
+  onDeleteSelected,
   className = '',
 }) {
   return (
@@ -49,11 +52,21 @@ export default function PhotoSelectionControlBar({
           {allVisibleSelected ? 'Clear all' : 'Select all'}
         </button>
         <ProjectDownloadDropdown
-          disabled={exportBusy}
+          disabled={exportBusy || deleteBusy}
           selectedCount={selectedCount}
           onSelectFullQuality={onSelectFullQuality}
           onSelectCompressed={onSelectCompressed}
         />
+        {canDeletePhotos ? (
+          <button
+            type="button"
+            className={`${pillClass} border-error/35 text-error hover:border-error hover:bg-error/10`}
+            disabled={deleteBusy || exportBusy}
+            onClick={onDeleteSelected}
+          >
+            Delete
+          </button>
+        ) : null}
       </div>
     </div>
   )
@@ -63,9 +76,12 @@ PhotoSelectionControlBar.propTypes = {
   selectedCount: PropTypes.number.isRequired,
   allVisibleSelected: PropTypes.bool.isRequired,
   exportBusy: PropTypes.bool,
+  canDeletePhotos: PropTypes.bool,
+  deleteBusy: PropTypes.bool,
   onClear: PropTypes.func.isRequired,
   onSelectAll: PropTypes.func.isRequired,
   onSelectFullQuality: PropTypes.func.isRequired,
   onSelectCompressed: PropTypes.func.isRequired,
+  onDeleteSelected: PropTypes.func,
   className: PropTypes.string,
 }

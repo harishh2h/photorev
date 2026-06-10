@@ -4,6 +4,8 @@ import PropTypes from 'prop-types'
 import { useAuth } from '@/features/auth/index.js'
 import { AppButton, AppInput } from '@/components/ui/index.js'
 import { listUsers, createUser, updateUser, deactivateUser } from '@/services/adminService.js'
+import { formatBytes } from '@/utils/formatBytes.js'
+import { formatQuotaGigabytes, parseQuotaGigabytesInput } from '@/utils/storageQuota.js'
 
 const ROLE_LABELS = { admin: 'Admin', user: 'User' }
 
@@ -42,7 +44,7 @@ function StatusDot({ isActive }) {
 
 StatusDot.propTypes = { isActive: PropTypes.bool.isRequired }
 
-const EMPTY_FORM = { name: '', email: '', password: '', role: 'user' }
+const EMPTY_FORM = { name: '', email: '', password: '', role: 'user', quotaGigabytes: '' }
 
 function UserFormModal({ initial, onSubmit, onClose, isSubmitting, error, isEdit }) {
   const [form, setForm] = useState(initial ?? EMPTY_FORM)
@@ -113,6 +115,21 @@ function UserFormModal({ initial, onSubmit, onClose, isSubmitting, error, isEdit
               <option value="admin">Admin</option>
             </select>
           </div>
+          <div className={fieldWrap}>
+            <label htmlFor="um-quota" className={labelClass}>Storage cap (GiB)</label>
+            <AppInput
+              id="um-quota"
+              type="number"
+              min="0"
+              step="0.1"
+              value={form.quotaGigabytes}
+              onChange={set('quotaGigabytes')}
+              placeholder="Unlimited"
+              disabled={isSubmitting}
+              className="min-h-11"
+            />
+            <p className="m-0 font-base text-xs text-muted">Leave empty for unlimited. 0 blocks uploads.</p>
+          </div>
 
           {error ? (
             <p className="m-0 font-base text-sm font-medium text-error" role="alert">{error}</p>
@@ -179,7 +196,18 @@ export default function AdminUsersPage() {
     setModalSubmitting(true)
     setModalError('')
     try {
-      const result = await createUser(token, { email: form.email, password: form.password, name: form.name, role: form.role })
+      const quotaBytes = parseQuotaGigabytesInput(form.quotaGigabytes)
+      if (quotaBytes === 'invalid') {
+        setModalError('Enter a valid storage cap (GiB)')
+        return
+      }
+      const result = await createUser(token, {
+        email: form.email,
+        password: form.password,
+        name: form.name,
+        role: form.role,
+        quotaBytes,
+      })
       if (result.success) {
         dispatch({ type: 'APPEND_USER', user: result.data })
         setModal(null)
@@ -199,6 +227,12 @@ export default function AdminUsersPage() {
       if (form.name) payload.name = form.name
       if (form.password) payload.password = form.password
       if (form.role) payload.role = form.role
+      const quotaBytes = parseQuotaGigabytesInput(form.quotaGigabytes)
+      if (quotaBytes === 'invalid') {
+        setModalError('Enter a valid storage cap (GiB)')
+        return
+      }
+      payload.quotaBytes = quotaBytes
       const result = await updateUser(token, modal.user.id, payload)
       if (result.success) {
         dispatch({ type: 'UPDATE_USER', user: result.data })
@@ -300,8 +334,9 @@ export default function AdminUsersPage() {
             ) : (
               <div className="divide-y divide-base-200">
                 {/* Table header — desktop only */}
-                <div className="hidden grid-cols-[1fr_auto_auto_auto] items-center gap-4 px-6 py-3 md:grid">
+                <div className="hidden grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 px-6 py-3 md:grid">
                   <span className="font-base text-xs font-semibold uppercase tracking-wide text-muted">User</span>
+                  <span className="font-base text-xs font-semibold uppercase tracking-wide text-muted">Storage</span>
                   <span className="font-base text-xs font-semibold uppercase tracking-wide text-muted">Role</span>
                   <span className="font-base text-xs font-semibold uppercase tracking-wide text-muted">Joined</span>
                   <span className="font-base text-xs font-semibold uppercase tracking-wide text-muted">Actions</span>
@@ -314,7 +349,7 @@ export default function AdminUsersPage() {
                   return (
                     <div
                       key={u.id}
-                      className="flex flex-col gap-3 px-6 py-4 transition-[background-color] duration-150 ease-out hover:bg-base-50 md:grid md:grid-cols-[1fr_auto_auto_auto] md:items-center md:gap-4"
+                      className="flex flex-col gap-3 px-6 py-4 transition-[background-color] duration-150 ease-out hover:bg-base-50 md:grid md:grid-cols-[1fr_auto_auto_auto_auto] md:items-center md:gap-4"
                     >
                       {/* User info */}
                       <div className="flex items-center gap-3 min-w-0">
@@ -336,6 +371,12 @@ export default function AdminUsersPage() {
                           </span>
                         )}
                       </div>
+
+                      <span className="font-base text-xs text-muted md:text-sm">
+                        {u.quota_bytes == null
+                          ? `${formatBytes(u.quota_usage_bytes ?? 0)} / ∞`
+                          : `${formatBytes(u.quota_usage_bytes ?? 0)} / ${formatBytes(u.quota_bytes)}`}
+                      </span>
 
                       {/* Role */}
                       <div className="flex items-center gap-2">
@@ -390,7 +431,13 @@ export default function AdminUsersPage() {
       )}
       {modal?.mode === 'edit' && (
         <UserFormModal
-          initial={{ name: modal.user.name, email: modal.user.email, password: '', role: modal.user.role }}
+          initial={{
+            name: modal.user.name,
+            email: modal.user.email,
+            password: '',
+            role: modal.user.role,
+            quotaGigabytes: formatQuotaGigabytes(modal.user.quota_bytes),
+          }}
           onSubmit={handleEdit}
           onClose={() => setModal(null)}
           isSubmitting={modalSubmitting}

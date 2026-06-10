@@ -1,5 +1,6 @@
 import apm from "../instrument";
 import { db } from "../db";
+import { reconcileAllUserQuotaUsage } from "../utils/storage-quota";
 import { exportRunner, purgeExpiredExports } from "./exportRunner";
 import { JobRunner } from "./jobRunner";
 import { WorkerPool } from "./workerPool";
@@ -65,6 +66,9 @@ export async function initJobSystem() {
 
   void schedulePurgeTick();
   void purgeExpiredExports();
+  void reconcileAllUserQuotaUsage(db).catch((err) => {
+    console.error("[scheduler] quota reconcile failed", err);
+  });
   const exportPurgeInterval = setInterval(() => {
     void purgeExpiredExports();
   }, PURGE_TICK_MS);
@@ -73,6 +77,12 @@ export async function initJobSystem() {
     void schedulePurgeTick();
   }, PURGE_TICK_MS);
   purgeInterval.unref?.();
+  const quotaReconcileInterval = setInterval(() => {
+    void reconcileAllUserQuotaUsage(db).catch((err) => {
+      console.error("[scheduler] quota reconcile failed", err);
+    });
+  }, PURGE_TICK_MS);
+  quotaReconcileInterval.unref?.();
 
   // wire shutdown
   process.on("SIGTERM", async () => {

@@ -41,6 +41,9 @@ export default function ProjectChrome({
   onSelectAllVisible,
   onSelectSelectedFullQuality,
   onSelectSelectedCompressed,
+  canDeletePhotos = false,
+  deleteBusy = false,
+  onDeleteSelected,
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeShareLink, setActiveShareLink] = useState(null)
@@ -78,10 +81,13 @@ export default function ProjectChrome({
             selectedCount={selectedCount}
             allVisibleSelected={allVisibleSelected}
             exportBusy={exportBusy}
+            canDeletePhotos={canDeletePhotos}
+            deleteBusy={deleteBusy}
             onClear={onClearSelection}
             onSelectAll={onSelectAllVisible}
             onSelectFullQuality={onSelectSelectedFullQuality}
             onSelectCompressed={onSelectSelectedCompressed}
+            onDeleteSelected={onDeleteSelected}
           />
         ) : (
           <ProjectContextBar
@@ -176,4 +182,7 @@ ProjectChrome.propTypes = {
   onSelectAllVisible: PropTypes.func,
   onSelectSelectedFullQuality: PropTypes.func,
   onSelectSelectedCompressed: PropTypes.func,
+  canDeletePhotos: PropTypes.bool,
+  deleteBusy: PropTypes.bool,
+  onDeleteSelected: PropTypes.func,
 }

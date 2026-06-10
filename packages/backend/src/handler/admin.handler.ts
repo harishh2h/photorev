@@ -25,9 +25,21 @@ function buildAdminHandler(fastify: FastifyInstance, opts: FastifyPluginOptions)
         },
 
         createUser: async (request, reply) => {
-            const body = request.body as { email: string; password: string; name: string; role?: string };
+            const body = request.body as {
+                email: string;
+                password: string;
+                name: string;
+                role?: string;
+                quotaBytes?: number | null;
+            };
             const role: UserRole = body.role === 'admin' ? 'admin' : 'user';
-            const result = await adminService.createUser({ email: body.email, password: body.password, name: body.name, role });
+            const result = await adminService.createUser({
+                email: body.email,
+                password: body.password,
+                name: body.name,
+                role,
+                quotaBytes: body.quotaBytes,
+            });
             if (result.success) {
                 sendSuccess(reply, 201, result.data, result.message);
                 return;
@@ -37,7 +49,7 @@ function buildAdminHandler(fastify: FastifyInstance, opts: FastifyPluginOptions)
 
         updateUser: async (request, reply) => {
             const { userId } = request.params as { userId: string };
-            const body = request.body as { name?: string; role?: string; password?: string };
+            const body = request.body as { name?: string; role?: string; password?: string; quotaBytes?: number | null };
             const typed = request as FastifyRequest & { user?: AuthUserPayload };
 
             // Admin cannot change their own role to prevent accidental self-demotion
@@ -46,10 +58,11 @@ function buildAdminHandler(fastify: FastifyInstance, opts: FastifyPluginOptions)
                 return;
             }
 
-            const updates: { name?: string; role?: UserRole; password?: string } = {};
+            const updates: { name?: string; role?: UserRole; password?: string; quotaBytes?: number | null } = {};
             if (body.name !== undefined) updates.name = body.name;
             if (body.role === 'admin' || body.role === 'user') updates.role = body.role;
             if (body.password !== undefined) updates.password = body.password;
+            if (body.quotaBytes !== undefined) updates.quotaBytes = body.quotaBytes;
 
             const result = await adminService.updateUser(userId, updates);
             if (result.success) {

@@ -6,13 +6,20 @@ import {
   PaginatedResult,
   PaginationParams,
 } from "../utils/pagination";
-import { mediaStoragePathForApi } from "../utils/storage";
+import { mediaStoragePathForApi, removeUploadDir } from "../utils/storage";
 import { jobRunner } from "../workers";
 import {
+  canDeletePhotos,
   canEditPhotoMetadata,
   canUploadPhotos,
   loadProjectPermissionContext,
 } from "../utils/project-permissions";
+import {
+  getProjectOwnerId,
+  releaseQuota,
+  reserveQuotaInTransaction,
+  StorageQuotaExceededError,
+} from "../utils/storage-quota";
 
 export interface PhotoInsert {
   id?: string;
@@ -93,6 +100,35 @@ export interface CanUploadToProjectParams {
   readonly projectId: string;
 }
 
+export interface DeletePhotoParams {
+  readonly userId: string;
+  readonly photoId: string;
+}
+
+export interface DeletePhotosParams {
+  readonly userId: string;
+  readonly photoIds: readonly string[];
+}
+
+export type PhotoMutationDenyReason = "not_found" | "forbidden";
+
+export interface DeletePhotoResult {
+  readonly ok: true;
+  readonly projectId: string;
+}
+
+export interface DeletePhotoFailure {
+  readonly ok: false;
+  readonly reason: PhotoMutationDenyReason;
+}
+
+export type DeletePhotoOutcome = DeletePhotoResult | DeletePhotoFailure;
+
+export interface DeletePhotosResult {
+  readonly deletedIds: readonly string[];
+  readonly failedIds: readonly string[];
+}
+
 export interface PhotosServiceMethods {
   listPhotos: (
     filters: ListPhotosFilters,
@@ -100,10 +136,12 @@ export interface PhotosServiceMethods {
   ) => Promise<PaginatedResult<PhotoDto>>;
   getPhoto: (params: GetPhotoParams) => Promise<PhotoDto | null>;
   updatePhotoMetadata: (params: UpdatePhotoMetadataParams) => Promise<PhotoDto | null>;
-  insertPhoto: (photo: PhotoInsert) => Promise<PhotoDto | null>;
+  insertPhoto: (photo: PhotoInsert, ownerIdForQuota?: string) => Promise<PhotoDto | null>;
   canUploadToProject: (
     params: CanUploadToProjectParams,
   ) => Promise<boolean>;
+  deletePhoto: (params: DeletePhotoParams) => Promise<DeletePhotoOutcome>;
+  deletePhotos: (params: DeletePhotosParams) => Promise<DeletePhotosResult>;
 }
 
 function mapPhotoRecordToDto(record: PhotoRecord): PhotoDto {
@@ -249,7 +287,117 @@ function buildPhotosService(
     return Boolean(ctx && canUploadPhotos(ctx));
   }
 
-  async function insertPhoto(photo: PhotoInsert): Promise<PhotoDto | null> {
+  async function loadDeletablePhoto(
+    photoId: string,
+  ): Promise<(PhotoRecord & { project_id: string }) | null> {
+    const row = await db<PhotoRecord>("photos")
+      .select<PhotoRecord[]>("photos.*")
+      .join("projects", "projects.id", "photos.project_id")
+      .where("photos.id", photoId)
+      .whereNot("projects.status", "deleted")
+      .whereNot("photos.status", "deleted")
+      .first();
+    return row ?? null;
+  }
+
+  async function purgePhotoRecord(
+    trx: Knex.Transaction,
+    projectId: string,
+    photoId: string,
+    fileSize: number,
+  ): Promise<boolean> {
+    const ownerId = await getProjectOwnerId(trx, projectId);
+    const deletedCount = await trx("photos").where({ id: photoId, project_id: projectId }).delete();
+    if (deletedCount === 0) {
+      return false;
+    }
+    if (ownerId && Number.isFinite(fileSize) && fileSize > 0) {
+      await releaseQuota(trx, ownerId, fileSize);
+    }
+    return true;
+  }
+
+  async function deletePhoto(params: DeletePhotoParams): Promise<DeletePhotoOutcome> {
+    const existing = await loadDeletablePhoto(params.photoId);
+    if (!existing) {
+      return { ok: false, reason: "not_found" };
+    }
+    const permCtx = await loadProjectPermissionContext(db, params.userId, existing.project_id);
+    if (!permCtx || !canDeletePhotos(permCtx)) {
+      return { ok: false, reason: "forbidden" };
+    }
+    const fileSize = Number(existing.file_size ?? 0);
+    const purged = await db.transaction(async (trx: Knex.Transaction) =>
+      purgePhotoRecord(trx, existing.project_id, params.photoId, fileSize),
+    );
+    if (!purged) {
+      return { ok: false, reason: "not_found" };
+    }
+    try {
+      await removeUploadDir(existing.project_id, params.photoId);
+    } catch (err) {
+      fastify.log.error(
+        { err, projectId: existing.project_id, photoId: params.photoId },
+        "removeUploadDir failed after photo delete",
+      );
+    }
+    return { ok: true, projectId: existing.project_id };
+  }
+
+  async function deletePhotos(params: DeletePhotosParams): Promise<DeletePhotosResult> {
+    const uniqueIds = [...new Set(params.photoIds.filter((id) => typeof id === "string" && id.length > 0))];
+    if (uniqueIds.length === 0) {
+      return { deletedIds: [], failedIds: [] };
+    }
+
+    const rows = await db<PhotoRecord>("photos")
+      .select<PhotoRecord[]>("photos.*")
+      .join("projects", "projects.id", "photos.project_id")
+      .whereIn("photos.id", uniqueIds)
+      .whereNot("projects.status", "deleted")
+      .whereNot("photos.status", "deleted");
+
+    const rowById = new Map(rows.map((row) => [row.id, row]));
+    const deletedIds: string[] = [];
+    const failedIds: string[] = [];
+
+    for (const photoId of uniqueIds) {
+      const row = rowById.get(photoId);
+      if (!row) {
+        failedIds.push(photoId);
+        continue;
+      }
+      const permCtx = await loadProjectPermissionContext(db, params.userId, row.project_id);
+      if (!permCtx || !canDeletePhotos(permCtx)) {
+        failedIds.push(photoId);
+        continue;
+      }
+      const fileSize = Number(row.file_size ?? 0);
+      const purged = await db.transaction(async (trx: Knex.Transaction) =>
+        purgePhotoRecord(trx, row.project_id, photoId, fileSize),
+      );
+      if (!purged) {
+        failedIds.push(photoId);
+        continue;
+      }
+      try {
+        await removeUploadDir(row.project_id, photoId);
+      } catch (err) {
+        fastify.log.error(
+          { err, projectId: row.project_id, photoId },
+          "removeUploadDir failed after bulk photo delete",
+        );
+      }
+      deletedIds.push(photoId);
+    }
+
+    return { deletedIds, failedIds };
+  }
+
+  async function insertPhoto(
+    photo: PhotoInsert,
+    ownerIdForQuota?: string,
+  ): Promise<PhotoDto | null> {
     const row: Record<string, unknown> = {
       project_id: photo.project_id,
       original_path: photo.original_path,
@@ -263,6 +411,9 @@ function buildPhotosService(
     if (photo.id) row.id = photo.id;
     try {
       const result = await db.transaction(async (trx: Knex.Transaction) => {
+        if (ownerIdForQuota) {
+          await reserveQuotaInTransaction(trx, ownerIdForQuota, photo.file_size ?? 0);
+        }
         const inserted = await trx<PhotoRecord>("photos").insert(row, "*");
         const insertedPhoto = inserted[0];
         if (!insertedPhoto) {
@@ -278,6 +429,9 @@ function buildPhotosService(
       jobRunner.notify();
       return mapPhotoRecordToDto(result);
     } catch (err) {
+      if (err instanceof StorageQuotaExceededError) {
+        throw err;
+      }
       fastify.log.error({ err }, "insertPhoto failed");
       return null;
     }
@@ -289,6 +443,8 @@ function buildPhotosService(
     updatePhotoMetadata,
     insertPhoto,
     canUploadToProject,
+    deletePhoto,
+    deletePhotos,
   };
 }
 

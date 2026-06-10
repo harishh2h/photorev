@@ -21,6 +21,9 @@ import { usePhotoMultiSelect } from '@/hooks/usePhotoMultiSelect.js'
 import { countForFilter, PHOTO_FILTER, REVIEW_SCOPE } from '@/utils/projectReviewFilters.js'
 import { isPhotoVirtualGridEnabled } from '@/utils/photoContentUrl.js'
 import { mapPhotosForViewer } from '@/utils/mapPhotosForViewer.js'
+import PhotoDeleteConfirmModal from './PhotoDeleteConfirmModal.jsx'
+import { deletePhotos } from '@/services/photoService.js'
+import { useToast } from '@/components/Toast/index.js'
 
 /**
  * @param {{ data: object; token: string; projectId: string; userEmail?: string; onLogout?: () => void; onRefresh: () => void; onLoadMorePhotos?: () => void; hasMorePhotos?: boolean; isLoadingMore?: boolean; isLoadingGrid?: boolean; reviewScope: string; activeFilter: string; onReviewScopeChange: (scope: string) => void; onFilterChange: (filter: string) => void }} props
@@ -43,10 +46,14 @@ export default function ProjectViewScreen({
   onFilterChange,
 }) {
   const navigate = useNavigate()
+  const { show: showToast } = useToast()
   const canReviewPhotos = data.canReviewPhotos !== false
+  const canDeletePhotos = Boolean(data.canDeletePhotos)
   const [collaboratorsOpen, setCollaboratorsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const exportReviewScope = canReviewPhotos ? reviewScope : REVIEW_SCOPE.TEAM
   const exportActiveFilter = canReviewPhotos ? activeFilter : PHOTO_FILTER.LIKED
   const scopeCounts =
@@ -88,7 +95,12 @@ export default function ProjectViewScreen({
     retryFailedUploads,
     cancelUploadJob,
     maxUploadConcurrency,
-  } = useProjectPhotoUpload({ token, projectId, onAfterBatch: onRefresh })
+  } = useProjectPhotoUpload({
+    token,
+    projectId,
+    onAfterBatch: onRefresh,
+    storageQuota: data.storageQuota ?? null,
+  })
 
   const gridPhotos = data.photos
   const visiblePhotoIds = useMemo(() => gridPhotos.map((photo) => photo.id), [gridPhotos])
@@ -126,6 +138,32 @@ export default function ProjectViewScreen({
     void exportState.startExport('preview', multiSelect.selectedIdList)
     multiSelect.clearSelection()
   }, [exportState, multiSelect])
+  const handleOpenDeleteSelected = useCallback(() => {
+    if (multiSelect.selectedCount === 0 || !canDeletePhotos) return
+    setDeleteModalOpen(true)
+  }, [canDeletePhotos, multiSelect.selectedCount])
+  const handleConfirmDeleteSelected = useCallback(async () => {
+    if (multiSelect.selectedCount === 0) return
+    setDeleteBusy(true)
+    try {
+      const result = await deletePhotos(token, multiSelect.selectedIdList)
+      if (result.failedIds.length > 0) {
+        showToast(`Deleted ${result.deletedIds.length}; ${result.failedIds.length} could not be removed`, 'info')
+      } else {
+        showToast(
+          `Deleted ${result.deletedIds.length} photo${result.deletedIds.length === 1 ? '' : 's'}`,
+          'success'
+        )
+      }
+      multiSelect.clearSelection()
+      setDeleteModalOpen(false)
+      onRefresh()
+    } catch (err) {
+      throw err
+    } finally {
+      setDeleteBusy(false)
+    }
+  }, [multiSelect, onRefresh, showToast, token])
   const handleManageCollaborators = useCallback(() => {
     if (data.isProjectCreator) {
       setCollaboratorsOpen(true)
@@ -191,6 +229,9 @@ export default function ProjectViewScreen({
         onSelectAllVisible={multiSelect.selectAllVisible}
         onSelectSelectedFullQuality={handleExportSelectedFullQuality}
         onSelectSelectedCompressed={handleExportSelectedCompressed}
+        canDeletePhotos={canDeletePhotos}
+        deleteBusy={deleteBusy}
+        onDeleteSelected={handleOpenDeleteSelected}
       />
       <ProjectExportStatusFloat
         show={exportState.showPanel}
@@ -283,6 +324,11 @@ export default function ProjectViewScreen({
             {canReviewPhotos && Boolean(data.canUploadPhotos) ? (
               <ProjectGridOverlays onAddPhotos={openFilePicker} isUploading={isUploading} />
             ) : null}
+            {data.isStorageQuotaBlocked ? (
+              <p className="mt-4 rounded-card border-[1.5px] border-warning/30 bg-warning/10 px-4 py-3 text-center font-base text-sm text-base-content">
+                Storage quota full. Contact an admin to increase your limit.
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
@@ -312,6 +358,15 @@ export default function ProjectViewScreen({
         token={token}
         projectId={projectId}
         projectName={data.projectTitle}
+      />
+      <PhotoDeleteConfirmModal
+        isOpen={deleteModalOpen}
+        photoCount={multiSelect.selectedCount}
+        busy={deleteBusy}
+        onClose={() => {
+          if (!deleteBusy) setDeleteModalOpen(false)
+        }}
+        onConfirm={handleConfirmDeleteSelected}
       />
     </div>
   )
@@ -367,6 +422,14 @@ ProjectViewScreen.propTypes = {
     viewerContext: PropTypes.object,
     canReviewPhotos: PropTypes.bool,
     canUploadPhotos: PropTypes.bool,
+    canDeletePhotos: PropTypes.bool,
+    storageQuota: PropTypes.shape({
+      quotaBytes: PropTypes.number,
+      usageBytes: PropTypes.number,
+      remainingBytes: PropTypes.number,
+      canUpload: PropTypes.bool,
+    }),
+    isStorageQuotaBlocked: PropTypes.bool,
     isProjectCreator: PropTypes.bool,
     filterCounts: PropTypes.shape({
       mine: PropTypes.object.isRequired,
