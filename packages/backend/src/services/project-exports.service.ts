@@ -11,6 +11,7 @@ import {
 } from "../models/project-export";
 import {
   computeProjectExportHash,
+  computeProjectExportHashByIds,
   DEFAULT_EXPORT_FILTER,
   DEFAULT_EXPORT_SCOPE,
 } from "../utils/export-photo-query";
@@ -24,11 +25,13 @@ export interface CreateProjectExportParams {
   readonly variant: ProjectExportVariant;
   readonly reviewScope?: string;
   readonly photoFilter?: string;
+  readonly photoIds?: unknown;
 }
 
 export interface CreateShareExportParams {
   readonly shareToken: string;
   readonly variant: ProjectExportVariant;
+  readonly photoIds?: unknown;
 }
 
 export interface GetExportParams {
@@ -164,9 +167,15 @@ function buildProjectExportsService(
     shareLinkId: string | null;
     photoCount: number;
     selectionHash: string;
-    reviewScope: string;
-    photoFilter: string;
+    reviewScope: string | null;
+    photoFilter: string | null;
+    photoIds: string[] | null;
   }): Promise<ProjectExportDto> {
+    const photoIdsJson =
+      params.photoIds != null && params.photoIds.length > 0
+        ? JSON.stringify(params.photoIds)
+        : null;
+
     const [row] = await db<ProjectExportRecord>("project_exports")
       .insert({
         project_id: params.projectId,
@@ -179,6 +188,7 @@ function buildProjectExportsService(
         selection_hash: params.selectionHash,
         review_scope: params.reviewScope,
         photo_filter: params.photoFilter,
+        photo_ids: photoIdsJson == null ? null : db.raw("?::jsonb", [photoIdsJson]),
       })
       .returning("*");
     exportRunner.notify();
@@ -192,7 +202,40 @@ function buildProjectExportsService(
     shareLinkId: string | null;
     reviewScope?: string;
     photoFilter?: string;
+    photoIds?: unknown;
+    shareEligibleOnly?: boolean;
   }): Promise<ProjectExportDto> {
+    const hasPhotoIds =
+      Array.isArray(params.photoIds) && params.photoIds.length > 0;
+
+    if (hasPhotoIds) {
+      const { hash, photoCount, photoIds } = await computeProjectExportHashByIds(
+        db,
+        params.projectId,
+        params.userId,
+        params.photoIds,
+        { shareEligibleOnly: params.shareEligibleOnly },
+      );
+      const existing = await findReusableExport(params.projectId, params.variant, hash);
+      if (existing) {
+        if (existing.status === "queued") {
+          exportRunner.notify();
+        }
+        return mapRecordToDto(existing, true);
+      }
+      return insertExport({
+        projectId: params.projectId,
+        variant: params.variant,
+        userId: params.userId,
+        shareLinkId: params.shareLinkId,
+        photoCount,
+        selectionHash: hash,
+        reviewScope: null,
+        photoFilter: null,
+        photoIds,
+      });
+    }
+
     const scope = params.reviewScope ?? DEFAULT_EXPORT_SCOPE;
     const filter = params.photoFilter ?? DEFAULT_EXPORT_FILTER;
     const { hash, photoCount } = await computeProjectExportHash(
@@ -223,6 +266,7 @@ function buildProjectExportsService(
       selectionHash: hash,
       reviewScope: scope,
       photoFilter: filter,
+      photoIds: null,
     });
   }
 
@@ -248,6 +292,7 @@ function buildProjectExportsService(
         shareLinkId: null,
         reviewScope: params.reviewScope,
         photoFilter: params.photoFilter,
+        photoIds: params.photoIds,
       });
     },
 
@@ -272,6 +317,8 @@ function buildProjectExportsService(
         variant: params.variant,
         userId: null,
         shareLinkId: link.id,
+        photoIds: params.photoIds,
+        shareEligibleOnly: true,
       });
     },
 

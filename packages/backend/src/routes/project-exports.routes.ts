@@ -35,6 +35,11 @@ const createExportSchema = {
         type: "string",
         enum: ["all", "liked", "rejected", "unreviewed", "conflicts", "trashed"],
       },
+      photoIds: {
+        type: "array",
+        items: { type: "string", format: "uuid" },
+        maxItems: 500,
+      },
     },
     additionalProperties: false,
   },

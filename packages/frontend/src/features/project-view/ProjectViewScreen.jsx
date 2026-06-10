@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PropTypes from 'prop-types'
 import { ProjectChrome } from '@/features/project-view/chrome/index.js'
@@ -17,6 +17,7 @@ import {
   useProjectExport,
 } from '@/features/project-export/index.js'
 import { useProjectPhotoUpload } from '@/hooks/useProjectPhotoUpload.js'
+import { usePhotoMultiSelect } from '@/hooks/usePhotoMultiSelect.js'
 import { countForFilter, PHOTO_FILTER, REVIEW_SCOPE } from '@/utils/projectReviewFilters.js'
 import { isPhotoVirtualGridEnabled } from '@/utils/photoContentUrl.js'
 import { mapPhotosForViewer } from '@/utils/mapPhotosForViewer.js'
@@ -90,6 +91,9 @@ export default function ProjectViewScreen({
   } = useProjectPhotoUpload({ token, projectId, onAfterBatch: onRefresh })
 
   const gridPhotos = data.photos
+  const visiblePhotoIds = useMemo(() => gridPhotos.map((photo) => photo.id), [gridPhotos])
+  const multiSelect = usePhotoMultiSelect(visiblePhotoIds)
+  const enableSelection = gridPhotos.length > 0
 
   const handleReviewScopeChange = useCallback(
     (scope) => {
@@ -112,6 +116,16 @@ export default function ProjectViewScreen({
   const handleExportCompressed = useCallback(() => {
     void exportState.startExport('preview')
   }, [exportState])
+  const handleExportSelectedFullQuality = useCallback(() => {
+    if (multiSelect.selectedCount === 0) return
+    void exportState.startExport('original', multiSelect.selectedIdList)
+    multiSelect.clearSelection()
+  }, [exportState, multiSelect])
+  const handleExportSelectedCompressed = useCallback(() => {
+    if (multiSelect.selectedCount === 0) return
+    void exportState.startExport('preview', multiSelect.selectedIdList)
+    multiSelect.clearSelection()
+  }, [exportState, multiSelect])
   const handleManageCollaborators = useCallback(() => {
     if (data.isProjectCreator) {
       setCollaboratorsOpen(true)
@@ -165,11 +179,18 @@ export default function ProjectViewScreen({
         onManageCollaborators={data.isProjectCreator ? handleManageCollaborators : undefined}
         onShare={handleShare}
         onSettings={handleSettings}
-        canDownload={filteredDownloadCount > 0}
+        canDownload={!multiSelect.selectionActive && filteredDownloadCount > 0}
         onSelectFullQuality={handleExportFullQuality}
         onSelectCompressed={handleExportCompressed}
         exportBusy={exportState.isBusy}
         viewerSelectedCount={data.sidebarStats.viewer.selected}
+        selectionActive={multiSelect.selectionActive}
+        selectedCount={multiSelect.selectedCount}
+        allVisibleSelected={multiSelect.allVisibleSelected}
+        onClearSelection={multiSelect.clearSelection}
+        onSelectAllVisible={multiSelect.selectAllVisible}
+        onSelectSelectedFullQuality={handleExportSelectedFullQuality}
+        onSelectSelectedCompressed={handleExportSelectedCompressed}
       />
       <ProjectExportStatusFloat
         show={exportState.showPanel}
@@ -214,7 +235,7 @@ export default function ProjectViewScreen({
           onCancelJob={cancelUploadJob}
         />
       ) : null}
-      <div className={`relative flex flex-col gap-6 pb-28 pt-4 ${canReviewPhotos ? 'lg:pb-16' : 'lg:pb-10'}`}>
+      <div className={`relative flex flex-col gap-6 pt-4 ${canReviewPhotos ? 'pb-28 lg:pb-16' : 'pb-28 lg:pb-10'}`}>
         {isLoadingGrid && gridPhotos.length === 0 ? (
           <div
             className="pointer-events-none absolute inset-0 z-raised flex items-start justify-center bg-base-100/50 pt-16"
@@ -234,7 +255,7 @@ export default function ProjectViewScreen({
                 onLoadMore={onLoadMorePhotos}
                 hasMore={hasMorePhotos}
                 isLoadingMore={isLoadingMore}
-                renderTile={({ photo, position, animationDelay }) => (
+                renderTile={({ photo, index, position, animationDelay }) => (
                   <ProjectPhotoTile
                     as="div"
                     photo={photo}
@@ -242,6 +263,13 @@ export default function ProjectViewScreen({
                     onOpenPhoto={openPhotoViewer}
                     reviewScope={reviewScope}
                     canReviewPhotos={canReviewPhotos}
+                    enableSelection={enableSelection}
+                    selectionActive={multiSelect.selectionActive}
+                    isSelected={multiSelect.isSelected(photo.id)}
+                    photoIndex={index}
+                    onPhotoClick={multiSelect.handlePhotoClick}
+                    onCheckboxPress={multiSelect.handleCheckboxPress}
+                    onLongPressSelect={multiSelect.handleLongPress}
                     layoutSlot={position}
                     animationDelay={animationDelay}
                   />
@@ -252,12 +280,8 @@ export default function ProjectViewScreen({
                 {emptyMessage}
               </p>
             )}
-            {canReviewPhotos ? (
-              <ProjectGridOverlays
-                onAddPhotos={openFilePicker}
-                isUploading={isUploading}
-                showAddPhotos={Boolean(data.canUploadPhotos)}
-              />
+            {canReviewPhotos && Boolean(data.canUploadPhotos) ? (
+              <ProjectGridOverlays onAddPhotos={openFilePicker} isUploading={isUploading} />
             ) : null}
           </div>
         </div>

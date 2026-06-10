@@ -26,13 +26,16 @@ import { apiFetch, getApiBaseUrl, isApiEnvelope, notifyUnauthorized } from './ht
  * @param {string} token
  * @param {string} projectId
  * @param {ExportVariant} variant
- * @param {{ scope?: string; filter?: string }} [options]
+ * @param {{ scope?: string; filter?: string; photoIds?: string[] }} [options]
  * @returns {Promise<ProjectExportStatus>}
  */
 export async function createProjectExport(token, projectId, variant, options = {}) {
   const body = { variant }
   if (options.scope) body.scope = options.scope
   if (options.filter) body.filter = options.filter
+  if (Array.isArray(options.photoIds) && options.photoIds.length > 0) {
+    body.photoIds = options.photoIds
+  }
   const { ok, message, data } = await apiFetch(`/projects/${encodeURIComponent(projectId)}/exports`, {
     token,
     method: 'POST',
@@ -94,16 +97,21 @@ export async function fetchProjectExportZipBlob(token, projectId, exportId, opti
  * @param {string} shareToken
  * @param {ExportVariant} variant
  * @param {string | null} unlockToken
+ * @param {{ photoIds?: string[] }} [options]
  * @returns {Promise<ProjectExportStatus>}
  */
-export async function createShareExport(shareToken, variant, unlockToken) {
+export async function createShareExport(shareToken, variant, unlockToken, options = {}) {
   const base = getApiBaseUrl()
   const headers = { 'Content-Type': 'application/json' }
   if (unlockToken) headers.Authorization = `Bearer ${unlockToken}`
+  const body = { variant }
+  if (Array.isArray(options.photoIds) && options.photoIds.length > 0) {
+    body.photoIds = options.photoIds
+  }
   const res = await fetch(`${base}/public/share/${encodeURIComponent(shareToken)}/exports`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ variant }),
+    body: JSON.stringify(body),
   })
   const parsed = await res.json()
   if (!isApiEnvelope(parsed) || parsed.error) {

@@ -10,6 +10,8 @@ import {
   DEFAULT_EXPORT_FILTER,
   DEFAULT_EXPORT_SCOPE,
   loadExportPhotoRows,
+  loadExportPhotoRowsByIds,
+  normalizeExportPhotoIds,
 } from "../utils/export-photo-query";
 import {
   resolveExportPhotoAbsolutePath,
@@ -65,15 +67,24 @@ export class ExportRunner {
 
   private async processExport(job: ProjectExportRecord): Promise<void> {
     try {
-      const scope = job.review_scope ?? DEFAULT_EXPORT_SCOPE;
-      const filter = job.photo_filter ?? DEFAULT_EXPORT_FILTER;
-      const filteredRows = await loadExportPhotoRows(
-        db,
-        job.project_id,
-        job.created_by_user_id,
-        scope,
-        filter,
-      );
+      const shareEligibleOnly = job.share_link_id != null;
+      const explicitIds = normalizeExportPhotoIds(job.photo_ids);
+      const filteredRows =
+        explicitIds.length > 0
+          ? await loadExportPhotoRowsByIds(
+              db,
+              job.project_id,
+              job.created_by_user_id,
+              explicitIds,
+              { shareEligibleOnly },
+            )
+          : await loadExportPhotoRows(
+              db,
+              job.project_id,
+              job.created_by_user_id,
+              job.review_scope ?? DEFAULT_EXPORT_SCOPE,
+              job.photo_filter ?? DEFAULT_EXPORT_FILTER,
+            );
       const photos: ExportPhotoRow[] = filteredRows.map((row) => ({
         id: row.id,
         original_name: row.original_name,

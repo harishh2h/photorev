@@ -25,6 +25,7 @@ export interface ProjectExportRecord {
   readonly selection_hash: string | null;
   readonly review_scope: string | null;
   readonly photo_filter: string | null;
+  readonly photo_ids: string[] | null;
 }
 
 export interface ProjectExportDto {

@@ -1,11 +1,24 @@
 /**
+ * @param {string[]} photoIds
+ * @returns {string}
+ */
+function photoIdsKeySegment(photoIds) {
+  if (!Array.isArray(photoIds) || photoIds.length === 0) return ''
+  return [...photoIds].sort().join(',')
+}
+
+/**
  * @param {'project' | 'share'} mode
  * @param {string} scopeId projectId or share token
- * @param {{ reviewScope?: string; activeFilter?: string }} [filters]
+ * @param {{ reviewScope?: string; activeFilter?: string; photoIds?: string[] }} [filters]
  * @returns {string}
  */
 export function getExportStorageKey(mode, scopeId, filters = {}) {
   const base = `photorev-export:${mode}:${scopeId}`
+  const idsSegment = photoIdsKeySegment(filters.photoIds)
+  if (idsSegment) {
+    return `${base}:ids:${idsSegment}`
+  }
   if (mode !== 'project') return base
   const reviewScope = filters.reviewScope ?? 'mine'
   const activeFilter = filters.activeFilter ?? 'all'

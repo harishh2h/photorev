@@ -154,7 +154,7 @@ export default function ProjectMobileActionsSheet({
         {canDownload && onSelectFullQuality && onSelectCompressed ? (
           <div className="px-1 py-1">
             <p className="mx-2 mb-1 mt-0 font-base text-xs font-semibold uppercase tracking-wide text-muted">
-              Download selected
+              Download all in view
             </p>
             <ProjectDownloadDropdown
               compact

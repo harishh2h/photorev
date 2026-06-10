@@ -22,6 +22,42 @@ export interface ExportPhotoQueryRow {
 
 export const DEFAULT_EXPORT_SCOPE: ProjectGridReviewScope = "team";
 export const DEFAULT_EXPORT_FILTER: ProjectGridPhotoFilter = "liked";
+export const MAX_EXPORT_PHOTO_IDS = 500;
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export interface LoadExportPhotoRowsByIdsOptions {
+  readonly shareEligibleOnly?: boolean;
+}
+
+/** Deduplicates, validates UUIDs, caps count, returns stable sorted order. */
+export function normalizeExportPhotoIds(input: unknown): string[] {
+  let rawInput = input;
+  if (typeof rawInput === "string") {
+    try {
+      rawInput = JSON.parse(rawInput) as unknown;
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(rawInput)) {
+    return [];
+  }
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const raw of rawInput) {
+    if (typeof raw !== "string" || !UUID_RE.test(raw) || seen.has(raw)) {
+      continue;
+    }
+    seen.add(raw);
+    ids.push(raw);
+    if (ids.length >= MAX_EXPORT_PHOTO_IDS) {
+      break;
+    }
+  }
+  return ids.sort();
+}
 
 export function resolveExportFilters(
   scope: unknown,
@@ -107,4 +143,60 @@ export async function computeProjectExportHash(
   ].join(",");
   const hash = createHash("sha256").update(payload).digest("hex");
   return { hash, photoCount: rows.length, scope, filter };
+}
+
+/**
+ * Photos included in an export for an explicit multi-select set.
+ */
+export async function loadExportPhotoRowsByIds(
+  db: Knex,
+  projectId: string,
+  userId: string | null,
+  photoIds: readonly string[],
+  options: LoadExportPhotoRowsByIdsOptions = {},
+): Promise<ExportPhotoQueryRow[]> {
+  if (photoIds.length === 0) {
+    return [];
+  }
+  const allRows = await loadProjectPhotoRows(db, projectId, userId);
+  const byId = new Map(allRows.map((row) => [row.id, row]));
+  const rows: ExportPhotoQueryRow[] = [];
+  for (const id of photoIds) {
+    const row = byId.get(id);
+    if (!row) {
+      continue;
+    }
+    if (options.shareEligibleOnly) {
+      if (row.status !== "ready" || row.final_decision !== 1) {
+        continue;
+      }
+    } else if (row.status === "deleted" || row.status === "trashed") {
+      continue;
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+export async function computeProjectExportHashByIds(
+  db: Knex,
+  projectId: string,
+  userId: string | null,
+  photoIdsInput: unknown,
+  options: LoadExportPhotoRowsByIdsOptions = {},
+): Promise<{ hash: string; photoCount: number; photoIds: string[] }> {
+  const photoIds = normalizeExportPhotoIds(photoIdsInput);
+  if (photoIds.length === 0) {
+    throw new Error("Select at least one photo to download");
+  }
+  const rows = await loadExportPhotoRowsByIds(db, projectId, userId, photoIds, options);
+  if (rows.length !== photoIds.length) {
+    throw new Error("One or more photos are not available for download");
+  }
+  const payload = [
+    "ids",
+    ...rows.map((row) => `${row.id}:${row.renamed_to?.trim() ?? ""}`),
+  ].join(",");
+  const hash = createHash("sha256").update(payload).digest("hex");
+  return { hash, photoCount: rows.length, photoIds };
 }

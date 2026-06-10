@@ -11,6 +11,7 @@ const itemClass =
  * @param {{
  *   disabled?: boolean;
  *   compact?: boolean;
+ *   selectedCount?: number;
  *   onSelectFullQuality: () => void;
  *   onSelectCompressed: () => void;
  * }} props
@@ -18,9 +19,14 @@ const itemClass =
 export default function ProjectDownloadDropdown({
   disabled = false,
   compact = false,
+  selectedCount = 0,
   onSelectFullQuality,
   onSelectCompressed,
 }) {
+  const label =
+    selectedCount > 0
+      ? `Download ${selectedCount} photo${selectedCount === 1 ? '' : 's'}`
+      : 'Download'
   const menu = useDropdown()
 
   const handleSelect = (action) => {
@@ -51,12 +57,12 @@ export default function ProjectDownloadDropdown({
         onClick={menu.toggle}
         aria-expanded={menu.isOpen}
         aria-haspopup="menu"
-        aria-label="Download selected photos"
+        aria-label={selectedCount > 0 ? `Download ${selectedCount} selected photos` : 'Download selected photos'}
       >
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
           <path d="M12 4v12M6 12l6 6 6-6M5 21h14" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        Download
+        {label}
         <span
           className={`flex text-muted transition-transform duration-150 ease-out ${menu.isOpen ? 'rotate-180' : ''}`}
           aria-hidden
@@ -99,6 +105,7 @@ export default function ProjectDownloadDropdown({
 ProjectDownloadDropdown.propTypes = {
   disabled: PropTypes.bool,
   compact: PropTypes.bool,
+  selectedCount: PropTypes.number,
   onSelectFullQuality: PropTypes.func.isRequired,
   onSelectCompressed: PropTypes.func.isRequired,
 }

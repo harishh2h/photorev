@@ -69,6 +69,11 @@ const shareExportCreateSchema = {
     required: ["variant"],
     properties: {
       variant: { type: "string", enum: ["original", "preview"] },
+      photoIds: {
+        type: "array",
+        items: { type: "string", format: "uuid" },
+        maxItems: 500,
+      },
     },
     additionalProperties: false,
   },
@@ -312,7 +317,7 @@ async function publicShareRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const { token } = request.params as { token: string };
-      const body = request.body as { variant?: string };
+      const body = request.body as { variant?: string; photoIds?: unknown };
       const variant = body.variant === "preview" ? "preview" : "original";
       const link = await shareSvc.loadShareByToken(token);
       if (!link || link.revoked_at) {
@@ -335,7 +340,11 @@ async function publicShareRoutes(
         }
       }
       try {
-        const created = await exportSvc.createForShare({ shareToken: token, variant });
+        const created = await exportSvc.createForShare({
+          shareToken: token,
+          variant,
+          photoIds: body.photoIds,
+        });
         if (!created) {
           sendFailure(reply, 404, "Share link not found", null);
           return;

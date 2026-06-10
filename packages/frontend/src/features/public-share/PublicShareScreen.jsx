@@ -1,9 +1,11 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import PropTypes from 'prop-types'
 import PublicSharePasswordGate from './PublicSharePasswordGate.jsx'
 import PublicShareGrid from './PublicShareGrid.jsx'
 import PublicShareLightbox from './PublicShareLightbox.jsx'
+import PhotoSelectionControlBar from '@/features/project-view/PhotoSelectionControlBar.jsx'
 import { usePublicShare } from './usePublicShare.js'
+import { usePhotoMultiSelect } from '@/hooks/usePhotoMultiSelect.js'
 import {
   getExportStorageKey,
   ProjectDownloadDropdown,
@@ -38,6 +40,21 @@ export default function PublicShareScreen({ token }) {
     void exportState.startExport('preview')
   }, [exportState])
 
+  const photoIds = useMemo(() => (listing?.photos ?? []).map((photo) => photo.id), [listing?.photos])
+  const multiSelect = usePhotoMultiSelect(photoIds)
+
+  const handleExportSelectedFullQuality = useCallback(() => {
+    if (multiSelect.selectedCount === 0) return
+    void exportState.startExport('original', multiSelect.selectedIdList)
+    multiSelect.clearSelection()
+  }, [exportState, multiSelect])
+
+  const handleExportSelectedCompressed = useCallback(() => {
+    if (multiSelect.selectedCount === 0) return
+    void exportState.startExport('preview', multiSelect.selectedIdList)
+    multiSelect.clearSelection()
+  }, [exportState, multiSelect])
+
   if (loading && !listing) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-bg px-4 font-base text-sm text-muted">
@@ -67,30 +84,46 @@ export default function PublicShareScreen({ token }) {
   }
 
   const { meta, photos } = listing
+  const allowDownload = meta.allowDownload && photos.length > 0
+
   return (
     <div className="min-h-screen bg-bg">
-      <header className="border-b-[1.5px] border-base-300 bg-base-100">
-        <div className="mx-auto flex max-w-[1400px] flex-col gap-2 px-4 py-6 md:flex-row md:items-end md:justify-between md:px-8 md:py-8">
-          <div className="flex flex-col gap-1">
-            <p className="m-0 font-base text-xs font-semibold uppercase tracking-[0.08em] text-accent">
-              Shared gallery
-            </p>
-            <h1 className="m-0 font-base text-3xl font-bold leading-tight text-base-content md:text-4xl">
-              {meta.projectName}
-            </h1>
-            {meta.description ? (
-              <p className="m-0 max-w-prose font-base text-sm text-muted">{meta.description}</p>
-            ) : null}
-          </div>
-          {meta.allowDownload && photos.length > 0 ? (
-            <div className="flex shrink-0 items-center md:pb-1">
-              <ProjectDownloadDropdown
-                disabled={exportState.isBusy}
-                onSelectFullQuality={handleExportFullQuality}
-                onSelectCompressed={handleExportCompressed}
-              />
+      <header className="sticky top-0 z-sticky border-b-[1.5px] border-base-300 bg-base-100/95 backdrop-blur-md">
+        <div className="mx-auto max-w-[1400px] px-4 md:px-8">
+          {multiSelect.selectionActive ? (
+            <PhotoSelectionControlBar
+              selectedCount={multiSelect.selectedCount}
+              allVisibleSelected={multiSelect.allVisibleSelected}
+              exportBusy={exportState.isBusy}
+              onClear={multiSelect.clearSelection}
+              onSelectAll={multiSelect.selectAllVisible}
+              onSelectFullQuality={handleExportSelectedFullQuality}
+              onSelectCompressed={handleExportSelectedCompressed}
+            />
+          ) : (
+            <div className="flex flex-col gap-2 py-6 md:flex-row md:items-end md:justify-between md:py-8">
+              <div className="flex flex-col gap-1">
+                <p className="m-0 font-base text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+                  Shared gallery
+                </p>
+                <h1 className="m-0 font-base text-3xl font-bold leading-tight text-base-content md:text-4xl">
+                  {meta.projectName}
+                </h1>
+                {meta.description ? (
+                  <p className="m-0 max-w-prose font-base text-sm text-muted">{meta.description}</p>
+                ) : null}
+              </div>
+              {allowDownload ? (
+                <div className="flex shrink-0 items-center md:pb-1">
+                  <ProjectDownloadDropdown
+                    disabled={exportState.isBusy}
+                    onSelectFullQuality={handleExportFullQuality}
+                    onSelectCompressed={handleExportCompressed}
+                  />
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          )}
         </div>
       </header>
       <main className="mx-auto max-w-[1400px] px-4 pb-16 pt-6 md:px-8 md:pt-10">
@@ -99,6 +132,12 @@ export default function PublicShareScreen({ token }) {
           unlockToken={unlockToken}
           photos={photos}
           onSelect={(i) => setActiveIndex(i)}
+          enableSelection={allowDownload}
+          selectionActive={multiSelect.selectionActive}
+          isSelected={multiSelect.isSelected}
+          onPhotoClick={multiSelect.handlePhotoClick}
+          onCheckboxPress={multiSelect.handleCheckboxPress}
+          onLongPressSelect={multiSelect.handleLongPress}
         />
       </main>
       <ProjectExportStatusFloat

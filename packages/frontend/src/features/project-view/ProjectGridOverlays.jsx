@@ -1,25 +1,18 @@
 import PropTypes from 'prop-types'
 
-/**
- * Fixed add-photos FAB — stays visible while the grid scrolls.
- *
- * @param {{ onAddPhotos: () => void; isUploading?: boolean; showAddPhotos?: boolean }} props
- */
-export default function ProjectGridOverlays({
-  onAddPhotos,
-  isUploading = false,
-  showAddPhotos = true,
-}) {
-  if (!showAddPhotos) {
-    return null
-  }
+const fabClass =
+  'pointer-events-auto flex h-14 w-14 min-h-14 min-w-14 items-center justify-center rounded-full border-0 bg-primary text-primary-content shadow-floating transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.94] focus-visible:outline-none focus-visible:shadow-focus enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-40'
 
+/**
+ * Fixed upload FAB — stays visible while the grid scrolls.
+ */
+export default function ProjectGridOverlays({ onAddPhotos, isUploading = false }) {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[220] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-      <div className="pointer-events-none relative mx-auto max-w-[1400px] px-4 md:px-6 lg:px-8">
+      <div className="pointer-events-none relative mx-auto flex max-w-[1400px] justify-end px-4 md:px-6 lg:px-8">
         <button
           type="button"
-          className="pointer-events-auto absolute bottom-0 right-4 flex h-14 w-14 min-h-14 min-w-14 items-center justify-center rounded-full border-0 bg-primary text-primary-content shadow-floating transition-[background-color,transform] duration-150 ease-out hover:bg-[#222222] active:scale-[0.94] focus-visible:outline-none focus-visible:shadow-focus enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 md:right-6 lg:right-8"
+          className={fabClass}
           aria-label="Add photos"
           aria-busy={isUploading}
           disabled={isUploading}
@@ -37,5 +30,4 @@ export default function ProjectGridOverlays({
 ProjectGridOverlays.propTypes = {
   onAddPhotos: PropTypes.func.isRequired,
   isUploading: PropTypes.bool,
-  showAddPhotos: PropTypes.bool,
 }

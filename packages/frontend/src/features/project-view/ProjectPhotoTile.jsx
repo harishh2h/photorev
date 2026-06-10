@@ -1,6 +1,8 @@
-import { memo } from 'react'
+import { memo, useCallback } from 'react'
 import PropTypes from 'prop-types'
 import ProjectPhotoImage from './ProjectPhotoImage.jsx'
+import { PhotoSelectCheckbox } from '@/components/photo-grid/index.js'
+import { useLongPress } from '@/hooks/useLongPress.js'
 import { REVIEW_SCOPE } from '@/utils/projectReviewFilters.js'
 import {
   GRID_TILE_HOVER_IMAGE_CLASS,
@@ -51,7 +53,7 @@ function ConflictBadge({ conflictState }) {
 }
 
 /**
- * @param {{ photo: object; token: string; onOpenPhoto: (photoId: string) => void; reviewScope?: string; canReviewPhotos?: boolean; animationDelay?: string; as?: 'li' | 'div'; layoutSlot?: { width: number; height: number } }} props
+ * @param {{ photo: object; token: string; onOpenPhoto: (photoId: string) => void; reviewScope?: string; canReviewPhotos?: boolean; enableSelection?: boolean; selectionActive?: boolean; isSelected?: boolean; photoIndex?: number; onPhotoClick?: (photoId: string, index: number, event: import('react').MouseEvent) => boolean; onCheckboxPress?: (photoId: string, index: number) => void; onLongPressSelect?: (photoId: string, index: number) => void; animationDelay?: string; as?: 'li' | 'div'; layoutSlot?: { width: number; height: number } }} props
  */
 function ProjectPhotoTile({
   photo,
@@ -59,10 +61,46 @@ function ProjectPhotoTile({
   onOpenPhoto,
   reviewScope = REVIEW_SCOPE.MINE,
   canReviewPhotos = true,
+  enableSelection = true,
+  selectionActive = false,
+  isSelected = false,
+  photoIndex = 0,
+  onPhotoClick,
+  onCheckboxPress,
+  onLongPressSelect,
   animationDelay = '0ms',
   as: Tag = 'li',
   layoutSlot,
 }) {
+  const handleLongPress = useCallback(() => {
+    onLongPressSelect?.(photo.id, photoIndex)
+  }, [onLongPressSelect, photo.id, photoIndex])
+
+  const longPress = useLongPress(handleLongPress)
+
+  const handleTileClick = (event) => {
+    if (enableSelection && onPhotoClick?.(photo.id, photoIndex, event)) {
+      return
+    }
+    onOpenPhoto(photo.id)
+  }
+
+  const tileAriaLabel = selectionActive
+    ? `${isSelected ? 'Deselect' : 'Select'} ${photo.alt || 'photo'}`
+    : `Open ${photo.alt || 'photo'} fullscreen`
+
+  const selectionCheckbox =
+    enableSelection ? (
+      <PhotoSelectCheckbox
+        checked={isSelected}
+        visible={selectionActive || isSelected}
+        label={photo.alt || 'photo'}
+        onToggle={() => onCheckboxPress?.(photo.id, photoIndex)}
+      />
+    ) : null
+
+  const selectedRingClass =
+    selectionActive && isSelected ? 'ring-2 ring-accent ring-offset-2 ring-offset-base-100' : ''
   const showScopeBadges = canReviewPhotos
   const useTeamScope = reviewScope === REVIEW_SCOPE.TEAM
   const showLiked = showScopeBadges && (useTeamScope ? photo.teamIsLiked : photo.myIsLiked)
@@ -76,16 +114,22 @@ function ProjectPhotoTile({
         style={{ animationDelay }}
       >
         <div
-          className={`${GRID_TILE_ROOT_CLASS} ${dimRejected ? 'border-muted/55 opacity-90' : ''}`}
+          className={`${GRID_TILE_ROOT_CLASS} ${dimRejected ? 'border-muted/55 opacity-90' : ''} ${selectedRingClass}`}
         >
           <button
             type="button"
             className={`${GRID_TILE_SHELL_BUTTON_CLASS} ${GRID_TILE_PLACEHOLDER_BG} ${
               dimRejected ? 'after:pointer-events-none after:absolute after:inset-0 after:bg-muted/30' : ''
             } focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base-100`}
-            onClick={() => onOpenPhoto(photo.id)}
-            aria-label={`Open ${photo.alt || 'photo'} fullscreen`}
+            onClick={handleTileClick}
+            onClickCapture={longPress.onClickCapture}
+            onPointerDown={longPress.onPointerDown}
+            onPointerUp={longPress.onPointerUp}
+            onPointerLeave={longPress.onPointerLeave}
+            onPointerCancel={longPress.onPointerCancel}
+            aria-label={tileAriaLabel}
           >
+            {selectionCheckbox}
             <ProjectPhotoImage
               photoId={photo.id}
               token={token}
@@ -143,16 +187,22 @@ function ProjectPhotoTile({
       <article
         className={`group relative overflow-hidden rounded-sm border-[1.5px] bg-base-100 text-left shadow-card transition-[transform,box-shadow] duration-[380ms] ease-out hover:-translate-y-1 hover:shadow-card-hover ${
           dimRejected ? 'border-muted/55' : 'border-base-300'
-        }`}
+        } ${selectedRingClass}`}
       >
         <button
           type="button"
           className={`relative flex aspect-[3/4] w-full cursor-pointer overflow-hidden border-0 bg-[#EDF7F2] bg-[radial-gradient(circle_at_1px_1px,rgba(110,231,183,0.45)_1px,transparent_0)] bg-[length:14px_14px] p-0 text-left outline-none transition-[transform] duration-[380ms] focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base-100 ${
             dimRejected ? 'bg-base-300 bg-none after:pointer-events-none after:absolute after:inset-0 after:bg-muted/30' : ''
           }`}
-          onClick={() => onOpenPhoto(photo.id)}
-          aria-label={`Open ${photo.alt || 'photo'} fullscreen`}
+          onClick={handleTileClick}
+          onClickCapture={longPress.onClickCapture}
+          onPointerDown={longPress.onPointerDown}
+          onPointerUp={longPress.onPointerUp}
+          onPointerLeave={longPress.onPointerLeave}
+          onPointerCancel={longPress.onPointerCancel}
+          aria-label={tileAriaLabel}
         >
+          {selectionCheckbox}
           <ProjectPhotoImage
             photoId={photo.id}
             token={token}
@@ -210,6 +260,13 @@ ProjectPhotoTile.propTypes = {
   onOpenPhoto: PropTypes.func.isRequired,
   reviewScope: PropTypes.oneOf([REVIEW_SCOPE.MINE, REVIEW_SCOPE.TEAM]),
   canReviewPhotos: PropTypes.bool,
+  enableSelection: PropTypes.bool,
+  selectionActive: PropTypes.bool,
+  isSelected: PropTypes.bool,
+  photoIndex: PropTypes.number,
+  onPhotoClick: PropTypes.func,
+  onCheckboxPress: PropTypes.func,
+  onLongPressSelect: PropTypes.func,
   animationDelay: PropTypes.string,
   as: PropTypes.oneOf(['li', 'div']),
   layoutSlot: PropTypes.shape({

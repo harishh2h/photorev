@@ -7,7 +7,7 @@ import {
   fetchShareExportStatus,
   fetchShareExportZipBlob,
 } from '@/services/projectExportService.js'
-import { clearActiveExport, readActiveExport, writeActiveExport } from './exportStorage.js'
+import { clearActiveExport, getExportStorageKey, readActiveExport, writeActiveExport } from './exportStorage.js'
 import { EXPORT_VARIANT_LABELS } from './exportLabels.js'
 
 const POLL_MS = 2500
@@ -68,7 +68,12 @@ export function useProjectExport({
   const [panelOpen, setPanelOpen] = useState(false)
   const [activeVariant, setActiveVariant] = useState(null)
   const exportIdRef = useRef(null)
+  const activeStorageKeyRef = useRef(storageKey)
   const restoredRef = useRef(false)
+
+  useEffect(() => {
+    activeStorageKeyRef.current = storageKey
+  }, [storageKey])
 
   const fetchStatus = useCallback(
     async (exportId) => {
@@ -140,7 +145,7 @@ export function useProjectExport({
           setPhase('ready')
         } else if (row.status === 'failed' || row.status === 'expired') {
           setPhase(row.status === 'failed' ? 'failed' : 'idle')
-          if (row.status === 'expired') clearActiveExport(storageKey)
+          if (row.status === 'expired') clearActiveExport(activeStorageKeyRef.current)
         }
       } catch {
         /* transient */
@@ -158,24 +163,29 @@ export function useProjectExport({
   }, [phase, fetchStatus, storageKey])
 
   const startExport = useCallback(
-    async (variant) => {
+    async (variant, photoIds = null) => {
       setError(null)
       setActiveVariant(variant)
       setPanelOpen(true)
       setPhase('starting')
+      const hasPhotoIds = Array.isArray(photoIds) && photoIds.length > 0
+      const jobStorageKey = hasPhotoIds
+        ? getExportStorageKey(mode, mode === 'project' ? projectId : shareToken, { photoIds })
+        : storageKey
+      activeStorageKeyRef.current = jobStorageKey
       try {
+        const exportOptions = hasPhotoIds
+          ? { photoIds }
+          : { scope: reviewScope, filter: activeFilter }
         const created =
           mode === 'project' && projectId
-            ? await createProjectExport(token, projectId, variant, {
-                scope: reviewScope,
-                filter: activeFilter,
-              })
+            ? await createProjectExport(token, projectId, variant, exportOptions)
             : mode === 'share' && shareToken
-              ? await createShareExport(shareToken, variant, unlockToken)
+              ? await createShareExport(shareToken, variant, unlockToken, exportOptions)
               : null
         if (!created) throw new Error('Could not start export')
         exportIdRef.current = created.id
-        writeActiveExport(storageKey, {
+        writeActiveExport(jobStorageKey, {
           exportId: created.id,
           variant,
           projectName,
@@ -237,8 +247,8 @@ export function useProjectExport({
     setDownloading(false)
     setPanelOpen(false)
     setActiveVariant(null)
-    clearActiveExport(storageKey)
-  }, [storageKey])
+    clearActiveExport(activeStorageKeyRef.current)
+  }, [])
 
   const zipName = `${(projectName || 'project').replace(/[^\w\s-]/g, '').trim() || 'project'}-selected.zip`
   const variantLabel = activeVariant ? EXPORT_VARIANT_LABELS[activeVariant] : null

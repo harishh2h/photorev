@@ -1,4 +1,5 @@
 export { default as JustifiedPhotoGrid } from './JustifiedPhotoGrid.jsx'
+export { default as PhotoSelectCheckbox } from './PhotoSelectCheckbox.jsx'
 export { getJustifiedGridStaggerDelay } from './justifiedGridStagger.js'
 export {
   GRID_TILE_HOVER_IMAGE_CLASS,
