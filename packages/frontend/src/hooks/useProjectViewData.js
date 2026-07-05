@@ -193,6 +193,7 @@ export function useProjectViewData(projectId, token, currentUser) {
   const [reviewScope, setReviewScope] = useState(() => initialCache?.reviewScope ?? REVIEW_SCOPE.MINE)
   const [activeFilter, setActiveFilter] = useState(() => initialCache?.activeFilter ?? PHOTO_FILTER.ALL)
   const prevScopeRef = useRef(null)
+  const gridQueryRef = useRef(null)
   const gridPageRef = useRef(initialCache?.gridPage ?? 1)
   const projectRef = useRef(initialCache?.project ?? null)
   const membersRef = useRef(initialCache?.members ?? [])
@@ -233,6 +234,7 @@ export function useProjectViewData(projectId, token, currentUser) {
       setActiveFilter(PHOTO_FILTER.ALL)
       gridPageRef.current = 1
       gridPhotosRef.current = []
+      gridQueryRef.current = null
       projectRef.current = null
       setProjectReady(false)
     }
@@ -314,32 +316,56 @@ export function useProjectViewData(projectId, token, currentUser) {
     async function run() {
       setIsLoadingGrid(true)
       setError(null)
+
+      const prevQuery = gridQueryRef.current
+      const queryChanged =
+        prevQuery == null ||
+        prevQuery.projectId !== projectId ||
+        prevQuery.reviewScope !== reviewScope ||
+        prevQuery.activeFilter !== activeFilter
+      gridQueryRef.current = { projectId, reviewScope, activeFilter }
+
+      const pagesToLoad = queryChanged ? 1 : Math.max(1, gridPageRef.current)
       gridPageRef.current = 1
       gridPhotosRef.current = []
 
       const query = resolveGridQuery(canReviewPhotosRef.current, reviewScope, activeFilter)
 
       try {
-        const grid = await fetchProjectGrid(token, projectId, {
-          page: 1,
-          pageSize: GRID_PAGE_SIZE,
-          scope: query.scope,
-          filter: query.filter,
-        })
-        if (cancelled) return
+        let allMapped = []
+        let gridTotal = 0
+        let lastPageFetched = 1
 
-        filterCountsRef.current = grid.filterCounts ?? null
-        const mapped = grid.items.map(mapGridItemToPhoto)
-        gridPhotosRef.current = mapped
-        setLoadedCount(mapped.length)
-        setTotalCount(grid.total)
+        for (let page = 1; page <= pagesToLoad; page += 1) {
+          const grid = await fetchProjectGrid(token, projectId, {
+            page,
+            pageSize: GRID_PAGE_SIZE,
+            scope: query.scope,
+            filter: query.filter,
+          })
+          if (cancelled) return
+
+          filterCountsRef.current = grid.filterCounts ?? filterCountsRef.current
+          gridTotal = grid.total
+          allMapped = [...allMapped, ...grid.items.map(mapGridItemToPhoto)]
+          lastPageFetched = page
+
+          if (allMapped.length >= gridTotal || grid.items.length < GRID_PAGE_SIZE) {
+            break
+          }
+        }
+
+        gridPageRef.current = lastPageFetched
+        gridPhotosRef.current = allMapped
+        setLoadedCount(allMapped.length)
+        setTotalCount(gridTotal)
         setData(
           buildViewData(
-            mapped,
+            allMapped,
             projectRef.current,
             membersRef.current,
             currentUser,
-            grid.filterCounts ?? null,
+            filterCountsRef.current,
           ),
         )
       } catch (err) {

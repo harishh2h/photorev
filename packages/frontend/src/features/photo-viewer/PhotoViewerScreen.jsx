@@ -302,11 +302,12 @@ export default function PhotoViewerScreen({
   }, [deleteBusy])
 
   useEffect(() => {
-    if (localPhotos.length === 0 || !projectId) return
-    if (index === -1) {
-      goPhoto(localPhotos[0].id)
-    }
-  }, [goPhoto, index, localPhotos, projectId])
+    if (localPhotos.length === 0 || !projectId || !photoId) return
+    if (index !== -1) return
+    // Parent grid refetch can shrink before nav snapshot catches up — don't snap to photo 1.
+    if (lastPhotoRef.current?.id === photoId) return
+    goPhoto(localPhotos[0].id)
+  }, [goPhoto, index, localPhotos, photoId, projectId])
 
   usePhotoViewerShortcuts({
     detailOpen,

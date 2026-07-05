@@ -3,7 +3,7 @@ import { useLocation, useParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/index.js'
 import PhotoViewerScreen from '@/features/photo-viewer/PhotoViewerScreen.jsx'
 import { useProjectViewData } from '@/hooks/useProjectViewData.js'
-import { mapPhotosForViewer } from '@/utils/mapPhotosForViewer.js'
+import { mapPhotosForViewer, mergeViewerPhotosFromGrid } from '@/utils/mapPhotosForViewer.js'
 
 export default function PhotoViewerPage() {
   const { projectId } = useParams()
@@ -16,6 +16,13 @@ export default function PhotoViewerPage() {
   const photosForViewer = useMemo(() => {
     const orderedIds =
       Array.isArray(viewerPhotoIds) && viewerPhotoIds.length > 0 ? viewerPhotoIds : null
+    const navPhotos =
+      Array.isArray(viewerPhotosFromNav) && viewerPhotosFromNav.length > 0 ? viewerPhotosFromNav : null
+
+    // Nav snapshot is canonical — grid refetch must not drop photos beyond page 1.
+    if (navPhotos) {
+      return mergeViewerPhotosFromGrid(navPhotos, data?.photos ?? [])
+    }
 
     if (data?.photos?.length) {
       const byId = new Map(data.photos.map((p) => [p.id, p]))
@@ -26,9 +33,6 @@ export default function PhotoViewerPage() {
       return mapPhotosForViewer(data.photos)
     }
 
-    if (Array.isArray(viewerPhotosFromNav) && viewerPhotosFromNav.length > 0) {
-      return viewerPhotosFromNav
-    }
     return []
   }, [data, viewerPhotoIds, viewerPhotosFromNav])
 
